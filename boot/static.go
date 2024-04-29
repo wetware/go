@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/thejerf/suture/v4"
 )
 
 type StaticPeers struct {
-	Bus   event.Bus
+	Host  host.Host
 	Addrs []string
 }
 
@@ -32,14 +31,17 @@ func (static StaticPeers) Serve(ctx context.Context) error {
 		return err
 	}
 
-	e, err := static.Bus.Emitter(new(EvtPeerFound))
+	e, err := static.Host.EventBus().Emitter(new(EvtPeerFound))
 	if err != nil {
 		return err
 	}
 
 	for _, info := range peers {
+		if static.Host.ID() == info.ID {
+			continue
+		}
+
 		EmitPeerFound{
-			TTL:     peerstore.PermanentAddrTTL,
 			Emitter: e,
 		}.HandlePeerFound(info)
 
