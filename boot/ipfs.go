@@ -6,6 +6,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/ipfs/kubo/core/coreiface/options"
 	"github.com/libp2p/go-libp2p/core/host"
 )
 
@@ -29,11 +30,23 @@ func (i IPFS) Serve(ctx context.Context) error {
 	// 	return err
 	// }
 
-	if err := i.API.Pin().Add(ctx, p); err != nil {
+	if err := i.API.Pin().Add(ctx, p, func(pas *options.PinAddSettings) error {
+		// pas.Name =
+		// pas.Recursive =
+		return nil
+	}); err != nil {
 		return err
 	}
 
-	ps, err := i.API.Routing().FindProviders(ctx, p)
+	i.API.Routing().Provide(ctx, p, func(dps *options.DhtProvideSettings) error {
+		// dps.Recursive =
+		return nil
+	})
+
+	ps, err := i.API.Routing().FindProviders(ctx, p, func(dfps *options.DhtFindProvidersSettings) error {
+		// dfps.NumProviders =
+		return nil
+	})
 	if err != nil {
 		return err
 	}
