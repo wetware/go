@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/coreapi"
 	iface "github.com/ipfs/kubo/core/coreiface"
@@ -42,6 +43,10 @@ func main() {
 			&cli.StringSliceFlag{
 				Name:    "mdns",
 				EnvVars: []string{"WW_MDNS"},
+			},
+			&cli.StringFlag{
+				Name:    "root",
+				EnvVars: []string{"WW_ROOT"},
 			},
 		},
 	}
@@ -83,6 +88,11 @@ func run(c *cli.Context) error {
 	}
 
 	// Start the event loop
+	root, err := cid.Decode(c.String("root"))
+	if err != nil {
+		return err
+	}
+
 	rh := routedhost.Wrap(node.PeerHost, node.DHT)
 	return ww.EventLoop{
 		Name: node.PeerHost.ID().String(),
@@ -103,6 +113,11 @@ func run(c *cli.Context) error {
 			&boot.MDNS{
 				Host:        rh,
 				ServiceName: c.String("mdns"),
+			},
+			&boot.IPFS{
+				Host: rh,
+				API:  api,
+				CID:  root,
 			},
 
 			//
