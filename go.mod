@@ -1,4 +1,4 @@
-module github.com/wetware/ww
+module github.com/wetware/go
 
 go 1.22
 

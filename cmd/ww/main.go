@@ -19,8 +19,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/ww"
-	"github.com/wetware/ww/boot"
+	ww "github.com/wetware/go"
+	"github.com/wetware/go/boot"
 )
 
 func main() {

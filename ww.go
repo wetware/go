@@ -5,8 +5,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/thejerf/suture/v4"
-	"github.com/wetware/ww/boot"
-	"github.com/wetware/ww/util"
+	"github.com/wetware/go/boot"
+	"github.com/wetware/go/util"
 )
 
 const Proto = "/ww/0.0.0"
