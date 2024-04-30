@@ -2,7 +2,6 @@ package boot
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
@@ -23,16 +22,27 @@ func (i IPFS) Serve(ctx context.Context) error {
 	}
 	defer e.Close()
 
-	n, err := i.API.ResolveNode(ctx, path.FromCid(i.CID))
+	p := path.FromCid(i.CID)
+
+	// _, err = i.API.ResolveNode(ctx, p)
+	// if err != nil {
+	// 	return err
+	// }
+
+	if err := i.API.Pin().Add(ctx, p); err != nil {
+		return err
+	}
+
+	ps, err := i.API.Routing().FindProviders(ctx, p)
 	if err != nil {
 		return err
 	}
 
-	slog.WarnContext(ctx, string(n.RawData()),
-		"cid", n.Cid())
-
-	// TODO:  use IPLD node.
-	// ...
+	for info := range ps {
+		EmitPeerFound{
+			Emitter: e,
+		}.HandlePeerFound(info)
+	}
 
 	<-ctx.Done()
 	return ctx.Err()
