@@ -1,4 +1,4 @@
-//go:generate GOOS=wasip1 GOARCH=wasm go build -o main.wasm
+//go:generate env GOOS=wasip1 GOARCH=wasm go build -o main.wasm
 
 package main
 
