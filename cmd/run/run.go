@@ -64,8 +64,13 @@ func run() cli.ActionFunc {
 		})
 
 		for _, s := range c.StringSlice("load") {
+			p, err := node.Name().Resolve(c.Context, s)
+			if err != nil {
+				return err
+			}
+
 			wetware.Add(&ww.Cluster{
-				Name: s,
+				Root: p,
 				IPFS: node,
 				Host: routedhost.Wrap(h, node.Routing()),
 			})
