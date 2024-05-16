@@ -58,6 +58,7 @@ func run() cli.ActionFunc {
 		if err != nil {
 			return err
 		}
+		defer h.Close()
 
 		wetware := suture.New("ww", suture.Spec{
 			EventHook: util.EventHook,
