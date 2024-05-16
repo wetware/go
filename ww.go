@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
 	wasi "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -28,6 +30,10 @@ type Cluster struct {
 
 func (c Cluster) String() string {
 	return fmt.Sprintf("Cluster{%s}", c.Root)
+}
+
+func (c Cluster) Proto() protocol.ID {
+	return protocol.ID(filepath.Join(Proto, c.Root.String()))
 }
 
 // Serve the cluster's root processs
