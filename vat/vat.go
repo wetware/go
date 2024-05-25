@@ -6,22 +6,26 @@ import (
 	"log/slog"
 	"time"
 
+	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/wetware/go/system"
 )
 
 const Proto = "/ww/0.0.0"
 
 var _ rpc.Network = (*Network)(nil)
 
+type Bootable interface {
+	Boot(api.Module) capnp.Client
+}
+
 type NetConfig struct {
 	Host        host.Host
 	Guest       api.Module
-	System      *system.Module
+	System      Bootable
 	DialTimeout time.Duration
 }
 
