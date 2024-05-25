@@ -7,13 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/tetratelabs/wazero"
 	wasi "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -26,75 +24,53 @@ const Proto = "/ww/0.0.0"
 
 var _ suture.Service = (*Cluster)(nil)
 
+type Resolver interface {
+	Resolve(ctx context.Context, ns string) (path.Path, error)
+}
+
 type Config struct {
 	NS     string
 	IPFS   iface.CoreAPI
 	Host   host.Host
 	Router routing.Routing
+	Debug  bool // debug info enabled
 }
 
 func (cfg Config) Build(ctx context.Context) Cluster {
-	p, err := cfg.IPFS.Name().Resolve(ctx, cfg.NS)
-	if err != nil {
-		defer slog.ErrorContext(ctx, "failed to build cluster",
-			"ns", cfg.NS,
-			"reason", err)
-	}
-
 	return Cluster{
-		Err:    err,
-		Root:   p,
-		IPFS:   cfg.IPFS,
-		Host:   cfg.Host,
-		Router: cfg.Router,
+		Config: cfg,
 	}
 }
 
 type Cluster struct {
-	Err    error
-	Root   path.Path
-	IPFS   iface.CoreAPI
-	Host   host.Host
-	Router routing.Routing
+	Config
 }
 
 func (c Cluster) String() string {
 	peer := c.Host.ID()
-	root := c.Root
-	return fmt.Sprintf("%s::%s", peer, root)
+	return fmt.Sprintf("Cluster{peer=%s}", peer)
 }
 
-func (c Cluster) Proto() protocol.ID {
-	return protocol.ID(filepath.Join(Proto, c.Root.String()))
-}
-
-func (c Cluster) Setup(ctx context.Context) error {
-	// build failed?
-	if c.Err != nil {
-		defer slog.Debug("skipped broken build",
-			"path", c.Root,
-			"error", c.Err)
-		return suture.ErrDoNotRestart
+func (c Cluster) Bootstrap(ctx context.Context) error {
+	if c.Router == nil {
+		slog.WarnContext(ctx, "no router",
+			"cluster", c.NS)
+		return nil
 	}
 
-	if c.Router != nil {
-		if err := c.Router.Bootstrap(ctx); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return c.Router.Bootstrap(ctx)
 }
 
 // Serve the cluster's root process
 func (c Cluster) Serve(ctx context.Context) error {
-	if err := c.Setup(ctx); err != nil {
+	if err := c.Bootstrap(ctx); err != nil {
 		return err
 	}
 
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		WithMemoryLimitPages(1024). // 64MB
 		WithCloseOnContextDone(true).
-		WithDebugInfoEnabled(false))
+		WithDebugInfoEnabled(c.Debug))
 	defer r.Close(ctx)
 
 	cl, err := wasi.Instantiate(ctx, r)
@@ -146,14 +122,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 }
 
 func (c Cluster) CompileModule(ctx context.Context, r wazero.Runtime) (wazero.CompiledModule, error) {
-	f, err := c.ResolveRoot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	// FIXME:  address the obvious DoS vector
-	bytecode, err := io.ReadAll(f)
+	bytecode, err := c.LoadByteCode(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +130,18 @@ func (c Cluster) CompileModule(ctx context.Context, r wazero.Runtime) (wazero.Co
 	return r.CompileModule(ctx, bytecode)
 }
 
-func (c Cluster) ResolveRoot(ctx context.Context) (files.File, error) {
-	n, err := c.IPFS.Unixfs().Get(ctx, c.Root)
+func (c Cluster) LoadByteCode(ctx context.Context) ([]byte, error) {
+	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
 	if err != nil {
 		return nil, err
 	}
 
-	return n.(files.File), nil
+	n, err := c.IPFS.Unixfs().Get(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	defer n.Close()
+
+	// FIXME:  address the obvious DoS vector
+	return io.ReadAll(n.(files.File))
 }
