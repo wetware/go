@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"time"
 
 	"capnproto.org/go/capnp/v3"
@@ -28,8 +27,7 @@ type NetConfig struct {
 }
 
 func (c NetConfig) Proto() protocol.ID {
-	proto := filepath.Join(Proto, c.Guest.Name())
-	return protocol.ID(proto)
+	return ProtoFromModule(c.Guest)
 }
 
 func (c NetConfig) Build(ctx context.Context) Network {
@@ -37,9 +35,13 @@ func (c NetConfig) Build(ctx context.Context) Network {
 		c.DialTimeout = time.Second * 10
 	}
 
+	l := ListenConfig{
+		Host: c.Host,
+	}.Listen(ctx, c.Proto())
+
 	return Network{
 		NetConfig: c,
-		Listener:  ListenConfig{Host: c.Host}.Listen(ctx, c.Proto()),
+		Listener:  l,
 	}
 }
 
