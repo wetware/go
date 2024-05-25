@@ -19,7 +19,7 @@ import (
 	peerstore "github.com/libp2p/go-libp2p/core/peerstore"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	record "github.com/libp2p/go-libp2p/core/record"
-	go_multiaddr "github.com/multiformats/go-multiaddr"
+	multiaddr "github.com/multiformats/go-multiaddr"
 )
 
 // MockHost is a mock of Host interface.
@@ -46,10 +46,10 @@ func (m *MockHost) EXPECT() *MockHostMockRecorder {
 }
 
 // Addrs mocks base method.
-func (m *MockHost) Addrs() []go_multiaddr.Multiaddr {
+func (m *MockHost) Addrs() []multiaddr.Multiaddr {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Addrs")
-	ret0, _ := ret[0].([]go_multiaddr.Multiaddr)
+	ret0, _ := ret[0].([]multiaddr.Multiaddr)
 	return ret0
 }
 
@@ -321,10 +321,10 @@ func (mr *MockConnMockRecorder) IsClosed() *gomock.Call {
 }
 
 // LocalMultiaddr mocks base method.
-func (m *MockConn) LocalMultiaddr() go_multiaddr.Multiaddr {
+func (m *MockConn) LocalMultiaddr() multiaddr.Multiaddr {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LocalMultiaddr")
-	ret0, _ := ret[0].(go_multiaddr.Multiaddr)
+	ret0, _ := ret[0].(multiaddr.Multiaddr)
 	return ret0
 }
 
@@ -364,10 +364,10 @@ func (mr *MockConnMockRecorder) NewStream(arg0 interface{}) *gomock.Call {
 }
 
 // RemoteMultiaddr mocks base method.
-func (m *MockConn) RemoteMultiaddr() go_multiaddr.Multiaddr {
+func (m *MockConn) RemoteMultiaddr() multiaddr.Multiaddr {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoteMultiaddr")
-	ret0, _ := ret[0].(go_multiaddr.Multiaddr)
+	ret0, _ := ret[0].(multiaddr.Multiaddr)
 	return ret0
 }
 
@@ -777,10 +777,10 @@ func (mr *MockNetworkMockRecorder) DialPeer(arg0, arg1 interface{}) *gomock.Call
 }
 
 // InterfaceListenAddresses mocks base method.
-func (m *MockNetwork) InterfaceListenAddresses() ([]go_multiaddr.Multiaddr, error) {
+func (m *MockNetwork) InterfaceListenAddresses() ([]multiaddr.Multiaddr, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InterfaceListenAddresses")
-	ret0, _ := ret[0].([]go_multiaddr.Multiaddr)
+	ret0, _ := ret[0].([]multiaddr.Multiaddr)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -792,7 +792,7 @@ func (mr *MockNetworkMockRecorder) InterfaceListenAddresses() *gomock.Call {
 }
 
 // Listen mocks base method.
-func (m *MockNetwork) Listen(arg0 ...go_multiaddr.Multiaddr) error {
+func (m *MockNetwork) Listen(arg0 ...multiaddr.Multiaddr) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{}
 	for _, a := range arg0 {
@@ -810,10 +810,10 @@ func (mr *MockNetworkMockRecorder) Listen(arg0 ...interface{}) *gomock.Call {
 }
 
 // ListenAddresses mocks base method.
-func (m *MockNetwork) ListenAddresses() []go_multiaddr.Multiaddr {
+func (m *MockNetwork) ListenAddresses() []multiaddr.Multiaddr {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListenAddresses")
-	ret0, _ := ret[0].([]go_multiaddr.Multiaddr)
+	ret0, _ := ret[0].([]multiaddr.Multiaddr)
 	return ret0
 }
 
