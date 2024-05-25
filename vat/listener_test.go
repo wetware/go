@@ -13,7 +13,7 @@ import (
 	"github.com/wetware/go/vat"
 )
 
-func TestStreamHandler(t *testing.T) {
+func TestListener(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)

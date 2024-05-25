@@ -9,8 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
-type ReleaseFunc func()
-
 type ListenConfig struct {
 	Host host.Host
 }
@@ -53,7 +51,7 @@ func NewStreamHandler(ctx context.Context, ch chan<- network.Stream) network.Str
 
 type Listener struct {
 	C       <-chan network.Stream
-	Release ReleaseFunc
+	Release func()
 }
 
 func (h Listener) Accept(ctx context.Context) (s network.Stream, err error) {
