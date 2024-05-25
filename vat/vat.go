@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -60,16 +59,11 @@ func (n Network) LocalID() rpc.PeerID {
 	return rpc.PeerID{Value: n.Host.ID()}
 }
 
-func (n Network) BootstrapClient() capnp.Client {
-	proc := n.System.Bind(n.Guest)
-	return capnp.Client(proc)
-}
-
 func (n Network) Serve(ctx context.Context) error {
-	proc := n.System.Bind(n.Guest)
-	defer proc.Release()
+	c := n.System.Bind(n.Guest)
+	defer c.Release()
 
-	for c := capnp.Client(proc); ; {
+	for {
 		if conn, err := n.Accept(ctx, &rpc.Options{
 			BootstrapClient: c.AddRef(),
 			Network:         n,

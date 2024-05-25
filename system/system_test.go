@@ -43,9 +43,10 @@ func TestSystemSocket(t *testing.T) {
 	require.NoError(t, err)
 	defer mod.Close(ctx)
 
-	proc := sys.Bind(mod) // bind the guest module to the system socket
+	client := sys.Bind(mod) // bind the guest module to the system socket
+	defer client.Release()
 
-	f, release := proc.Handle(ctx, func(h system.Proc_handle_Params) error {
+	f, release := system.Proc(client).Handle(ctx, func(h system.Proc_handle_Params) error {
 		return h.SetEvent([]byte("Hello, Wetware!"))
 	})
 	defer release()

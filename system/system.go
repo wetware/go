@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 
+	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/exp/bufferpool"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -35,9 +36,10 @@ func (m *Module) SocketConfig(mod api.Module) SocketConfig {
 	}
 }
 
-func (m *Module) Bind(mod api.Module) Proc {
+func (m *Module) Bind(mod api.Module) capnp.Client {
 	socket := m.SocketConfig(mod).Build()
-	return Proc_ServerToClient(socket)
+	server := Proc_NewServer(socket)
+	return capnp.NewClient(server)
 }
 
 type Builder struct {
