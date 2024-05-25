@@ -42,18 +42,20 @@ func (cfg Config) Build(ctx context.Context) Cluster {
 	}
 
 	return Cluster{
-		Err:  err,
-		Root: p,
-		IPFS: cfg.IPFS,
-		Host: cfg.Host,
+		Err:    err,
+		Root:   p,
+		IPFS:   cfg.IPFS,
+		Host:   cfg.Host,
+		Router: cfg.Router,
 	}
 }
 
 type Cluster struct {
-	Err  error
-	Root path.Path
-	IPFS iface.CoreAPI
-	Host host.Host
+	Err    error
+	Root   path.Path
+	IPFS   iface.CoreAPI
+	Host   host.Host
+	Router routing.Routing
 }
 
 func (c Cluster) String() string {
@@ -66,7 +68,7 @@ func (c Cluster) Proto() protocol.ID {
 	return protocol.ID(filepath.Join(Proto, c.Root.String()))
 }
 
-func (c Cluster) Setup() error {
+func (c Cluster) Setup(ctx context.Context) error {
 	// build failed?
 	if c.Err != nil {
 		defer slog.Debug("skipped broken build",
@@ -75,12 +77,18 @@ func (c Cluster) Setup() error {
 		return suture.ErrDoNotRestart
 	}
 
+	if c.Router != nil {
+		if err := c.Router.Bootstrap(ctx); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Serve the cluster's root processs
 func (c Cluster) Serve(ctx context.Context) error {
-	if err := c.Setup(); err != nil {
+	if err := c.Setup(ctx); err != nil {
 		return err
 	}
 
