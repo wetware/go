@@ -86,7 +86,7 @@ func (c Cluster) Setup(ctx context.Context) error {
 	return nil
 }
 
-// Serve the cluster's root processs
+// Serve the cluster's root process
 func (c Cluster) Serve(ctx context.Context) error {
 	if err := c.Setup(ctx); err != nil {
 		return err
