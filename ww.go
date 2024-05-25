@@ -135,11 +135,14 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer mod.Close(ctx)
 
-	return vat.NetConfig{
+	net := vat.NetConfig{
 		Host:   c.Host,
 		Guest:  mod,
 		System: sys,
-	}.Build().Serve(ctx)
+	}.Build(ctx)
+	defer net.Release()
+
+	return net.Serve(ctx)
 }
 
 func (c Cluster) CompileModule(ctx context.Context, r wazero.Runtime) (wazero.CompiledModule, error) {

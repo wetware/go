@@ -32,20 +32,21 @@ func (c NetConfig) Proto() protocol.ID {
 	return protocol.ID(proto)
 }
 
-func (c NetConfig) Build() Network {
+func (c NetConfig) Build(ctx context.Context) Network {
 	if c.DialTimeout <= 0 {
 		c.DialTimeout = time.Second * 10
 	}
 
 	return Network{
 		NetConfig: c,
-		Handler:   &StreamHandler{Host: c.Host, Proto: c.Proto()},
+		Listener:  ListenConfig{Host: c.Host}.Listen(ctx, c.Proto()),
 	}
 }
 
 type Network struct {
+	Host host.Host
 	NetConfig
-	Handler *StreamHandler
+	Listener
 }
 
 func (n Network) String() string {
@@ -63,9 +64,6 @@ func (n Network) BootstrapClient() capnp.Client {
 }
 
 func (n Network) Serve(ctx context.Context) error {
-	release := n.Handler.Bind(ctx)
-	defer release()
-
 	proc := n.System.Bind(n.Guest)
 	defer proc.Release()
 
@@ -131,7 +129,7 @@ func (n Network) Dial(id rpc.PeerID, opt *rpc.Options) (*rpc.Conn, error) {
 // supplied Options for the connection. Generally, callers will
 // want to invoke this in a loop when launching a server.
 func (n Network) Accept(ctx context.Context, opt *rpc.Options) (*rpc.Conn, error) {
-	s, err := n.Handler.Accept(ctx)
+	s, err := n.Listener.Accept(ctx)
 	if err != nil {
 		return nil, err
 	}

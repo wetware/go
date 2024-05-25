@@ -3,7 +3,6 @@ package vat
 import (
 	"context"
 	"log/slog"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -12,28 +11,26 @@ import (
 
 type ReleaseFunc func()
 
-type StreamHandler struct {
-	Host   host.Host
-	Proto  protocol.ID
-	accept <-chan network.Stream
+type ListenConfig struct {
+	Host host.Host
 }
 
-func (h *StreamHandler) Bind(ctx context.Context) ReleaseFunc {
+func (c ListenConfig) Listen(ctx context.Context, id protocol.ID) Listener {
+	ctx, cancel := context.WithCancel(ctx)
 	ch := make(chan network.Stream)
-	*h = StreamHandler{
-		Host:   h.Host,
-		Proto:  h.Proto,
-		accept: ch,
-	}
+	c.Host.SetStreamHandler(id, NewStreamHandler(ctx, ch))
 
-	h.Host.SetStreamHandler(h.Proto, h.NewStreamHandler(ctx, ch))
-	return h.NewRelease(func() {
-		defer close(ch)
-		defer h.Host.RemoveStreamHandler(h.Proto)
-	})
+	return Listener{
+		C: ch,
+		Release: func() {
+			defer close(ch)
+			defer cancel()
+			c.Host.RemoveStreamHandler(id)
+		},
+	}
 }
 
-func (h *StreamHandler) NewStreamHandler(ctx context.Context, ch chan<- network.Stream) network.StreamHandler {
+func NewStreamHandler(ctx context.Context, ch chan<- network.Stream) network.StreamHandler {
 	return func(s network.Stream) {
 		select {
 		case ch <- s:
@@ -54,16 +51,14 @@ func (h *StreamHandler) NewStreamHandler(ctx context.Context, ch chan<- network.
 	}
 }
 
-func (h *StreamHandler) NewRelease(f func()) ReleaseFunc {
-	var once sync.Once
-	return func() {
-		once.Do(f) // f is called at most once.
-	}
+type Listener struct {
+	C       <-chan network.Stream
+	Release ReleaseFunc
 }
 
-func (h *StreamHandler) Accept(ctx context.Context) (s network.Stream, err error) {
+func (h Listener) Accept(ctx context.Context) (s network.Stream, err error) {
 	select {
-	case s = <-h.accept:
+	case s = <-h.C:
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
