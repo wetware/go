@@ -60,7 +60,7 @@ func (n Network) LocalID() rpc.PeerID {
 }
 
 func (n Network) Serve(ctx context.Context) error {
-	c := n.System.Bind(n.Guest)
+	c := n.System.Boot(n.Guest)
 	defer c.Release()
 
 	for {

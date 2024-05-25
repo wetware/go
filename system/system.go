@@ -36,7 +36,7 @@ func (m *Module) SocketConfig(mod api.Module) SocketConfig {
 	}
 }
 
-func (m *Module) Bind(mod api.Module) capnp.Client {
+func (m *Module) Boot(mod api.Module) capnp.Client {
 	socket := m.SocketConfig(mod).Build()
 	server := Proc_NewServer(socket)
 	return capnp.NewClient(server)

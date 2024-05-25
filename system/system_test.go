@@ -43,7 +43,7 @@ func TestSystemSocket(t *testing.T) {
 	require.NoError(t, err)
 	defer mod.Close(ctx)
 
-	client := sys.Bind(mod) // bind the guest module to the system socket
+	client := sys.Boot(mod) // bind the guest module to the system socket
 	defer client.Release()
 
 	f, release := system.Proc(client).Handle(ctx, func(h system.Proc_handle_Params) error {
