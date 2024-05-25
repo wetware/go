@@ -5,11 +5,13 @@ go 1.22
 toolchain go1.22.2
 
 require (
+	capnproto.org/go/capnp/v3 v3.0.0-alpha.30
 	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/kubo v0.28.0
 	github.com/libp2p/go-libp2p v0.33.2
 	github.com/lmittmann/tint v1.0.4
 	github.com/multiformats/go-multiaddr v0.12.3
+	github.com/stretchr/testify v1.8.4
 	github.com/tetratelabs/wazero v1.7.1
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/urfave/cli/v2 v2.27.1
@@ -25,6 +27,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20231225121904-e25f5bc08668 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -109,6 +112,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/prometheus/client_golang v1.19.0 // indirect
 	github.com/prometheus/client_model v0.6.0 // indirect
@@ -150,5 +154,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240108191215-35c7eff3a6b1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240108191215-35c7eff3a6b1 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
+	zenhack.net/go/util v0.0.0-20230414204917-531d38494cf5 // indirect
 )
