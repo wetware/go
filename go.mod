@@ -6,6 +6,7 @@ toolchain go1.22.2
 
 require (
 	capnproto.org/go/capnp/v3 v3.0.0-alpha.30
+	github.com/golang/mock v1.6.0
 	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/kubo v0.28.0
 	github.com/libp2p/go-libp2p v0.33.2
