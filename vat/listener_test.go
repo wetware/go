@@ -13,7 +13,7 @@ import (
 	"github.com/wetware/go/vat"
 )
 
-func TestListener(t *testing.T) {
+func TestStreamHandler(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -23,12 +23,14 @@ func TestListener(t *testing.T) {
 	defer cancel()
 
 	c := test_libp2p.NewMockConn(ctrl)
-	c.EXPECT().RemotePeer().
+	c.EXPECT().
+		RemotePeer().
 		Return(peer.ID("test")).
 		Times(1)
 
 	s := test_libp2p.NewMockStream(ctrl)
-	s.EXPECT().Conn().
+	s.EXPECT().
+		Conn().
 		Return(c).
 		Times(1)
 	s.EXPECT().ID().
@@ -44,6 +46,29 @@ func TestListener(t *testing.T) {
 
 	_, err := vat.Listener{C: ch}.Accept(ctx)
 	require.NoError(t, err)
+}
+
+func TestListener(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	proto := vat.ProtoFromRoot("test")
+
+	h := test_libp2p.NewMockHost(ctrl)
+	h.EXPECT().
+		SetStreamHandler(proto, gomock.Any()).
+		Times(1)
+	h.EXPECT().
+		RemoveStreamHandler(proto).
+		Times(1)
+
+	l := vat.ListenConfig{Host: h}.Listen(ctx, proto)
+	defer l.Release() // calls h.RemoveStreamHandler
 }
 
 // func TestXXX(t *testing.T) {

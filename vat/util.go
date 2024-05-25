@@ -7,7 +7,11 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-func ProtoFromModule(mod api.Module) protocol.ID {
-	path := filepath.Join(Proto, mod.Name())
+func ProtoFromRoot(path string) protocol.ID {
+	path = filepath.Join(Proto, path)
 	return protocol.ID(path)
+}
+
+func ProtoFromModule(mod api.Module) protocol.ID {
+	return ProtoFromRoot(mod.Name())
 }
