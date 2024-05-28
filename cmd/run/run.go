@@ -13,7 +13,6 @@ import (
 	ww "github.com/wetware/go"
 	"github.com/wetware/go/util"
 	"github.com/libp2p/go-libp2p-kad-dht"
-
 )
 
 func Command() *cli.Command {
