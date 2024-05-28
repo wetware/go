@@ -1,18 +1,19 @@
 package run
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/thejerf/suture/v4"
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
 	"github.com/wetware/go/util"
-	"github.com/libp2p/go-libp2p-kad-dht"
 )
 
 func Command() *cli.Command {
@@ -61,7 +62,7 @@ func run() cli.ActionFunc {
 		}
 		defer h.Close()
 
-		dht, err := dht.New(c, h)
+		dht, err := dht.New(context.Background(), h)
 		if err != nil {
 			return err
 		}
