@@ -12,6 +12,8 @@ import (
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
 	"github.com/wetware/go/util"
+	"github.com/libp2p/go-libp2p-kad-dht"
+
 )
 
 func Command() *cli.Command {
@@ -60,6 +62,12 @@ func run() cli.ActionFunc {
 		}
 		defer h.Close()
 
+		dht, err := dht.New(c, h)
+		if err != nil {
+			return err
+		}
+		defer dht.Close()
+
 		wetware := suture.New("ww", suture.Spec{
 			EventHook: util.EventHook,
 		})
@@ -69,7 +77,7 @@ func run() cli.ActionFunc {
 				NS:   s,
 				IPFS: node,
 				Host: routedhost.Wrap(h, node.Routing()),
-				// Router: /* TODO:  assign DHT here */,
+				Router: dht,
 			}.Build(c.Context))
 		}
 
