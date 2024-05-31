@@ -2,13 +2,9 @@ package ww
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"io"
 	"log/slog"
-	"os"
 
-	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -16,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	wasi "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
+	"github.com/wetware/go/guest"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/vat"
 )
@@ -88,24 +85,11 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer sys.Close(ctx)
 
-	cm, err := c.CompileModule(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer cm.Close(ctx)
-
-	mod, err := r.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
-		// WithName().
-		// WithArgs().
-		// WithEnv().
-		WithRandSource(rand.Reader).
-		// WithFS().
-		// WithFSConfig().
-		// WithStartFunctions(). // remove _start so that we can call it later
-		WithStdin(sys.Stdin()).
-		WithStdout(os.Stdout). // FIXME
-		WithStderr(os.Stderr). // FIXME
-		WithSysNanotime())
+	mod, err := guest.Config{
+		IPFS: c.IPFS,
+		NS:   c.NS,
+		Sys:  sys,
+	}.Instanatiate(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -113,35 +97,10 @@ func (c Cluster) Serve(ctx context.Context) error {
 
 	net := vat.NetConfig{
 		Host:   c.Host,
-		Guest:  mod,
 		System: sys,
+		Guest:  mod,
 	}.Build(ctx)
 	defer net.Release()
 
 	return net.Serve(ctx)
-}
-
-func (c Cluster) CompileModule(ctx context.Context, r wazero.Runtime) (wazero.CompiledModule, error) {
-	bytecode, err := c.LoadByteCode(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.CompileModule(ctx, bytecode)
-}
-
-func (c Cluster) LoadByteCode(ctx context.Context) ([]byte, error) {
-	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
-	if err != nil {
-		return nil, err
-	}
-
-	n, err := c.IPFS.Unixfs().Get(ctx, root)
-	if err != nil {
-		return nil, err
-	}
-	defer n.Close()
-
-	// FIXME:  address the obvious DoS vector
-	return io.ReadAll(n.(files.File))
 }

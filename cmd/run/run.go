@@ -72,9 +72,9 @@ func run() cli.ActionFunc {
 			EventHook: util.EventHook,
 		})
 
-		for _, s := range c.StringSlice("load") {
+		for _, ns := range c.StringSlice("load") {
 			wetware.Add(ww.Config{
-				NS:   s,
+				NS:   ns,
 				IPFS: node,
 				Host: routedhost.Wrap(h, node.Routing()),
 				Router: dht,
