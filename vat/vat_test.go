@@ -70,7 +70,7 @@ func TestNetConfig(t *testing.T) {
 
 	h := test_libp2p.NewMockHost(ctrl)
 
-	net := vat.NetConfig{
+	net := vat.Config{
 		Host: h,
 	}.Build(ctx)
 

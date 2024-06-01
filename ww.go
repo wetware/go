@@ -106,7 +106,7 @@ func (c Cluster) ServeVat(ctx context.Context, root path.Path) error {
 	client := sys.Boot(mod)
 	defer client.Release()
 
-	net := vat.NetConfig{
+	net := vat.Config{
 		Host:  c.Host,
 		Proto: vat.ProtoFromModule(mod),
 	}.Build(ctx)

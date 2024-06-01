@@ -22,13 +22,13 @@ type Bootable interface {
 	Boot(api.Module) capnp.Client
 }
 
-type NetConfig struct {
+type Config struct {
 	Host        host.Host
 	Proto       protocol.ID
 	DialTimeout time.Duration
 }
 
-func (c NetConfig) Build(ctx context.Context) Network {
+func (c Config) Build(ctx context.Context) Network {
 	if c.DialTimeout <= 0 {
 		c.DialTimeout = time.Second * 10
 	}
@@ -38,14 +38,14 @@ func (c NetConfig) Build(ctx context.Context) Network {
 	}.Listen(ctx, c.Proto)
 
 	return Network{
-		NetConfig: c,
-		Listener:  l,
+		Config:   c,
+		Listener: l,
 	}
 }
 
 type Network struct {
 	Host host.Host
-	NetConfig
+	Config
 	Listener
 }
 

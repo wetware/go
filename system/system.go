@@ -36,6 +36,8 @@ func (m *Module) SocketConfig(mod api.Module) SocketConfig {
 	}
 }
 
+// Boot returns the system's bootstrap client.  This capability is
+// analogous to the "root" user in a Unix system.
 func (m *Module) Boot(mod api.Module) capnp.Client {
 	socket := m.SocketConfig(mod).Build()
 	server := Proc_NewServer(socket)
