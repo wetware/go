@@ -25,21 +25,14 @@ func (m *Module) Stdin() io.Reader {
 	return &m.stdin
 }
 
-func (m *Module) Mailbox() io.Writer {
-	return &m.stdin
-}
-
-func (m *Module) SocketConfig(mod api.Module) SocketConfig {
-	return SocketConfig{
-		System: m,
-		Guest:  mod,
-	}
-}
-
 // Boot returns the system's bootstrap client.  This capability is
 // analogous to the "root" user in a Unix system.
-func (m *Module) Boot(mod api.Module) capnp.Client {
-	socket := m.SocketConfig(mod).Build()
+func (m *Module) Boot(ctx context.Context, mod api.Module) capnp.Client {
+	socket := SocketConfig{
+		Mailbox: &m.stdin,
+		Deliver: mod.ExportedFunction("deliver"),
+	}.Build(ctx)
+
 	server := Proc_NewServer(socket)
 	return capnp.NewClient(server)
 }

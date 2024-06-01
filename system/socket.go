@@ -7,23 +7,29 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/wetware/go/util"
 )
 
 type SocketConfig struct {
-	System interface{ Mailbox() io.Writer }
-	Guest  interface{ ExportedFunction(string) api.Function }
+	Mailbox io.Writer
+	Deliver api.Function
 }
 
-func (b SocketConfig) Spawn() Proc {
-	return Proc_ServerToClient(b.Build())
+func (c SocketConfig) Spawn(ctx context.Context) Proc {
+	if c.Deliver == nil {
+		return util.Failf[Proc]("missing export: deliver")
+	}
+
+	return Proc_ServerToClient(c.Build(ctx))
 }
 
-func (c SocketConfig) Build() (sock Socket) {
-	sock.Buffer = c.System.Mailbox()
-	sock.Deliver = c.Guest.ExportedFunction("deliver")
+func (c SocketConfig) Build(ctx context.Context) (sock Socket) {
+	sock.Buffer = c.Mailbox
+	sock.Deliver = c.Deliver
 	return
 }
 
+// Socket is an interface to a process.
 type Socket struct {
 	// Buffer is an io.Writer that accumulates bytes in preparation for
 	// a call to deliver.  Default implementation is bytes.Buffer.

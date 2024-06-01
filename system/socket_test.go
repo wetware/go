@@ -18,12 +18,15 @@ func TestSocket(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// This is currently emulating two different things and will
+	// no doubt cause confusion down the road.  Fixit whenever,
+	// or not...
 	deliver := &mockFn{Name: "deliver", Want: "test"}
 
 	proc := system.SocketConfig{
-		System: deliver,
-		Guest:  deliver,
-	}.Spawn()
+		Mailbox: deliver.Mailbox(),
+		Deliver: deliver,
+	}.Spawn(ctx)
 	defer proc.Release()
 
 	f, release := proc.Handle(ctx, func(p system.Proc_handle_Params) error {

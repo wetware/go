@@ -103,7 +103,7 @@ func (c Cluster) ServeVat(ctx context.Context, root path.Path) error {
 
 	// Obtain the system client.  This gives us an API to our root
 	// process.
-	client := sys.Boot(mod)
+	client := sys.Boot(ctx, mod)
 	defer client.Release()
 
 	net := vat.Config{
