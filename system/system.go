@@ -72,7 +72,7 @@ func (b Builder) WithTransport(hmb wazero.HostModuleBuilder) wazero.HostModuleBu
 	return WithExports(hmb, send)
 }
 
-func WithExports(hmb wazero.HostModuleBuilder, exports ...*HostFunc) wazero.HostModuleBuilder {
+func WithExports(hmb wazero.HostModuleBuilder, exports ...HostFunc) wazero.HostModuleBuilder {
 	for _, e := range exports {
 		hmb = hmb.NewFunctionBuilder().
 			WithName(e.Name).
@@ -85,7 +85,7 @@ func WithExports(hmb wazero.HostModuleBuilder, exports ...*HostFunc) wazero.Host
 	return hmb
 }
 
-var send = &HostFunc{
+var send = HostFunc{
 	Name:        "send",
 	ParamNames:  []string{"offset", "length"},
 	ParamTypes:  []api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
