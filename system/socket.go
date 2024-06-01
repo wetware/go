@@ -15,7 +15,7 @@ type SocketConfig struct {
 	Deliver api.Function
 }
 
-func (c SocketConfig) Spawn(ctx context.Context) Proc {
+func (c SocketConfig) Bind(ctx context.Context) Proc {
 	if c.Deliver == nil {
 		return util.Failf[Proc]("missing export: deliver")
 	}

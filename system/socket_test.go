@@ -26,7 +26,7 @@ func TestSocket(t *testing.T) {
 	proc := system.SocketConfig{
 		Mailbox: deliver.Mailbox(),
 		Deliver: deliver,
-	}.Spawn(ctx)
+	}.Bind(ctx)
 	defer proc.Release()
 
 	f, release := proc.Handle(ctx, func(p system.Proc_handle_Params) error {
