@@ -12,6 +12,7 @@ import (
 	"capnproto.org/go/capnp/v3/exp/bufferpool"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/wetware/go/util"
 )
 
 const ModuleName = "ww"
@@ -28,10 +29,15 @@ func (m *Module) Stdin() io.Reader {
 // Boot returns the system's bootstrap client.  This capability is
 // analogous to the "root" user in a Unix system.
 func (m *Module) Boot(ctx context.Context, mod api.Module) capnp.Client {
-	socket := SocketConfig{
-		Mailbox: &m.stdin,
-		Deliver: mod.ExportedFunction("deliver"),
-	}.Build(ctx)
+	deliver := mod.ExportedFunction("deliver")
+	if deliver == nil {
+		return util.Failf[capnp.Client]("missing export: deliver")
+	}
+
+	socket := Socket{
+		Buffer:  &m.stdin,
+		Deliver: deliver,
+	}
 
 	server := Proc_NewServer(socket)
 	return capnp.NewClient(server)

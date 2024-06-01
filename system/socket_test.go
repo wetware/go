@@ -23,10 +23,12 @@ func TestSocket(t *testing.T) {
 	// or not...
 	deliver := &mockFn{Name: "deliver", Want: "test"}
 
-	proc := system.SocketConfig{
-		Mailbox: deliver.Mailbox(),
+	sock := system.Socket{
+		Buffer:  deliver.Mailbox(),
 		Deliver: deliver,
-	}.Bind(ctx)
+	}
+
+	proc := system.Proc_ServerToClient(sock)
 	defer proc.Release()
 
 	f, release := proc.Handle(ctx, func(p system.Proc_handle_Params) error {

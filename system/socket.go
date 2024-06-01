@@ -7,27 +7,7 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/wetware/go/util"
 )
-
-type SocketConfig struct {
-	Mailbox io.Writer
-	Deliver api.Function
-}
-
-func (c SocketConfig) Bind(ctx context.Context) Proc {
-	if c.Deliver == nil {
-		return util.Failf[Proc]("missing export: deliver")
-	}
-
-	return Proc_ServerToClient(c.Build(ctx))
-}
-
-func (c SocketConfig) Build(ctx context.Context) (sock Socket) {
-	sock.Buffer = c.Mailbox
-	sock.Deliver = c.Deliver
-	return
-}
 
 // Socket is an interface to a process.
 type Socket struct {
