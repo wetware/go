@@ -49,22 +49,27 @@ func (c Cluster) String() string {
 	return fmt.Sprintf("Cluster{peer=%s}", peer)
 }
 
-func (c Cluster) Bootstrap(ctx context.Context) error {
+// Serve the cluster's root process
+func (c Cluster) Serve(ctx context.Context) error {
 	if c.Router == nil {
-		slog.WarnContext(ctx, "no router",
-			"cluster", c.NS)
+		slog.WarnContext(ctx, "started with null router",
+			"ns", c.NS)
 		return nil
 	}
 
-	return c.Router.Bootstrap(ctx)
-}
-
-// Serve the cluster's root process
-func (c Cluster) Serve(ctx context.Context) error {
-	if err := c.Bootstrap(ctx); err != nil {
+	if err := c.Router.Bootstrap(ctx); err != nil {
 		return err
 	}
 
+	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
+	if err != nil {
+		return err
+	}
+
+	return c.ServeVat(ctx, root)
+}
+
+func (c Cluster) ServeVat(ctx context.Context, root path.Path) error {
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		WithMemoryLimitPages(1024). // 64MB
 		WithCloseOnContextDone(true).
@@ -88,7 +93,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 
 	mod, err := guest.Config{
 		IPFS: c.IPFS,
-		NS:   c.NS,
+		Root: root,
 		Sys:  sys,
 	}.Instanatiate(ctx, r)
 	if err != nil {

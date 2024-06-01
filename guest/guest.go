@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/ipfs/boxo/files"
+	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -14,7 +15,7 @@ import (
 
 type Config struct {
 	IPFS iface.CoreAPI
-	NS   string
+	Root path.Path
 	Sys  interface {
 		Stdin() io.Reader
 	}
@@ -53,7 +54,7 @@ func (c Config) CompileModule(ctx context.Context, r wazero.Runtime) (wazero.Com
 }
 
 func (c Config) LoadByteCode(ctx context.Context) ([]byte, error) {
-	n, err := c.LoadRoot(ctx)
+	n, err := c.IPFS.Unixfs().Get(ctx, c.Root)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +62,4 @@ func (c Config) LoadByteCode(ctx context.Context) ([]byte, error) {
 
 	// FIXME:  address the obvious DoS vector
 	return io.ReadAll(n.(files.File))
-}
-
-func (c Config) LoadRoot(ctx context.Context) (files.Node, error) {
-	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.IPFS.Unixfs().Get(ctx, root)
 }
