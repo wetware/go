@@ -60,15 +60,6 @@ func (b Builder) Instantiate(ctx context.Context, r wazero.Runtime) (*Module, er
 
 func (b Builder) HostModuleBuilder(r wazero.Runtime) wazero.HostModuleBuilder {
 	hmb := r.NewHostModuleBuilder(ModuleName)
-	return b.WithExports(hmb)
-}
-
-func (b Builder) WithExports(hmb wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-	hmb = b.WithTransport(hmb)
-	return hmb
-}
-
-func (b Builder) WithTransport(hmb wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 	return WithExports(hmb, send)
 }
 
