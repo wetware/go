@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -95,12 +96,25 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer mod.Close(ctx)
 
+	// Obtain the system client.  This gives us an API to our root
+	// process.
+	client := sys.Boot(mod)
+	defer client.Release()
+
 	net := vat.NetConfig{
-		Host:   c.Host,
-		System: sys,
-		Guest:  mod,
+		Host:  c.Host,
+		Proto: vat.ProtoFromModule(mod),
 	}.Build(ctx)
 	defer net.Release()
 
-	return net.Serve(ctx)
+	for {
+		if conn, err := net.Accept(ctx, &rpc.Options{
+			BootstrapClient: client.AddRef(),
+			Network:         net,
+		}); err == nil {
+			go net.ServeConn(ctx, conn)
+		} else {
+			return err
+		}
+	}
 }

@@ -24,13 +24,8 @@ type Bootable interface {
 
 type NetConfig struct {
 	Host        host.Host
-	Guest       api.Module
-	System      Bootable
+	Proto       protocol.ID
 	DialTimeout time.Duration
-}
-
-func (c NetConfig) Proto() protocol.ID {
-	return ProtoFromModule(c.Guest)
 }
 
 func (c NetConfig) Build(ctx context.Context) Network {
@@ -40,7 +35,7 @@ func (c NetConfig) Build(ctx context.Context) Network {
 
 	l := ListenConfig{
 		Host: c.Host,
-	}.Listen(ctx, c.Proto())
+	}.Listen(ctx, c.Proto)
 
 	return Network{
 		NetConfig: c,
@@ -61,22 +56,6 @@ func (n Network) String() string {
 // Return the identifier for caller on this network.
 func (n Network) LocalID() rpc.PeerID {
 	return rpc.PeerID{Value: n.Host.ID()}
-}
-
-func (n Network) Serve(ctx context.Context) error {
-	c := n.System.Boot(n.Guest)
-	defer c.Release()
-
-	for {
-		if conn, err := n.Accept(ctx, &rpc.Options{
-			BootstrapClient: c.AddRef(),
-			Network:         n,
-		}); err == nil {
-			go n.ServeConn(ctx, conn)
-		} else {
-			return err
-		}
-	}
 }
 
 func (n Network) ServeConn(ctx context.Context, conn *rpc.Conn) {
@@ -117,7 +96,7 @@ func (n Network) Dial(id rpc.PeerID, opt *rpc.Options) (*rpc.Conn, error) {
 
 	pid := id.Value.(peer.ID)
 
-	stream, err := n.Host.NewStream(ctx, pid, n.Proto())
+	stream, err := n.Host.NewStream(ctx, pid, n.Proto)
 	if err != nil {
 		return nil, err
 	}
