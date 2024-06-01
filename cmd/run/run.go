@@ -7,7 +7,7 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/thejerf/suture/v4"
@@ -62,7 +62,7 @@ func run() cli.ActionFunc {
 		}
 		defer h.Close()
 
-		dht, err := dht.New(context.Background(), h)
+		dht, err := dual.New(context.Background(), h)
 		if err != nil {
 			return err
 		}
@@ -74,9 +74,9 @@ func run() cli.ActionFunc {
 
 		for _, ns := range c.StringSlice("load") {
 			wetware.Add(ww.Config{
-				NS:   ns,
-				IPFS: node,
-				Host: routedhost.Wrap(h, node.Routing()),
+				NS:     ns,
+				IPFS:   node,
+				Host:   routedhost.Wrap(h, node.Routing()),
 				Router: dht,
 			}.Build(c.Context))
 		}

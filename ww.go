@@ -106,6 +106,10 @@ func (c Cluster) ServeVat(ctx context.Context, root path.Path) error {
 	client := sys.Boot(mod)
 	defer client.Release()
 
+	// serve client from
+	// - libp2p
+	// - local unix socket
+
 	net := vat.Config{
 		Host:  c.Host,
 		Proto: vat.ProtoFromModule(mod),
