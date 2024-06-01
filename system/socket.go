@@ -1,7 +1,6 @@
 package system
 
 import (
-	"bytes"
 	context "context"
 	"errors"
 	"io"
@@ -27,7 +26,7 @@ func (c SocketConfig) Build() (sock Socket) {
 
 type Socket struct {
 	Deliver api.Function
-	Buffer  io.Writer
+	Buffer  io.Writer // bytes.Buffer
 }
 
 func (p Socket) Handle(ctx context.Context, call Proc_handle) error {
@@ -40,7 +39,7 @@ func (p Socket) Handle(ctx context.Context, call Proc_handle) error {
 		return err
 	}
 
-	n, err := io.Copy(p.Buffer, bytes.NewReader(b))
+	n, err := p.Buffer.Write(b)
 	if err != nil {
 		return err
 	} else if n > math.MaxUint32 {
