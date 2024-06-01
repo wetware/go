@@ -25,8 +25,13 @@ func (c SocketConfig) Build() (sock Socket) {
 }
 
 type Socket struct {
+	// Buffer is an io.Writer that accumulates bytes in preparation for
+	// a call to deliver.  Default implementation is bytes.Buffer.
+	Buffer io.Writer
+
+	// Deliver is a guest export that takes a u32 number of bytes to
+	// consume from Buffer.
 	Deliver api.Function
-	Buffer  io.Writer // bytes.Buffer
 }
 
 func (p Socket) Handle(ctx context.Context, call Proc_handle) error {
