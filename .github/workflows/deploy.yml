@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main  # TODO:  change this to 'prod' or something
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan lthibau.lt >> ~/.ssh/known_hosts
+
+      - name: Deploy to remote server
+        run: |
+          ssh -o StrictHostKeyChecking=no ww@lthibau.lt << 'EOF'
+            cd /home/ww/go
+            # Your deployment commands here
+            echo "Deploying application..."
+            # For example, pull the latest changes and restart a service
+            git pull origin main
+            sudo systemctl restart your-service
+          EOF
