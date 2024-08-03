@@ -2,18 +2,27 @@ package guest
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/pkg/errors"
 )
 
 var _ fs.FS = (*FS)(nil)
 
+// An FS provides access to a hierarchical file system.
+//
+// The FS interface is the minimum implementation required of the file system.
+// A file system may implement additional interfaces,
+// such as [ReadFileFS], to provide additional or optimized functionality.
+//
+// [testing/fstest.TestFS] may be used to test implementations of an FS for
+// correctness.
 type FS struct {
-	IPFS iface.CoreAPI
+	UNIX iface.UnixfsAPI
+	Root path.Path
 }
 
 // Open opens the named file.
@@ -23,34 +32,48 @@ type FS struct {
 // and the Err field describing the problem.
 //
 // Open should reject attempts to open names that do not satisfy
-// ValidPath(name), returning a *PathError with Err set to
-// ErrInvalid or ErrNotExist.
-func (fs FS) Open(name string) (fs.File, error) {
-	p, err := path.NewPath(name)
+// fs.ValidPath(name), returning a *fs.PathError with Err set to
+// fs.ErrInvalid or fs.ErrNotExist.
+func (f FS) Open(name string) (fs.File, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  errors.New("invalid path"),
+		}
+	}
+
+	root, err := f.UNIX.Get(context.TODO(), f.Root)
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := fs.IPFS.Unixfs().Get(context.TODO(), p)
-	return fsNode{Node: n}, err
+	switch node := root.(type) {
+	case files.File:
+		return fileNode{File: node}, nil
+
+	case files.Directory:
+		defer node.Close()
+
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  errors.New("is a directory"),
+		}
+
+	default:
+		panic(node) // unhandled type
+	}
 }
 
-// fsNode provides access to a single file. The fs.File interface is the minimum
+// fileNode provides access to a single file. The fs.File interface is the minimum
 // implementation required of the file. Directory files should also implement [ReadDirFile].
 // A file may implement io.ReaderAt or io.Seeker as optimizations.
 
-type fsNode struct {
-	files.Node
+type fileNode struct {
+	files.File
 }
 
-func (n fsNode) Stat() (fs.FileInfo, error) {
-	return nil, errors.New("fsNode.Stat::NOT IMPLEMENTED")
-}
-
-func (n fsNode) Read([]byte) (int, error) {
-	return 0, errors.New("fsNode.Read::NOT IMPLEMENTED")
-}
-
-func (n fsNode) Close() error {
-	return n.Node.Close()
+func (n fileNode) Stat() (fs.FileInfo, error) {
+	return nil, errors.New("fileNode.Stat::NOT IMPLEMENTED")
 }
