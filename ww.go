@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
@@ -30,46 +28,23 @@ type Resolver interface {
 }
 
 type Config struct {
-	NS     string
-	IPFS   iface.CoreAPI
-	Host   host.Host
-	Router routing.Routing
-	Debug  bool // debug info enabled
-	Stdio  struct {
-		Reader    io.Reader
-		Writer    io.WriteCloser
-		ErrWriter io.WriteCloser
-	}
+	NS      string
+	IPFS    iface.CoreAPI
+	Host    host.Host
+	IO      system.Streams
+	Runtime wazero.RuntimeConfig
 }
 
-func (cfg Config) Build(ctx context.Context) Cluster {
+func (config Config) Build() Cluster {
+	if config.Runtime == nil {
+		config.Runtime = wazero.NewRuntimeConfig().
+			// WithCompilationCache().
+			WithCloseOnContextDone(true)
+	}
+
 	return Cluster{
-		Config: cfg,
+		Config: config,
 	}
-}
-
-func (c Config) Stdin() io.Reader {
-	if c.Stdio.Reader == nil {
-		return os.Stdin
-	}
-
-	return c.Stdio.Reader
-}
-
-func (c Config) Stdout() io.WriteCloser {
-	if c.Stdio.Writer == nil {
-		return os.Stdout
-	}
-
-	return c.Stdio.Writer
-}
-
-func (c Config) Stderr() io.WriteCloser {
-	if c.Stdio.ErrWriter == nil {
-		return os.Stdout
-	}
-
-	return c.Stdio.ErrWriter
 }
 
 type Cluster struct {
@@ -80,18 +55,18 @@ func (c Cluster) String() string {
 	return c.Config.NS
 }
 
-// Serve the cluster's root process
+// Serve the cluster's root filesystem
 func (c Cluster) Serve(ctx context.Context) error {
-	root, err := path.NewPath(c.NS)
+	fs, err := c.NewFS(ctx)
 	if err != nil {
 		return err
 	}
 
-	node, err := c.Resolve(ctx, root)
+	root, err := c.Resolve(ctx, fs.Root)
 	if err != nil {
 		return err
 	}
-	defer node.Close()
+	defer root.Close()
 
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true))
@@ -103,12 +78,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer wasi.Close(ctx)
 
-	bytecode, err := c.LoadByteCode(ctx, node)
-	if err != nil {
-		return err
-	}
-
-	compiled, err := r.CompileModule(ctx, bytecode)
+	compiled, err := c.CompileNode(ctx, r, root)
 	if err != nil {
 		return err
 	}
@@ -119,10 +89,10 @@ func (c Cluster) Serve(ctx context.Context) error {
 		WithName(c.NS).
 		// WithArgs().
 		// WithEnv().
-		WithStdin(c.Stdin()).
-		WithStderr(c.Stderr()).
-		WithStdout(c.Stdout()).
-		WithFS(system.FS{Ctx: ctx, API: c.IPFS.Unixfs(), Root: root}).
+		WithStdin(c.IO.Stdin()).
+		WithStdout(c.IO.Stdout()).
+		WithStderr(c.IO.Stderr()).
+		WithFS(fs).
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched))
 	if err != nil {
@@ -132,6 +102,19 @@ func (c Cluster) Serve(ctx context.Context) error {
 
 	_, err = mod.ExportedFunction("_start").Call(ctx)
 	return err
+}
+
+func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
+	root, err := path.NewPath(c.NS)
+	if err != nil {
+		return nil, err
+	}
+
+	return &system.FS{
+		Ctx:  ctx,
+		API:  c.IPFS.Unixfs(),
+		Root: root,
+	}, nil
 }
 
 func (c Cluster) Resolve(ctx context.Context, root path.Path) (n files.Node, err error) {
@@ -150,6 +133,15 @@ func (c Cluster) Resolve(ctx context.Context, root path.Path) (n files.Node, err
 
 	n, err = c.IPFS.Unixfs().Get(ctx, root)
 	return
+}
+
+func (c Cluster) CompileNode(ctx context.Context, r wazero.Runtime, node files.Node) (wazero.CompiledModule, error) {
+	bytecode, err := c.LoadByteCode(ctx, node)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.CompileModule(ctx, bytecode)
 }
 
 func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) (b []byte, err error) {

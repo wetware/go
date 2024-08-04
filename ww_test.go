@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero/sys"
 	ww "github.com/wetware/go"
+	"github.com/wetware/go/system"
 )
 
 func TestService(t *testing.T) {
@@ -22,23 +23,14 @@ func TestService(t *testing.T) {
 	ipfs, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	buf := new(bytes.Buffer)
 	cluster := ww.Config{
 		NS:   root.String(),
 		IPFS: ipfs,
-		// Router: ,
-		// Debug: ,
-		Stdio: struct {
-			Reader    io.Reader
-			Writer    io.WriteCloser
-			ErrWriter io.WriteCloser
-		}{Writer: nopCloser{buf}},
-	}.Build(ctx)
+		IO:   system.Streams{Writer: nopCloser{buf}},
+	}.Build()
 
-	err = cluster.Serve(ctx)
+	err = cluster.Serve(context.Background())
 	status := err.(*sys.ExitError).ExitCode()
 	require.Zero(t, status)
 

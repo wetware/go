@@ -69,7 +69,7 @@ func run() cli.ActionFunc {
 				NS:   ns,
 				IPFS: node,
 				Host: routedhost.Wrap(h, node.Routing()),
-			}.Build(c.Context))
+			}.Build())
 		}
 
 		return wetware.Serve(c.Context)

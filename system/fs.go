@@ -53,7 +53,7 @@ func (f FS) Open(name string) (fs.File, error) {
 		}
 	}
 
-	path, node, err := f.Resolve(name)
+	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, &fs.PathError{
 			Op:   "open",
@@ -68,13 +68,13 @@ func (f FS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
-func (f FS) Resolve(name string) (path.Path, files.Node, error) {
+func (f FS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
 	joined, err := path.Join(f.Root, clean(name))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	node, err := f.API.Get(f.Ctx, joined)
+	node, err := f.API.Get(ctx, joined)
 	return joined, node, err
 }
 
@@ -91,7 +91,7 @@ func clean(name string) string {
 // Stat returns a FileInfo describing the file.
 // If there is an error, it should be of type *PathError.
 func (f FS) Stat(name string) (fs.FileInfo, error) {
-	path, node, err := f.Resolve(name)
+	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, err
 	}
