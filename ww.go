@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"os"
-	"reflect"
+	"path/filepath"
+	"runtime"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
@@ -34,12 +35,41 @@ type Config struct {
 	Host   host.Host
 	Router routing.Routing
 	Debug  bool // debug info enabled
+	Stdio  struct {
+		Reader    io.Reader
+		Writer    io.WriteCloser
+		ErrWriter io.WriteCloser
+	}
 }
 
 func (cfg Config) Build(ctx context.Context) Cluster {
 	return Cluster{
 		Config: cfg,
 	}
+}
+
+func (c Config) Stdin() io.Reader {
+	if c.Stdio.Reader == nil {
+		return os.Stdin
+	}
+
+	return c.Stdio.Reader
+}
+
+func (c Config) Stdout() io.WriteCloser {
+	if c.Stdio.Writer == nil {
+		return os.Stdout
+	}
+
+	return c.Stdio.Writer
+}
+
+func (c Config) Stderr() io.WriteCloser {
+	if c.Stdio.ErrWriter == nil {
+		return os.Stdout
+	}
+
+	return c.Stdio.ErrWriter
 }
 
 type Cluster struct {
@@ -52,12 +82,12 @@ func (c Cluster) String() string {
 
 // Serve the cluster's root process
 func (c Cluster) Serve(ctx context.Context) error {
-	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
+	root, err := path.NewPath(c.NS)
 	if err != nil {
 		return err
 	}
 
-	node, err := c.IPFS.Unixfs().Get(ctx, root)
+	node, err := c.Resolve(ctx, root)
 	if err != nil {
 		return err
 	}
@@ -67,61 +97,86 @@ func (c Cluster) Serve(ctx context.Context) error {
 		WithCloseOnContextDone(true))
 	defer r.Close(ctx)
 
-	switch n := node.(type) {
-	case files.File:
-		// assume it's a WASM file; run it
-		body := io.LimitReader(n, 2<<32)
-		b, err := io.ReadAll(body)
-		if err != nil {
-			return err
-		}
-
-		r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-			WithCloseOnContextDone(true))
-		defer r.Close(ctx)
-
-		cl, err := wasi_snapshot_preview1.Instantiate(ctx, r)
-		if err != nil {
-			return err
-		}
-		defer cl.Close(ctx)
-
-		cm, err := r.CompileModule(ctx, b)
-		if err != nil {
-			return err
-		}
-		defer cm.Close(ctx)
-
-		mod, err := r.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
-			// WithArgs().
-			// WithEnv().
-			// WithNanosleep().
-			// WithNanotime().
-			// WithOsyield().
-			// WithSysNanosleep().
-			// WithSysNanotime().
-			// WithSysWalltime().
-			// WithWalltime().
-			WithStartFunctions().
-			WithFS(system.FS{API: c.IPFS.Unixfs()}).
-			WithRandSource(rand.Reader).
-			WithStdin(os.Stdin).
-			WithStderr(os.Stderr).
-			WithStdout(os.Stdout).
-			WithName(c.NS))
-		if err != nil {
-			return err
-		}
-		defer mod.Close(ctx)
-
-		_, err = mod.ExportedFunction("_start").Call(ctx)
+	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, r)
+	if err != nil {
 		return err
-
-	case files.Directory:
-		// TODO:  look for a main.wasm and execute it
-		return errors.New("Cluster.Serve::TODO:implement directory handler")
-
-	default:
-		return fmt.Errorf("unhandled type: %s", reflect.TypeOf(n))
 	}
+	defer wasi.Close(ctx)
+
+	bytecode, err := c.LoadByteCode(ctx, node)
+	if err != nil {
+		return err
+	}
+
+	compiled, err := r.CompileModule(ctx, bytecode)
+	if err != nil {
+		return err
+	}
+	defer compiled.Close(ctx)
+
+	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().
+		WithStartFunctions(). // don't call _start automatically
+		WithName(c.NS).
+		// WithArgs().
+		// WithEnv().
+		WithStdin(c.Stdin()).
+		WithStderr(c.Stderr()).
+		WithStdout(c.Stdout()).
+		WithFS(system.FS{Ctx: ctx, API: c.IPFS.Unixfs(), Root: root}).
+		WithRandSource(rand.Reader).
+		WithOsyield(runtime.Gosched))
+	if err != nil {
+		return err
+	}
+	defer mod.Close(ctx)
+
+	_, err = mod.ExportedFunction("_start").Call(ctx)
+	return err
 }
+
+func (c Cluster) Resolve(ctx context.Context, root path.Path) (n files.Node, err error) {
+	switch ns := root.Segments()[0]; ns {
+	case "ipld":
+		// IPLD introduces one level of indirection:  a mutable name.
+		// Here we are fetching the IPFS record to which the name is
+		// currently pointing.
+		root, err = c.IPFS.Name().Resolve(ctx, root.String())
+		if err != nil {
+			return
+		}
+
+	default: // It's probably /ipfs/
+	}
+
+	n, err = c.IPFS.Unixfs().Get(ctx, root)
+	return
+}
+
+func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) (b []byte, err error) {
+	err = files.Walk(node, func(fpath string, node files.Node) error {
+		if b != nil {
+			return errAbortWalk
+		}
+
+		switch fname := filepath.Base(fpath); fname {
+		case "main.wasm":
+			slog.InfoContext(ctx, "loading file",
+				"name", fname,
+				"path", fpath)
+
+			if f := files.ToFile(node); f != nil {
+				b, err = io.ReadAll(f)
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err == errAbortWalk {
+		err = nil
+	}
+
+	return
+}
+
+var errAbortWalk = errors.New("abort walk")

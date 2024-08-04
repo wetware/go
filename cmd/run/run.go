@@ -1,13 +1,11 @@
 package run
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/thejerf/suture/v4"
@@ -62,22 +60,15 @@ func run() cli.ActionFunc {
 		}
 		defer h.Close()
 
-		dht, err := dual.New(context.Background(), h)
-		if err != nil {
-			return err
-		}
-		defer dht.Close()
-
 		wetware := suture.New("ww", suture.Spec{
 			EventHook: util.EventHook,
 		})
 
 		for _, ns := range c.StringSlice("load") {
 			wetware.Add(ww.Config{
-				NS:     ns,
-				IPFS:   node,
-				Host:   routedhost.Wrap(h, node.Routing()),
-				Router: dht,
+				NS:   ns,
+				IPFS: node,
+				Host: routedhost.Wrap(h, node.Routing()),
 			}.Build(c.Context))
 		}
 
