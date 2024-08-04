@@ -1,10 +1,11 @@
-package guest
+package system
 
 import (
 	"context"
 	"io/fs"
 
 	"github.com/ipfs/boxo/files"
+	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/pkg/errors"
 )
@@ -20,7 +21,8 @@ var _ fs.FS = (*FS)(nil)
 // [testing/fstest.TestFS] may be used to test implementations of an FS for
 // correctness.
 type FS struct {
-	IPFS iface.CoreAPI
+	API  iface.UnixfsAPI
+	Path path.Path
 }
 
 // Open opens the named file.
@@ -33,20 +35,24 @@ type FS struct {
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
 func (f FS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
+	p, err := path.Join(f.Path, name)
+	if err != nil {
 		return nil, &fs.PathError{
-			Op:   "FS.Open",
+			Op:   "path.Join",
+			Path: name,
+			Err:  err,
+		}
+	}
+
+	if !fs.ValidPath(p.String()) {
+		return nil, &fs.PathError{
+			Op:   "fs.ValidPath",
 			Path: name,
 			Err:  errors.New("invalid path"),
 		}
 	}
 
-	path, err := f.IPFS.Name().Resolve(context.TODO(), name)
-	if err != nil {
-		return nil, err
-	}
-
-	node, err := f.IPFS.Unixfs().Get(context.TODO(), path)
+	node, err := f.API.Get(context.TODO(), p)
 	if err != nil {
 		return nil, err
 	}

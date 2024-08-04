@@ -17,7 +17,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
-	"github.com/wetware/go/guest"
+	"github.com/wetware/go/system"
 )
 
 const Proto = "/ww/0.0.0"
@@ -103,7 +103,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 			// WithSysWalltime().
 			// WithWalltime().
 			WithStartFunctions().
-			WithFS(guest.FS{IPFS: c.IPFS}).
+			WithFS(system.FS{API: c.IPFS.Unixfs()}).
 			WithRandSource(rand.Reader).
 			WithStdin(os.Stdin).
 			WithStderr(os.Stderr).
