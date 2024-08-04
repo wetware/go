@@ -2,20 +2,22 @@ package ww
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
-	"log/slog"
+	"io"
+	"os"
+	"reflect"
 
-	"capnproto.org/go/capnp/v3/rpc"
+	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/tetratelabs/wazero"
-	wasi "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
 	"github.com/wetware/go/guest"
-	"github.com/wetware/go/system"
-	"github.com/wetware/go/vat"
 )
 
 const Proto = "/ww/0.0.0"
@@ -45,81 +47,81 @@ type Cluster struct {
 }
 
 func (c Cluster) String() string {
-	peer := c.Host.ID()
-	return fmt.Sprintf("Cluster{peer=%s}", peer)
+	return c.Config.NS
 }
 
 // Serve the cluster's root process
 func (c Cluster) Serve(ctx context.Context) error {
-	if c.Router == nil {
-		slog.WarnContext(ctx, "started with null router",
-			"ns", c.NS)
-		return nil
-	}
-
-	if err := c.Router.Bootstrap(ctx); err != nil {
-		return err
-	}
-
 	root, err := c.IPFS.Name().Resolve(ctx, c.NS)
 	if err != nil {
 		return err
 	}
 
-	return c.ServeVat(ctx, root)
-}
+	node, err := c.IPFS.Unixfs().Get(ctx, root)
+	if err != nil {
+		return err
+	}
+	defer node.Close()
 
-func (c Cluster) ServeVat(ctx context.Context, root path.Path) error {
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		WithMemoryLimitPages(1024). // 64MB
-		WithCloseOnContextDone(true).
-		WithDebugInfoEnabled(c.Debug))
+		WithCloseOnContextDone(true))
 	defer r.Close(ctx)
 
-	cl, err := wasi.Instantiate(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer cl.Close(ctx)
-
-	sys, err := system.Builder{
-		// Host:    c.Host,
-		// IPFS:    c.IPFS,
-	}.Instantiate(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer sys.Close(ctx)
-
-	mod, err := guest.Config{
-		IPFS: c.IPFS,
-		Root: root,
-		Sys:  sys,
-	}.Instanatiate(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer mod.Close(ctx)
-
-	// Obtain the system client.  This gives us an API to our root
-	// process.
-	client := sys.Boot(ctx, mod)
-	defer client.Release()
-
-	net := vat.Config{
-		Host:  c.Host,
-		Proto: vat.ProtoFromModule(mod),
-	}.Build(ctx)
-	defer net.Release()
-
-	for {
-		if conn, err := net.Accept(ctx, &rpc.Options{
-			BootstrapClient: client.AddRef(),
-			Network:         net,
-		}); err == nil {
-			go net.ServeConn(ctx, conn)
-		} else {
+	switch n := node.(type) {
+	case files.File:
+		// assume it's a WASM file; run it
+		body := io.LimitReader(n, 2<<32)
+		b, err := io.ReadAll(body)
+		if err != nil {
 			return err
 		}
+
+		r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+			WithCloseOnContextDone(true))
+		defer r.Close(ctx)
+
+		cl, err := wasi_snapshot_preview1.Instantiate(ctx, r)
+		if err != nil {
+			return err
+		}
+		defer cl.Close(ctx)
+
+		cm, err := r.CompileModule(ctx, b)
+		if err != nil {
+			return err
+		}
+		defer cm.Close(ctx)
+
+		mod, err := r.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
+			// WithArgs().
+			// WithEnv().
+			// WithNanosleep().
+			// WithNanotime().
+			// WithOsyield().
+			// WithSysNanosleep().
+			// WithSysNanotime().
+			// WithSysWalltime().
+			// WithWalltime().
+			WithStartFunctions().
+			WithFS(guest.FS{IPFS: c.IPFS}).
+			WithRandSource(rand.Reader).
+			WithStdin(os.Stdin).
+			WithStderr(os.Stderr).
+			WithStdout(os.Stdout).
+			WithName(c.NS))
+		if err != nil {
+			return err
+		}
+		defer mod.Close(ctx)
+
+		_, err = mod.ExportedFunction("_start").Call(ctx)
+		return err
+
+	case files.Directory:
+		// TODO:  look for a main.wasm and execute it
+		return errors.New("Cluster.Serve::TODO:implement directory handler")
+
+	default:
+		return fmt.Errorf("unhandled type: %s", reflect.TypeOf(n))
 	}
 }
