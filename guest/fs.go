@@ -5,7 +5,6 @@ import (
 	"io/fs"
 
 	"github.com/ipfs/boxo/files"
-	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/pkg/errors"
 )
@@ -21,8 +20,7 @@ var _ fs.FS = (*FS)(nil)
 // [testing/fstest.TestFS] may be used to test implementations of an FS for
 // correctness.
 type FS struct {
-	UNIX iface.UnixfsAPI
-	Root path.Path
+	IPFS iface.CoreAPI
 }
 
 // Open opens the named file.
@@ -37,32 +35,36 @@ type FS struct {
 func (f FS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{
-			Op:   "open",
+			Op:   "FS.Open",
 			Path: name,
 			Err:  errors.New("invalid path"),
 		}
 	}
 
-	root, err := f.UNIX.Get(context.TODO(), f.Root)
+	path, err := f.IPFS.Name().Resolve(context.TODO(), name)
 	if err != nil {
 		return nil, err
 	}
 
-	switch node := root.(type) {
+	node, err := f.IPFS.Unixfs().Get(context.TODO(), path)
+	if err != nil {
+		return nil, err
+	}
+
+	switch n := node.(type) {
 	case files.File:
-		return fileNode{File: node}, nil
+		return fileNode{File: n}, nil
 
 	case files.Directory:
-		defer node.Close()
-
+		defer n.Close()
 		return nil, &fs.PathError{
-			Op:   "open",
+			Op:   "FS.Open",
 			Path: name,
-			Err:  errors.New("is a directory"),
+			Err:  errors.New("node is a directory"),
 		}
 
 	default:
-		panic(node) // unhandled type
+		panic(n) // unhandled type
 	}
 }
 

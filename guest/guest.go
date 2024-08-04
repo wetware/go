@@ -35,7 +35,7 @@ func (c Config) Instanatiate(ctx context.Context, r wazero.Runtime) (api.Module,
 		// WithArgs().
 		// WithEnv().
 		WithRandSource(rand.Reader).
-		WithFS(FS{UNIX: c.IPFS.Unixfs(), Root: c.Root}).
+		WithFS(FS{IPFS: c.IPFS}).
 		// WithFSConfig().
 		// WithStartFunctions(). // remove _start so that we can call it later
 		WithStdin(c.Sys.Stdin()).
