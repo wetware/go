@@ -125,7 +125,7 @@ func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
 
 func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err error) {
 	switch ns := p.Segments()[0]; ns {
-	case "ipnsxs":
+	case "ipns":
 		// IPLD introduces one level of indirection:  a mutable name.
 		// Here we are fetching the IPFS record to which the name is
 		// currently pointing.
@@ -135,7 +135,7 @@ func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err er
 		}
 
 	default:
-		slog.Info("resolved namespace",
+		slog.Debug("resolved namespace",
 			"ns", ns)
 	}
 
@@ -160,10 +160,6 @@ func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) (b []byte, e
 
 		switch fname := filepath.Base(fpath); fname {
 		case "main.wasm":
-			slog.InfoContext(ctx, "loading file",
-				"name", fname,
-				"path", fpath)
-
 			if f := files.ToFile(node); f != nil {
 				b, err = io.ReadAll(f)
 				return err
