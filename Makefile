@@ -4,6 +4,7 @@ all: binary
 
 clean:
 	@if [ -f "ww" ]; then rm ww; fi
+	@rm -f $(GOPATH)/bin/ww
 
 generate:
 	go generate ./...
