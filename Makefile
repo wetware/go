@@ -11,5 +11,5 @@ generate:
 binary: generate
 	@go build -o ww cmd/main.go
 
-install: generate
+install:
 	@go install github.com/wetware/go/cmd
