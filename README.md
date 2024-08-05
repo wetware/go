@@ -90,7 +90,7 @@ ROOT_CID=<hash-you-copied>  # e.g. QmTK1JSQnzsYfbrTWn359jtYBAeVAHtfknWa2Hgikinxj
 
 Now start a wetware node.  Note the path.
 ```bash
-$ww run -load "/ipfs/QmWhFh9U2CxkCXSwKpwncafxjphaXs31oSnNpdRZU2wkEj/system/cmd/nop"
+$ww run -load "/ipfs/QmWXvzjDBwjFcbLyiDZduqjk3RSxzfEkk5gn9uNX841XYR/system/cmd/nop"
 ```
 
 
