@@ -9,6 +9,9 @@ clean:
 generate:
 	go generate ./...
 
+publish: generate
+	ipfs add -r .
+
 binary: generate
 	go build -o ww cmd/main.go
 

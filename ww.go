@@ -95,12 +95,15 @@ func (c Cluster) Serve(ctx context.Context) error {
 		WithName(c.NS).
 		// WithArgs().
 		// WithEnv().
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime().
+		WithRandSource(rand.Reader).
+		WithOsyield(runtime.Gosched).
 		WithStdin(c.IO.Stdin()).
 		WithStdout(c.IO.Stdout()).
 		WithStderr(c.IO.Stderr()).
-		WithFS(fs).
-		WithRandSource(rand.Reader).
-		WithOsyield(runtime.Gosched))
+		WithFS(fs))
 	if err != nil {
 		return err
 	}
