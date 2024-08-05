@@ -12,8 +12,5 @@ generate:
 publish: generate
 	ipfs add -r .
 
-binary: generate
-	go build -o ww cmd/main.go
-
 install:
-	go install github.com/wetware/go/cmd
+	go install github.com/wetware/go/cmd/ww

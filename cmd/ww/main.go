@@ -10,8 +10,8 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/export"
-	"github.com/wetware/go/cmd/run"
+	"github.com/wetware/go/cmd/internal/export"
+	"github.com/wetware/go/cmd/internal/run"
 )
 
 func main() {
