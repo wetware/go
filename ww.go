@@ -13,6 +13,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
@@ -41,6 +42,11 @@ func (config Config) Build() Cluster {
 			// WithCompilationCache().
 			WithCloseOnContextDone(true)
 	}
+
+	// Use the public IPFS DHT for routing.
+	config.Host = routedhost.Wrap(
+		config.Host,
+		config.IPFS.Routing())
 
 	return Cluster{
 		Config: config,

@@ -6,7 +6,6 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/thejerf/suture/v4"
 	"github.com/urfave/cli/v2"
@@ -68,7 +67,7 @@ func run() cli.ActionFunc {
 			wetware.Add(ww.Config{
 				NS:   ns,
 				IPFS: node,
-				Host: routedhost.Wrap(h, node.Routing()),
+				Host: h,
 			}.Build())
 		}
 
