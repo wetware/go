@@ -123,21 +123,23 @@ func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
 	}, nil
 }
 
-func (c Cluster) Resolve(ctx context.Context, root path.Path) (n files.Node, err error) {
-	switch ns := root.Segments()[0]; ns {
-	case "ipld":
+func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err error) {
+	switch ns := p.Segments()[0]; ns {
+	case "ipnsxs":
 		// IPLD introduces one level of indirection:  a mutable name.
 		// Here we are fetching the IPFS record to which the name is
 		// currently pointing.
-		root, err = c.IPFS.Name().Resolve(ctx, root.String())
+		p, err = c.IPFS.Name().Resolve(ctx, p.String())
 		if err != nil {
 			return
 		}
 
-	default: // It's probably /ipfs/
+	default:
+		slog.Info("resolved namespace",
+			"ns", ns)
 	}
 
-	n, err = c.IPFS.Unixfs().Get(ctx, root)
+	n, err = c.IPFS.Unixfs().Get(ctx, p)
 	return
 }
 
