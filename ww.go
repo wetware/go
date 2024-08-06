@@ -24,10 +24,6 @@ const Proto = "/ww/0.0.0"
 
 var _ suture.Service = (*Cluster)(nil)
 
-type Resolver interface {
-	Resolve(ctx context.Context, ns string) (path.Path, error)
-}
-
 type Config struct {
 	NS      string
 	IPFS    iface.CoreAPI
