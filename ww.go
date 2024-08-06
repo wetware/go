@@ -127,7 +127,7 @@ func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
 func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err error) {
 	switch ns := p.Segments()[0]; ns {
 	case "ipns":
-		// IPLD introduces one level of indirection:  a mutable name.
+		// IPNS introduces one level of indirection:  a mutable name.
 		// Here we are fetching the IPFS record to which the name is
 		// currently pointing.
 		p, err = c.IPFS.Name().Resolve(ctx, p.String())
