@@ -16,10 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	_ fs.FS     = (*FS)(nil)
-	_ fs.StatFS = (*FS)(nil)
-)
+var _ fs.FS = (*FS)(nil)
 
 // An FS provides access to a hierarchical file system.
 //
@@ -51,6 +48,10 @@ func (f FS) Open(name string) (fs.File, error) {
 			Path: name,
 			Err:  errors.New("invalid path"),
 		}
+	}
+
+	if name == "." {
+		name = ""
 	}
 
 	path, node, err := f.Resolve(f.Ctx, name)
@@ -86,20 +87,6 @@ func clean(name string) string {
 	name = filepath.Clean(name)
 	// name = strings.Trim(name, "./")
 	return name
-}
-
-// Stat returns a FileInfo describing the file.
-// If there is an error, it should be of type *PathError.
-func (f FS) Stat(name string) (fs.FileInfo, error) {
-	path, node, err := f.Resolve(f.Ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ipfsNode{
-		Path: path,
-		Node: node,
-	}, nil
 }
 
 var (
@@ -210,7 +197,7 @@ func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 
 		var subpath path.Path
 		if subpath, err = path.Join(n.Path, name); err != nil {
-			break
+			return
 		}
 
 		entries = append(entries, &ipfsNode{
@@ -224,10 +211,10 @@ func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 	}
 
 	// If we get here, it's because the iterator stopped.  It either
-	// failed or is exhausted.
-
-	if err == nil && iter.Err() != nil {
-		err = iter.Err() // iterator failed
+	// failed or is exhausted. Any other error has already caused us
+	// to return.
+	if err = iter.Err(); err == nil {
+		err = io.EOF // exhausted
 	}
 
 	return
