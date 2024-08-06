@@ -109,6 +109,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 	return err
 }
 
+// NewFS returns an fs.FS.
 func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
 	root, err := path.NewPath(c.NS)
 	if err != nil {
@@ -122,6 +123,7 @@ func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
 	}, nil
 }
 
+// Resolve an IPFS path into a virtual filesystem node.
 func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err error) {
 	switch ns := p.Segments()[0]; ns {
 	case "ipns":
@@ -142,6 +144,7 @@ func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err er
 	return
 }
 
+// CompileNode reads bytecode from an IPFS node and compiles it.
 func (c Cluster) CompileNode(ctx context.Context, r wazero.Runtime, node files.Node) (wazero.CompiledModule, error) {
 	bytecode, err := c.LoadByteCode(ctx, node)
 	if err != nil {
@@ -151,6 +154,7 @@ func (c Cluster) CompileNode(ctx context.Context, r wazero.Runtime, node files.N
 	return r.CompileModule(ctx, bytecode)
 }
 
+// LoadByteCode from the provided IPFS node.
 func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) (b []byte, err error) {
 	err = files.Walk(node, func(fpath string, node files.Node) error {
 		if b != nil {
