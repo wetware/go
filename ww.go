@@ -88,7 +88,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 
 	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().
 		WithStartFunctions(). // don't call _start automatically
-		WithName(c.NS).
+		WithName(fs.Root.String()).
 		// WithArgs().
 		// WithEnv().
 		WithSysNanosleep().
