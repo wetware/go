@@ -14,8 +14,6 @@ import (
 func TestFS(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO:  re-enable and make sure these pass")
-
 	root, err := path.NewPath("/ipfs/QmQuTsZYyFSVXD8r6yfWyJyJ5xhzV8wkqy9wWuTeoccDtW")
 	require.NoError(t, err)
 

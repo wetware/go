@@ -213,7 +213,9 @@ func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 	// If we get here, it's because the iterator stopped.  It either
 	// failed or is exhausted. Any other error has already caused us
 	// to return.
-	if err = iter.Err(); err == nil {
+	if iter.Err() != nil {
+		err = iter.Err() // failed
+	} else if max >= 0 {
 		err = io.EOF // exhausted
 	}
 
