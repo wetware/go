@@ -1,6 +1,6 @@
 .PHONY: clean
 
-all: binary
+all: install
 
 clean:
 	@if [ -f "ww" ]; then rm ww; fi
