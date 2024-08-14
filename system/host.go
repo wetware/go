@@ -18,12 +18,27 @@ type HostConfig struct {
 func (c HostConfig) Instantiate(ctx context.Context, r wazero.Runtime) (api.Module, error) {
 	mod, err := r.NewHostModuleBuilder("ww").
 		NewFunctionBuilder().
+		WithName("send").
+		WithParameterNames("segment").
+		// WithResultNames("handle").
 		WithGoModuleFunction(api.GoModuleFunc(c.Send),
 			[]api.ValueType{MemorySegment(0).ValueType()}, // params
 			[]api.ValueType{}). // return values
 		Export("send").
 		Instantiate(ctx)
-	return &module{mod}, err
+	if err != nil {
+		return nil, err
+	}
+
+	// e, err := c.Host.EventBus().Emitter(new())
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	return &HostModule{
+		Module: mod,
+		// Emitter: e,
+	}, nil
 }
 
 func (c HostConfig) Send(ctx context.Context, mod api.Module, stack []uint64) {
@@ -84,10 +99,18 @@ func (s MemorySegment) Load(mem api.Memory) ([]byte, bool) {
 	return mem.Read(offset, length)
 }
 
-type module struct {
+type HostModule struct {
 	api.Module
+	// Emitter event.Emitter
 }
 
-func (m module) Close(ctx context.Context) error {
+func (m HostModule) Close(ctx context.Context) error {
+	// defer func() {
+	// 	if err := m.Emitter.Close(); err != nil {
+	// 		slog.ErrorContext(ctx, "unable to close event emitter",
+	// 			"reason", err)
+	// 	}
+	// }()
+
 	return m.Module.Close(ctx)
 }
