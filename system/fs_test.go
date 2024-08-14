@@ -11,10 +11,12 @@ import (
 	"github.com/wetware/go/system"
 )
 
+const IPFS_ROOT = "/ipfs/QmcKcGYiGcfSQ1s3VX7SnzQwRZHsgAuuPXdnrRghjCrBMx/system/testdata/fs"
+
 func TestFS(t *testing.T) {
 	t.Parallel()
 
-	root, err := path.NewPath("/ipfs/QmQuTsZYyFSVXD8r6yfWyJyJ5xhzV8wkqy9wWuTeoccDtW")
+	root, err := path.NewPath(IPFS_ROOT)
 	require.NoError(t, err)
 
 	ipfs, err := rpc.NewLocalApi()
@@ -22,6 +24,8 @@ func TestFS(t *testing.T) {
 
 	fs := system.FS{Ctx: context.Background(), API: ipfs.Unixfs(), Root: root}
 	err = fstest.TestFS(fs,
+		"main.go",
+		"main.wasm",
 		"testdata")
 	require.NoError(t, err)
 }
@@ -29,7 +33,7 @@ func TestFS(t *testing.T) {
 func TestIPFSNode(t *testing.T) {
 	t.Parallel()
 
-	root, err := path.NewPath("/ipfs/QmQuTsZYyFSVXD8r6yfWyJyJ5xhzV8wkqy9wWuTeoccDtW")
+	root, err := path.NewPath(IPFS_ROOT)
 	require.NoError(t, err)
 
 	ipfs, err := rpc.NewLocalApi()
@@ -43,7 +47,7 @@ func TestIPFSNode(t *testing.T) {
 		names = append(names, entry.Name)
 	}
 
-	expect := []string{"testdata"}
+	expect := []string{"testdata", "main.go", "main.wasm"}
 	require.ElementsMatch(t, names, expect,
 		"unexpected file path")
 }

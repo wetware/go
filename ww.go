@@ -80,6 +80,15 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer wasi.Close(ctx)
 
+	sys, err := system.HostConfig{
+		NS:   c.NS,
+		Host: c.Host,
+	}.Instantiate(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer sys.Close(ctx)
+
 	compiled, err := c.CompileNode(ctx, r, root)
 	if err != nil {
 		return err
