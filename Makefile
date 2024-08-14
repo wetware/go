@@ -1,6 +1,6 @@
 .PHONY: clean
 
-all: install
+all: install publish
 
 clean:
 	@if [ -f "ww" ]; then rm ww; fi

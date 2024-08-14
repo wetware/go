@@ -16,9 +16,21 @@ For the smoothest developer experience, we encouraged you to check that `$GOPATH
 
 ## Building from Source
 
->This section is for people who are hacking on Wetware itself.  If you're just using Wetware, you can safely skip this section.
+This section is for people who are hacking on Wetware itself.  If you're just using Wetware, you don't need to read this.
 
-It is recommended configure your shell to add `$GOPATH/bin` to your `PATH`, if you have not done so already.
+Before starting, it is recommended configure your shell to add `$GOPATH/bin` to your `PATH`, if you have not done so already.
+
+### One-Liner
+
+You can perform the entire step-by-step build in once command.
+
+```bash
+$ make
+```
+
+
+
+### Step-by-Step
 
 Start by installing the binary to your `$GOPATH/bin`.
 
