@@ -16,13 +16,14 @@ type HostConfig struct {
 }
 
 func (c HostConfig) Instantiate(ctx context.Context, r wazero.Runtime) (api.Module, error) {
-	return r.NewHostModuleBuilder("ww").
+	mod, err := r.NewHostModuleBuilder("ww").
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(c.Send),
 			[]api.ValueType{MemorySegment(0).ValueType()}, // params
 			[]api.ValueType{}). // return values
 		Export("send").
 		Instantiate(ctx)
+	return &module{mod}, err
 }
 
 func (c HostConfig) Send(ctx context.Context, mod api.Module, stack []uint64) {
@@ -81,4 +82,12 @@ func (s MemorySegment) Load(mem api.Memory) ([]byte, bool) {
 	offset := s.Offset()
 	length := s.Length()
 	return mem.Read(offset, length)
+}
+
+type module struct {
+	api.Module
+}
+
+func (m module) Close(ctx context.Context) error {
+	return m.Module.Close(ctx)
 }
