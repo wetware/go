@@ -5,7 +5,6 @@ go 1.22
 toolchain go1.22.2
 
 require (
-	capnproto.org/go/capnp/v3 v3.0.0-alpha.30
 	github.com/golang/mock v1.6.0
 	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/kubo v0.28.0
@@ -157,5 +156,4 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
-	zenhack.net/go/util v0.0.0-20230414204917-531d38494cf5 // indirect
 )
