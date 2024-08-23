@@ -11,7 +11,7 @@ import (
 	"github.com/wetware/go/system"
 )
 
-const IPFS_ROOT = "/ipfs/QmQBVbGXWHoMDCrUfybMEHKa5zx71KaTCLwdUSNcb68WWi/system/testdata/fs"
+const IPFS_ROOT = "/ipfs/QmRecDLNaESeNY3oUFYZKK9ftdANBB8kuLaMdAXMD43yon" // go/system/testdata/fs
 
 func TestFS(t *testing.T) {
 	t.Parallel()
