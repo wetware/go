@@ -50,10 +50,6 @@ func (f FS) Open(name string) (fs.File, error) {
 		}
 	}
 
-	if name == "." {
-		name = ""
-	}
-
 	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, &fs.PathError{
