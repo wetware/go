@@ -237,3 +237,12 @@ func (n ipfsNode) Type() fs.FileMode {
 
 	return 0
 }
+
+func (n ipfsNode) Write(b []byte) (int, error) {
+	dst, ok := n.Node.(io.Writer)
+	if ok {
+		return dst.Write(b)
+	}
+
+	return 0, errors.New("not writeable")
+}
