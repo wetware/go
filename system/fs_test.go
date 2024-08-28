@@ -2,6 +2,7 @@ package system_test
 
 import (
 	"context"
+	"io/fs"
 	"testing"
 	"testing/fstest"
 
@@ -50,4 +51,27 @@ func TestIPFSNode(t *testing.T) {
 	expect := []string{"testdata", "main.go", "main.wasm"}
 	require.ElementsMatch(t, names, expect,
 		"unexpected file path")
+}
+
+// TestSubFS ensures that the filesystem retunred by fs.Sub correctly
+// handles the '.' path. The returned filesystem MUST ensure that '.'
+// resolves to the root IPFS path.
+func TestSubFS(t *testing.T) {
+	t.Parallel()
+
+	root, err := path.NewPath("/ipfs/QmSAyttKvYkSCBTghuMxAJaBZC3jD2XLRCQ5FB3CTrb9rE") // go/system/testdata
+	require.NoError(t, err)
+
+	ipfs, err := rpc.NewLocalApi()
+	require.NoError(t, err)
+
+	fs, err := fs.Sub(system.FS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}, "fs")
+	require.NoError(t, err)
+	require.NotNil(t, fs)
+
+	err = fstest.TestFS(fs,
+		"main.go",
+		"main.wasm",
+		"testdata")
+	require.NoError(t, err)
 }

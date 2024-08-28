@@ -73,6 +73,22 @@ func pathInvalid(name string) bool {
 	return !fs.ValidPath(name)
 }
 
+func (f FS) Sub(dir string) (fs.FS, error) {
+	var root path.Path
+	var err error
+	if (f == FS{}) {
+		root, err = path.NewPath(dir)
+	} else {
+		root, err = path.Join(f.Root, dir)
+	}
+
+	return &FS{
+		Ctx:  f.Ctx,
+		Root: root,
+		Unix: f.Unix,
+	}, err
+}
+
 var (
 	_ fs.FileInfo    = (*ipfsNode)(nil)
 	_ fs.ReadDirFile = (*ipfsNode)(nil)
