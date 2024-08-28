@@ -22,7 +22,7 @@ func TestFS(t *testing.T) {
 	ipfs, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	fs := system.FS{Ctx: context.Background(), API: ipfs.Unixfs(), Root: root}
+	fs := system.FS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}
 	err = fstest.TestFS(fs,
 		"main.go",
 		"main.wasm",

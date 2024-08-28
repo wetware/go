@@ -2,11 +2,9 @@ package system
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -28,8 +26,8 @@ var _ fs.FS = (*FS)(nil)
 // correctness.
 type FS struct {
 	Ctx  context.Context
-	API  iface.UnixfsAPI
 	Root path.Path
+	Unix iface.UnixfsAPI
 }
 
 // Open opens the named file.
@@ -42,20 +40,12 @@ type FS struct {
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
 func (f FS) Open(name string) (fs.File, error) {
-	if pathInvalid(name) {
-		return nil, &fs.PathError{
-			Op:   "open",
-			Path: name,
-			Err:  errors.New("invalid path"),
-		}
-	}
-
 	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, &fs.PathError{
 			Op:   "open",
 			Path: name,
-			Err:  fmt.Errorf("resolve: %w", err),
+			Err:  err,
 		}
 	}
 
@@ -66,23 +56,21 @@ func (f FS) Open(name string) (fs.File, error) {
 }
 
 func (f FS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
-	joined, err := path.Join(f.Root, clean(name))
+	if pathInvalid(name) {
+		return nil, nil, fs.ErrInvalid
+	}
+
+	p, err := path.Join(f.Root, name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	node, err := f.API.Get(ctx, joined)
-	return joined, node, err
+	node, err := f.Unix.Get(ctx, p)
+	return p, node, err
 }
 
 func pathInvalid(name string) bool {
 	return !fs.ValidPath(name)
-}
-
-func clean(name string) string {
-	name = filepath.Clean(name)
-	// name = strings.Trim(name, "./")
-	return name
 }
 
 var (
