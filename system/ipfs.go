@@ -14,17 +14,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-var _ fs.FS = (*FS)(nil)
+var _ fs.FS = (*IPFS)(nil)
 
-// An FS provides access to a hierarchical file system.
+// An IPFS provides access to a hierarchical file system.
 //
-// The FS interface is the minimum implementation required of the file system.
+// The IPFS interface is the minimum implementation required of the file system.
 // A file system may implement additional interfaces,
 // such as [ReadFileFS], to provide additional or optimized functionality.
 //
-// [testing/fstest.TestFS] may be used to test implementations of an FS for
+// [testing/fstest.TestFS] may be used to test implementations of an IPFS for
 // correctness.
-type FS struct {
+type IPFS struct {
 	Ctx  context.Context
 	Root path.Path
 	Unix iface.UnixfsAPI
@@ -39,7 +39,7 @@ type FS struct {
 // Open should reject attempts to open names that do not satisfy
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
-func (f FS) Open(name string) (fs.File, error) {
+func (f IPFS) Open(name string) (fs.File, error) {
 	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, &fs.PathError{
@@ -55,7 +55,7 @@ func (f FS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
-func (f FS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
+func (f IPFS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
 	if pathInvalid(name) {
 		return nil, nil, fs.ErrInvalid
 	}
@@ -73,16 +73,16 @@ func pathInvalid(name string) bool {
 	return !fs.ValidPath(name)
 }
 
-func (f FS) Sub(dir string) (fs.FS, error) {
+func (f IPFS) Sub(dir string) (fs.FS, error) {
 	var root path.Path
 	var err error
-	if (f == FS{}) {
+	if (f == IPFS{}) {
 		root, err = path.NewPath(dir)
 	} else {
 		root, err = path.Join(f.Root, dir)
 	}
 
-	return &FS{
+	return &IPFS{
 		Ctx:  f.Ctx,
 		Root: root,
 		Unix: f.Unix,
