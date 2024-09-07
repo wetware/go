@@ -59,17 +59,6 @@ func (c Cluster) String() string {
 
 // Serve the cluster's root filesystem
 func (c Cluster) Serve(ctx context.Context) error {
-	fs, err := c.NewFS(ctx)
-	if err != nil {
-		return err
-	}
-
-	root, err := c.Resolve(ctx, fs.Root)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true))
 	defer r.Close(ctx)
@@ -89,7 +78,12 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer sys.Close(ctx)
 
-	compiled, err := c.CompileNode(ctx, r, root)
+	fs, err := c.NewFS(ctx)
+	if err != nil {
+		return err
+	}
+
+	compiled, err := c.Compile(ctx, r, fs)
 	if err != nil {
 		return err
 	}
@@ -119,38 +113,30 @@ func (c Cluster) Serve(ctx context.Context) error {
 }
 
 // NewFS returns an fs.FS.
-func (c Cluster) NewFS(ctx context.Context) (*system.FS, error) {
+func (c Cluster) NewFS(ctx context.Context) (*system.IPFS, error) {
 	root, err := path.NewPath(c.NS)
 	if err != nil {
 		return nil, err
 	}
 
-	return &system.FS{
+	return &system.IPFS{
 		Ctx:  ctx,
-		API:  c.IPFS.Unixfs(),
+		Unix: c.IPFS.Unixfs(),
 		Root: root,
 	}, nil
 }
 
-// Resolve an IPFS path into a virtual filesystem node.
-func (c Cluster) Resolve(ctx context.Context, p path.Path) (n files.Node, err error) {
-	switch ns := p.Segments()[0]; ns {
-	case "ipns":
-		// IPNS introduces one level of indirection:  a mutable name.
-		// Here we are fetching the IPFS record to which the name is
-		// currently pointing.
-		p, err = c.IPFS.Name().Resolve(ctx, p.String())
-		if err != nil {
-			return
-		}
-
-	default:
-		slog.Debug("resolved namespace",
-			"ns", ns)
+func (c Cluster) Compile(ctx context.Context, r wazero.Runtime, fs *system.IPFS) (wazero.CompiledModule, error) {
+	root, n, err := fs.Resolve(ctx, ".")
+	if err != nil {
+		return nil, err
 	}
+	defer n.Close()
 
-	n, err = c.IPFS.Unixfs().Get(ctx, p)
-	return
+	slog.DebugContext(ctx, "resolved root",
+		"path", root)
+
+	return c.CompileNode(ctx, r, n)
 }
 
 // CompileNode reads bytecode from an IPFS node and compiles it.
@@ -163,24 +149,47 @@ func (c Cluster) CompileNode(ctx context.Context, r wazero.Runtime, node files.N
 	return r.CompileModule(ctx, bytecode)
 }
 
-// LoadByteCode from the provided IPFS node.
-func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) (b []byte, err error) {
-	err = files.Walk(node, func(fpath string, node files.Node) error {
+// LoadByteCode loads the bytecode from the provided IPFS node.
+// If the node is a directory, it will walk the directory and
+// load the bytecode from the first file named "main.wasm". If
+// the node is a file, it will attempt to load the bytecode from
+// the file.  An error from Wazero usually indicates that the
+// bytecode is invalid.
+func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) ([]byte, error) {
+	switch node := node.(type) {
+	case files.File:
+		return io.ReadAll(node)
+
+	case files.Directory:
+		return c.LoadByteCodeFromDir(ctx, node)
+
+	default:
+		panic(node) // unreachable
+	}
+}
+
+func (c Cluster) LoadByteCodeFromDir(ctx context.Context, d files.Directory) (b []byte, err error) {
+	if err = files.Walk(d, func(fpath string, node files.Node) error {
+		// Note:  early returns are used to short-circuit the walk. These
+		// are signaled by returning errAbortWalk.
+
+		// Already have the bytecode?
 		if b != nil {
 			return errAbortWalk
 		}
 
-		switch fname := filepath.Base(fpath); fname {
-		case "main.wasm":
-			if f := files.ToFile(node); f != nil {
-				b, err = io.ReadAll(f)
+		// File named "main.wasm"?
+		if fname := filepath.Base(fpath); fname == "main.wasm" {
+			if b, err = c.LoadByteCode(ctx, node); err != nil {
 				return err
 			}
+
+			return errAbortWalk
 		}
 
+		// Keep walking.
 		return nil
-	})
-	if err == errAbortWalk {
+	}); err == errAbortWalk { // no error; we've just bottomed out
 		err = nil
 	}
 
