@@ -33,18 +33,18 @@ func Command() *cli.Command {
 	}
 }
 
-// Global IPFS node.  This is usually colocated on the local host,
+// Global IPFS ipfs.  This is usually colocated on the local host,
 // or available on the local network.  By default, the setup func
 // will search for a local ~/.ipfs directory.
-var node iface.CoreAPI
+var ipfs iface.CoreAPI
 
 func setup() cli.BeforeFunc {
 	return func(c *cli.Context) (err error) {
 		var a ma.Multiaddr
 		if s := c.String("ipfs"); s == "local" {
-			node, err = rpc.NewLocalApi()
+			ipfs, err = rpc.NewLocalApi()
 		} else if a, err = ma.NewMultiaddr(s); err == nil {
-			node, err = rpc.NewApiWithClient(a, http.DefaultClient)
+			ipfs, err = rpc.NewApiWithClient(a, http.DefaultClient)
 		}
 
 		return
@@ -66,7 +66,7 @@ func run() cli.ActionFunc {
 		for _, ns := range c.StringSlice("load") {
 			wetware.Add(ww.Config{
 				NS:   ns,
-				IPFS: node,
+				IPFS: ipfs,
 				Host: h,
 			}.Build())
 		}
