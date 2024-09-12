@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero/sys"
 	ww "github.com/wetware/go"
-	"github.com/wetware/go/system"
 )
 
 func TestService(t *testing.T) {
@@ -27,7 +26,7 @@ func TestService(t *testing.T) {
 	cluster := ww.Config{
 		NS:   root.String(),
 		IPFS: ipfs,
-		IO:   system.Streams{Writer: nopCloser{buf}},
+		// IO:   system.Streams{Writer: nopCloser{buf}},
 	}.Build()
 
 	err = cluster.Serve(context.Background())

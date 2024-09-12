@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"capnproto.org/go/capnp/v3"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
@@ -25,10 +26,10 @@ const Proto = "/ww/0.0.0"
 var _ suture.Service = (*Cluster)(nil)
 
 type Config struct {
-	NS      string
-	IPFS    iface.CoreAPI
-	Host    host.Host
-	IO      system.Streams
+	NS   string
+	IPFS iface.CoreAPI
+	Host host.Host
+	// IO      system.Streams
 	Runtime wazero.RuntimeConfig
 }
 
@@ -46,11 +47,15 @@ func (config Config) Build() Cluster {
 
 	return Cluster{
 		Config: config,
+		System: system.TerminalConfig{
+			// ...
+		}.Build(),
 	}
 }
 
 type Cluster struct {
 	Config
+	System system.Terminal
 }
 
 func (c Cluster) String() string {
@@ -59,6 +64,9 @@ func (c Cluster) String() string {
 
 // Serve the cluster's root filesystem
 func (c Cluster) Serve(ctx context.Context) error {
+	sess, release := c.Login(ctx)
+	defer release()
+
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true))
 	defer r.Close(ctx)
@@ -99,9 +107,9 @@ func (c Cluster) Serve(ctx context.Context) error {
 		WithSysWalltime().
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched).
-		WithStdin(c.IO.Stdin()).
-		WithStdout(c.IO.Stdout()).
-		WithStderr(c.IO.Stderr()).
+		WithStdin(sess.Reader(ctx)).
+		WithStdout(sess.Writer(ctx)).
+		WithStderr(sess.ErrWriter(ctx)).
 		WithFS(fs))
 	if err != nil {
 		return err
@@ -110,6 +118,21 @@ func (c Cluster) Serve(ctx context.Context) error {
 
 	_, err = mod.ExportedFunction("_start").Call(ctx)
 	return err
+}
+
+func (c Cluster) Login(ctx context.Context) (system.Session, capnp.ReleaseFunc) {
+	pk := c.Host.Peerstore().PrivKey(c.Host.ID())
+	signer := &system.SignOnce{PrivKey: pk}
+	account := system.Signer_ServerToClient(signer)
+
+	f, release := c.System.Login(ctx, func(t system.Terminal_login_Params) error {
+		return t.SetAccount(account)
+	})
+
+	return system.Session{
+		Stdio: f.Stdio(),
+		// ...
+	}, release
 }
 
 // NewFS returns an fs.FS.

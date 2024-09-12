@@ -1,0 +1,37 @@
+using Go = import "/go.capnp";
+
+@0xe82706a772b0927b;
+
+$Go.package("system");
+$Go.import("github.com/wetware/go/system");
+
+
+# Signer identifies an accound.  It is a capability that can be
+# used to sign arbitrary nonces.
+#
+# The signature domain is "ww.auth"
+interface Signer {
+    sign @0 (data :Data, domain :Text="") -> (rawEnvelope :Data);
+}
+
+
+interface Terminal {
+    login @0 (account :Signer) -> (
+        stdio :Socket,
+    );
+}
+
+struct Socket {
+    reader @0 :ReadPipe;
+    writer @1 :WritePipe;
+    error  @2 :WritePipe;
+}
+
+
+interface ReadPipe {
+    read @0 (size :UInt32) -> (data :Data);
+}
+
+interface WritePipe {
+    write @0 (data :Data) -> stream;
+}
