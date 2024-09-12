@@ -60,7 +60,7 @@ func run() cli.ActionFunc {
 		defer h.Close()
 
 		wetware := suture.New("ww", suture.Spec{
-			EventHook: util.EventHook,
+			EventHook: util.EventHookWithContext(c.Context),
 		})
 
 		for _, ns := range c.StringSlice("load") {
