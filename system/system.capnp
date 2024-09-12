@@ -8,10 +8,8 @@ $Go.import("github.com/wetware/go/system");
 
 # Signer identifies an accound.  It is a capability that can be
 # used to sign arbitrary nonces.
-#
-# The signature domain is "ww.auth"
 interface Signer {
-    sign @0 (data :Data, domain :Text="") -> (rawEnvelope :Data);
+    sign @0 (data :Data) -> (rawEnvelope :Data);
 }
 
 
