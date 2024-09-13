@@ -1,4 +1,4 @@
-package system_test
+package auth_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/stretchr/testify/require"
 	"github.com/tj/assert"
-	"github.com/wetware/go/system"
+	auth "github.com/wetware/go/auth"
 )
 
 func TestAuthProvider(t *testing.T) {
@@ -26,27 +26,27 @@ func TestAuthProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	user := privkey(h)
-	account := system.Signer_ServerToClient(&system.SignOnce{
+	account := auth.Signer_ServerToClient(&auth.SignOnce{
 		PrivKey: user,
 	})
 
 	var called bool
-	p := NewMockAuthProvider(ctrl)
+	p := NewMockProvider(ctrl)
 	p.EXPECT().
 		BindPolicy(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(user crypto.PubKey, policy system.Terminal_login_Results) error {
+		DoAndReturn(func(user crypto.PubKey, policy auth.Terminal_login_Results) error {
 			called = true
 			return nil
 		}).
 		Times(1)
 
 	// Create a terminal server.
-	terminal := system.TerminalConfig{
+	terminal := auth.TerminalConfig{
 		Rand: rand.Reader,
 		Auth: p,
 	}.Build()
 
-	f, release := terminal.Login(context.Background(), func(p system.Terminal_login_Params) error {
+	f, release := terminal.Login(context.Background(), func(p auth.Terminal_login_Params) error {
 		return p.SetAccount(account)
 	})
 	defer release()

@@ -2,8 +2,8 @@ using Go = import "/go.capnp";
 
 @0xe82706a772b0927b;
 
-$Go.package("system");
-$Go.import("github.com/wetware/go/system");
+$Go.package("auth");
+$Go.import("github.com/wetware/go/auth");
 
 
 # Signer identifies an accound.  It is a capability that can be
@@ -27,9 +27,9 @@ struct Socket {
 
 
 interface ReadPipe {
-    read @0 (size :UInt32) -> (data :Data);
+    read @0 (size :UInt32) -> (data :Data, eof :Bool);
 }
 
 interface WritePipe {
-    write @0 (data :Data) -> stream;
+    write @0 (data :Data) -> (n :UInt32);
 }

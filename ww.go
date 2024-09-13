@@ -18,6 +18,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
+	"github.com/wetware/go/auth"
 	"github.com/wetware/go/system"
 )
 
@@ -47,15 +48,18 @@ func (config Config) Build() Cluster {
 
 	return Cluster{
 		Config: config,
-		System: system.TerminalConfig{
-			// ...
+		System: auth.TerminalConfig{
+			Rand: rand.Reader,
+			Auth: auth.Provide{
+				// ...
+			},
 		}.Build(),
 	}
 }
 
 type Cluster struct {
 	Config
-	System system.Terminal
+	System auth.Terminal
 }
 
 func (c Cluster) String() string {
@@ -120,18 +124,20 @@ func (c Cluster) Serve(ctx context.Context) error {
 	return err
 }
 
-func (c Cluster) Login(ctx context.Context) (system.Session, capnp.ReleaseFunc) {
+func (c Cluster) Login(ctx context.Context) (auth.Session, capnp.ReleaseFunc) {
 	pk := c.Host.Peerstore().PrivKey(c.Host.ID())
-	signer := &system.SignOnce{PrivKey: pk}
-	account := system.Signer_ServerToClient(signer)
+	signer := &auth.SignOnce{PrivKey: pk}
+	account := auth.Signer_ServerToClient(signer)
 
-	f, release := c.System.Login(ctx, func(t system.Terminal_login_Params) error {
+	f, release := c.System.Login(ctx, func(t auth.Terminal_login_Params) error {
 		return t.SetAccount(account)
 	})
 
-	return system.Session{
-		Stdio: f.Stdio(),
-		// ...
+	f.Stdio().Reader()
+
+	return auth.Session{
+		Proc: f.Stdio(),
+		Sock: system.Socket{},
 	}, release
 }
 
