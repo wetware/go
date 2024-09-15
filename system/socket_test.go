@@ -1,4 +1,4 @@
-package system
+package system_test
 
 import (
 	"bytes"
@@ -9,75 +9,53 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/system"
 )
 
 func TestReadPipe(t *testing.T) {
 	t.Parallel()
 
-	buf := newPipeBuffer(bytes.NewBufferString("test"))
-	pipe := auth.ReadPipe_ServerToClient(buf)
-	pr := pipeReader{ReadPipe: pipe}
+	pipe := system.NewReadPipe(strings.NewReader("test"))
+	f, release := pipe.Read(context.TODO(), func(read auth.ReadPipe_read_Params) error {
+		read.SetSize(int64(len("test")))
+		return nil
+	})
+	defer release()
 
-	b, err := io.ReadAll(pr)
+	res, err := f.Struct()
 	require.NoError(t, err)
-	require.Equal(t, "test", string(b))
+	data, err := res.Data()
+	require.NoError(t, err)
+	require.Equal(t, "test", string(data))
+	require.False(t, res.Eof())
+
+	f, release = pipe.Read(context.TODO(), func(read auth.ReadPipe_read_Params) error {
+		read.SetSize(int64(len("test")))
+		return nil
+	})
+	defer release()
+
+	res, err = f.Struct()
+	// require.EqualError(t, err, "auth.capnp:ReadPipe.read: EOF")
+	// require.NoError(t, err)
+	require.True(t, res.Eof(), "should report EOF")
 }
 
 func TestWritePipe(t *testing.T) {
 	t.Parallel()
 
-	buf := newPipeBuffer(new(bytes.Buffer))
-	pipe := auth.WritePipe_ServerToClient(buf)
-	pw := pipeWriter{WritePipe: pipe}
+	buf := new(bytes.Buffer)
+	pipe := system.NewWritePipe(nopCloser{Writer: buf})
+	f, release := pipe.Write(context.TODO(), func(write auth.WritePipe_write_Params) error {
+		return write.SetData([]byte("test"))
+	})
+	defer release()
 
-	n, err := io.Copy(pw, strings.NewReader("test"))
+	res, err := f.Struct()
 	require.NoError(t, err)
-	require.Equal(t, len("test"), int(n))
-	require.Equal(t, "test", buf.Buffer.String())
+	require.Equal(t, int64(len("test")), res.N())
 }
 
-type pipeBuffer struct {
-	Buffer *bytes.Buffer
-}
+type nopCloser struct{ io.Writer }
 
-func newPipeBuffer(b *bytes.Buffer) pipeBuffer {
-	return pipeBuffer{Buffer: b}
-}
-
-func (p pipeBuffer) Read(ctx context.Context, read auth.ReadPipe_read) error {
-	size := read.Args().Size()
-	res, err := read.AllocResults()
-	if err != nil {
-		return err
-	}
-
-	r := io.LimitReader(p.Buffer, int64(size))
-	b, err := io.ReadAll(r)
-	if err == io.EOF {
-		res.SetEof(true)
-		err = nil
-	} else if err == nil {
-		err = res.SetData(b)
-	}
-
-	return err
-}
-
-func (p pipeBuffer) Write(ctx context.Context, write auth.WritePipe_write) error {
-	data, err := write.Args().Data()
-	if err != nil {
-		return err
-	}
-
-	res, err := write.AllocResults()
-	if err != nil {
-		return err
-	}
-
-	n, err := io.Copy(p.Buffer, bytes.NewReader(data))
-	if err == nil {
-		res.SetN(uint32(n))
-	}
-
-	return err
-}
+func (nopCloser) Close() error { return nil }

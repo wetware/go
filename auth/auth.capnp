@@ -27,9 +27,9 @@ struct Socket {
 
 
 interface ReadPipe {
-    read @0 (size :UInt32) -> (data :Data, eof :Bool);
+    read @0 (size :Int64) -> (data :Data, eof :Bool);
 }
 
 interface WritePipe {
-    write @0 (data :Data) -> (n :UInt32);
+    write @0 (data :Data) -> (n :Int64);
 }

@@ -18,6 +18,7 @@ require (
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/tj/assert v0.0.3
 	github.com/urfave/cli/v2 v2.27.3
+	go.uber.org/multierr v1.11.0
 )
 
 require (
@@ -141,7 +142,6 @@ require (
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.20.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
