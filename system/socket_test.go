@@ -17,6 +17,8 @@ func TestPipeReader(t *testing.T) {
 
 	buf := strings.NewReader("test")
 	pipe := system.NewReadPipe(buf)
+	defer pipe.Release()
+
 	r := system.Socket{}.Connect(context.TODO(), pipe)
 	b, err := io.ReadAll(r)
 	require.NoError(t, err)
@@ -28,6 +30,8 @@ func TestPipeWriter(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	pipe := system.NewWritePipe(nopCloser{Writer: buf})
+	defer pipe.Release()
+
 	wc := system.Socket{}.Bind(context.TODO(), pipe)
 	n, err := io.Copy(wc, strings.NewReader("test"))
 	require.NoError(t, err)
@@ -40,6 +44,8 @@ func TestReadPipe(t *testing.T) {
 	t.Parallel()
 
 	pipe := system.NewReadPipe(strings.NewReader("test"))
+	defer pipe.Release()
+
 	f, release := pipe.Read(context.TODO(), func(read auth.ReadPipe_read_Params) error {
 		read.SetSize(int64(len("test")))
 		return nil
@@ -69,6 +75,8 @@ func TestWritePipe(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	pipe := system.NewWritePipe(nopCloser{Writer: buf})
+	defer pipe.Release()
+
 	f, release := pipe.Write(context.TODO(), func(write auth.WritePipe_write_Params) error {
 		return write.SetData([]byte("test"))
 	})
