@@ -12,6 +12,30 @@ import (
 	"github.com/wetware/go/system"
 )
 
+func TestPipeReader(t *testing.T) {
+	t.Parallel()
+
+	buf := strings.NewReader("test")
+	pipe := system.NewReadPipe(buf)
+	r := system.Socket{}.Connect(context.TODO(), pipe)
+	b, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.Equal(t, "test", string(b))
+}
+
+func TestPipeWriter(t *testing.T) {
+	t.Parallel()
+
+	buf := new(bytes.Buffer)
+	pipe := system.NewWritePipe(nopCloser{Writer: buf})
+	wc := system.Socket{}.Bind(context.TODO(), pipe)
+	n, err := io.Copy(wc, strings.NewReader("test"))
+	require.NoError(t, err)
+	require.Equal(t, int64(len("test")), n)
+	require.Equal(t, "test", buf.String())
+	require.NoError(t, wc.Close())
+}
+
 func TestReadPipe(t *testing.T) {
 	t.Parallel()
 
