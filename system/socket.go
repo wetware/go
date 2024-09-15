@@ -10,8 +10,6 @@ import (
 	"github.com/wetware/go/auth"
 )
 
-var _ = auth.Session{Sock: (*Socket)(nil)}
-
 type Socket struct{}
 
 func (s Socket) Bind(ctx context.Context, pipe auth.WritePipe) io.WriteCloser {

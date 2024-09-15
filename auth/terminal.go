@@ -11,6 +11,49 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Session is a login context for a terminal.  It binds the
+// guest's standard I/O to the host runtime.  For guest code,
+// the contract is as follows:
+//
+//   - The guest's standard input is produced by a Cap'n Proto
+//     RPC connection.
+//
+//   - The guest's standard output is consumed by a Cap'n Proto
+//     RPC connection.
+//
+//   - The guest's standard error is consumed and processed into
+//     wetware event logs.
+type Session struct {
+	// Proc exposes standard I/O to a guest process.
+	Proc interface {
+		Reader() ReadPipe  // guest's stdin
+		Writer() WritePipe // guest's stdout
+		Error() WritePipe  // guest's stderr
+	}
+
+	// Sock provides an abstraction over the bridging of
+	// Cap'n Proto RPC calls and Go's io.Reader/Writer.
+	Sock interface {
+		Bind(context.Context, WritePipe) io.WriteCloser
+		Connect(context.Context, ReadPipe) io.Reader
+	}
+}
+
+func (s Session) Reader(ctx context.Context) io.Reader {
+	rpipe := s.Proc.Reader()
+	return s.Sock.Connect(ctx, rpipe)
+}
+
+func (s Session) Writer(ctx context.Context) io.WriteCloser {
+	wpipe := s.Proc.Writer()
+	return s.Sock.Bind(ctx, wpipe)
+}
+
+func (s Session) ErrWriter(ctx context.Context) io.WriteCloser {
+	wpipe := s.Proc.Error()
+	return s.Sock.Bind(ctx, wpipe)
+}
+
 type TerminalConfig struct {
 	Rand io.Reader
 	Auth Provider
@@ -115,47 +158,4 @@ func (s *SignOnce) Sign(ctx context.Context, sign Signer_sign) error {
 	}
 
 	return res.SetRawEnvelope(raw)
-}
-
-// Session is a login context for a terminal.  It binds the
-// guest's standard I/O to the host runtime.  For guest code,
-// the contract is as follows:
-//
-//   - The guest's standard input is produced by a Cap'n Proto
-//     RPC connection.
-//
-//   - The guest's standard output is consumed by a Cap'n Proto
-//     RPC connection.
-//
-//   - The guest's standard error is consumed and processed into
-//     wetware event logs.
-type Session struct {
-	// Proc exposes standard I/O to a guest process.
-	Proc interface {
-		Reader() ReadPipe  // guest's stdin
-		Writer() WritePipe // guest's stdout
-		Error() WritePipe  // guest's stderr
-	}
-
-	// Sock provides an abstraction over the bridging of
-	// Cap'n Proto RPC calls and Go's io.Reader/Writer.
-	Sock interface {
-		Bind(context.Context, WritePipe) io.WriteCloser
-		Connect(context.Context, ReadPipe) io.Reader
-	}
-}
-
-func (s Session) Reader(ctx context.Context) io.Reader {
-	rpipe := s.Proc.Reader()
-	return s.Sock.Connect(ctx, rpipe)
-}
-
-func (s Session) Writer(ctx context.Context) io.WriteCloser {
-	wpipe := s.Proc.Writer()
-	return s.Sock.Bind(ctx, wpipe)
-}
-
-func (s Session) ErrWriter(ctx context.Context) io.WriteCloser {
-	wpipe := s.Proc.Error()
-	return s.Sock.Bind(ctx, wpipe)
 }
