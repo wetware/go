@@ -36,8 +36,7 @@ func TestReadPipe(t *testing.T) {
 	defer release()
 
 	res, err = f.Struct()
-	// require.EqualError(t, err, "auth.capnp:ReadPipe.read: EOF")
-	// require.NoError(t, err)
+	require.NoError(t, err)
 	require.True(t, res.Eof(), "should report EOF")
 }
 
