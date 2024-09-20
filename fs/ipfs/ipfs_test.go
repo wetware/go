@@ -1,4 +1,4 @@
-package system_test
+package ipfs_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/kubo/client/rpc"
 	"github.com/stretchr/testify/require"
-	"github.com/wetware/go/system"
+	"github.com/wetware/go/fs/ipfs"
 )
 
 const IPFS_ROOT = "/ipfs/QmRecDLNaESeNY3oUFYZKK9ftdANBB8kuLaMdAXMD43yon" // go/system/testdata/fs
@@ -25,10 +25,10 @@ func TestIPFS_Env(t *testing.T) {
 	root, err := path.NewPath(IPFS_ROOT)
 	require.NoError(t, err)
 
-	ipfs, err := rpc.NewLocalApi()
+	api, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	dir, err := ipfs.Unixfs().Ls(context.Background(), root)
+	dir, err := api.Unixfs().Ls(context.Background(), root)
 	require.NoError(t, err)
 
 	var names []string
@@ -47,10 +47,10 @@ func TestIPFS_FS(t *testing.T) {
 	root, err := path.NewPath(IPFS_ROOT)
 	require.NoError(t, err)
 
-	ipfs, err := rpc.NewLocalApi()
+	api, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	fs := system.IPFS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}
+	fs := ipfs.UnixFS{Ctx: context.Background(), Unix: api.Unixfs(), Root: root}
 	err = fstest.TestFS(fs,
 		"main.go",
 		"main.wasm",
@@ -67,10 +67,10 @@ func TestIPFS_SubFS(t *testing.T) {
 	root, err := path.NewPath("/ipfs/QmSAyttKvYkSCBTghuMxAJaBZC3jD2XLRCQ5FB3CTrb9rE") // go/system/testdata
 	require.NoError(t, err)
 
-	ipfs, err := rpc.NewLocalApi()
+	api, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	fs, err := fs.Sub(system.IPFS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}, "fs")
+	fs, err := fs.Sub(ipfs.UnixFS{Ctx: context.Background(), Unix: api.Unixfs(), Root: root}, "fs")
 	require.NoError(t, err)
 	require.NotNil(t, fs)
 

@@ -1,4 +1,4 @@
-package system
+package ipfs
 
 import (
 	"context"
@@ -14,17 +14,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-var _ fs.FS = (*IPFS)(nil)
+var _ fs.FS = (*UnixFS)(nil)
 
-// An IPFS provides access to a hierarchical file system.
+// An UnixFS provides access to a hierarchical file system.
 //
-// The IPFS interface is the minimum implementation required of the file system.
+// The UnixFS interface is the minimum implementation required of the file system.
 // A file system may implement additional interfaces,
 // such as [ReadFileFS], to provide additional or optimized functionality.
 //
-// [testing/fstest.TestFS] may be used to test implementations of an IPFS for
+// [testing/fstest.TestFS] may be used to test implementations of an UnixFS for
 // correctness.
-type IPFS struct {
+type UnixFS struct {
 	Ctx  context.Context
 	Root path.Path
 	Unix iface.UnixfsAPI
@@ -39,7 +39,7 @@ type IPFS struct {
 // Open should reject attempts to open names that do not satisfy
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
-func (f IPFS) Open(name string) (fs.File, error) {
+func (f UnixFS) Open(name string) (fs.File, error) {
 	path, node, err := f.Resolve(f.Ctx, name)
 	if err != nil {
 		return nil, &fs.PathError{
@@ -55,7 +55,7 @@ func (f IPFS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
-func (f IPFS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
+func (f UnixFS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
 	if pathInvalid(name) {
 		return nil, nil, fs.ErrInvalid
 	}
@@ -73,16 +73,16 @@ func pathInvalid(name string) bool {
 	return !fs.ValidPath(name)
 }
 
-func (f IPFS) Sub(dir string) (fs.FS, error) {
+func (f UnixFS) Sub(dir string) (fs.FS, error) {
 	var root path.Path
 	var err error
-	if (f == IPFS{}) {
+	if (f == UnixFS{}) {
 		root, err = path.NewPath(dir)
 	} else {
 		root, err = path.Join(f.Root, dir)
 	}
 
-	return &IPFS{
+	return &UnixFS{
 		Ctx:  f.Ctx,
 		Root: root,
 		Unix: f.Unix,
