@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -55,18 +56,12 @@ func (f IPFS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
-func (f IPFS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
-	if pathInvalid(name) {
-		return nil, nil, fs.ErrInvalid
+func (f IPFS) Resolve(ctx context.Context, name string) (p path.Path, n files.Node, err error) {
+	if p, err = f.Subpath(name); err == nil {
+		n, err = f.Unix.Get(ctx, p)
 	}
 
-	p, err := path.Join(f.Root, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	node, err := f.Unix.Get(ctx, p)
-	return p, node, err
+	return
 }
 
 func pathInvalid(name string) bool {
@@ -74,19 +69,24 @@ func pathInvalid(name string) bool {
 }
 
 func (f IPFS) Sub(dir string) (fs.FS, error) {
-	var root path.Path
-	var err error
-	if (f == IPFS{}) {
-		root, err = path.NewPath(dir)
-	} else {
-		root, err = path.Join(f.Root, dir)
-	}
-
+	root, err := f.Subpath(dir)
 	return &IPFS{
 		Ctx:  f.Ctx,
 		Root: root,
 		Unix: f.Unix,
 	}, err
+}
+
+func (f IPFS) Subpath(name string) (p path.Path, err error) {
+	if pathInvalid(name) {
+		err = fs.ErrInvalid
+	} else if f.Root == nil {
+		p, err = path.NewPath(name)
+	} else {
+		p, err = path.Join(f.Root, name)
+	}
+
+	return
 }
 
 var (
@@ -105,8 +105,7 @@ type ipfsNode struct {
 
 // base name of the file
 func (n ipfsNode) Name() string {
-	segs := n.Path.Segments()
-	return segs[len(segs)-1] // last segment is name
+	return filepath.Base(n.Path.String())
 }
 
 func (n *ipfsNode) Stat() (fs.FileInfo, error) {

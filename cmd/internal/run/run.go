@@ -6,10 +6,12 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/thejerf/suture/v4"
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
+	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -65,9 +67,14 @@ func run() cli.ActionFunc {
 
 		for _, ns := range c.StringSlice("load") {
 			wetware.Add(ww.Config{
-				NS:   ns,
-				IPFS: ipfs,
-				Host: h,
+				NS: ns,
+				Host: routedhost.Wrap(
+					h,
+					ipfs.Routing()),
+				UnixFS: &system.IPFS{
+					Ctx:  c.Context,
+					Unix: ipfs.Unixfs(),
+				},
 			}.Build())
 		}
 

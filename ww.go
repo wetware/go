@@ -5,52 +5,74 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
-	"log/slog"
+	"io/fs"
 	"path/filepath"
 	"runtime"
 
+	"capnproto.org/go/capnp/v3"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
+	"github.com/wetware/go/auth"
 	"github.com/wetware/go/system"
+	"go.uber.org/multierr"
 )
-
-const Proto = "/ww/0.0.0"
 
 var _ suture.Service = (*Cluster)(nil)
 
+type UnixFS interface {
+	fs.FS
+	Resolve(context.Context, string) (path.Path, files.Node, error)
+}
+
 type Config struct {
-	NS      string
-	IPFS    iface.CoreAPI
-	Host    host.Host
-	IO      system.Streams
-	Runtime wazero.RuntimeConfig
+	NS     string
+	Host   host.Host
+	UnixFS UnixFS
+	Cache  wazero.CompilationCache
+	Stdio  struct {
+		Reader        io.Reader
+		Writer, Error io.WriteCloser
+	}
 }
 
 func (config Config) Build() Cluster {
-	if config.Runtime == nil {
-		config.Runtime = wazero.NewRuntimeConfig().
-			// WithCompilationCache().
-			WithCloseOnContextDone(true)
+	// HACK:  right now we just have one capability
+	// and it's stdio, so always allow it.  This
+	// effectively disables auth.  We'll get back
+	// to it soon.
+	baseCaps := provide{
+		Stdio: stdio{
+			Reader: config.Stdio.Reader,
+			Writer: config.Stdio.Writer,
+			Error:  config.Stdio.Error,
+		},
 	}
-
-	// Use the public IPFS DHT for routing.
-	config.Host = routedhost.Wrap(
-		config.Host,
-		config.IPFS.Routing())
 
 	return Cluster{
 		Config: config,
+		System: auth.TerminalConfig{
+			Rand: rand.Reader,
+			Auth: baseCaps,
+		}.Build(),
 	}
+}
+
+func (config Config) CompilationCache() wazero.CompilationCache {
+	if config.Cache == nil {
+		config.Cache = wazero.NewCompilationCache()
+	}
+
+	return config.Cache
 }
 
 type Cluster struct {
 	Config
+	System auth.Terminal
 }
 
 func (c Cluster) String() string {
@@ -59,7 +81,11 @@ func (c Cluster) String() string {
 
 // Serve the cluster's root filesystem
 func (c Cluster) Serve(ctx context.Context) error {
+	sess, release := c.Login(ctx)
+	defer release()
+
 	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		WithCompilationCache(c.Config.CompilationCache()).
 		WithCloseOnContextDone(true))
 	defer r.Close(ctx)
 
@@ -69,21 +95,7 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer wasi.Close(ctx)
 
-	sys, err := system.HostConfig{
-		NS:   c.NS,
-		Host: c.Host,
-	}.Instantiate(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer sys.Close(ctx)
-
-	fs, err := c.NewFS(ctx)
-	if err != nil {
-		return err
-	}
-
-	compiled, err := c.Compile(ctx, r, fs)
+	compiled, err := c.Compile(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -99,10 +111,10 @@ func (c Cluster) Serve(ctx context.Context) error {
 		WithSysWalltime().
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched).
-		WithStdin(c.IO.Stdin()).
-		WithStdout(c.IO.Stdout()).
-		WithStderr(c.IO.Stderr()).
-		WithFS(fs))
+		WithStdin(sess.Reader(ctx)).
+		WithStdout(sess.Writer(ctx)).
+		WithStderr(sess.ErrWriter(ctx)).
+		WithFS(c.UnixFS))
 	if err != nil {
 		return err
 	}
@@ -112,29 +124,27 @@ func (c Cluster) Serve(ctx context.Context) error {
 	return err
 }
 
-// NewFS returns an fs.FS.
-func (c Cluster) NewFS(ctx context.Context) (*system.IPFS, error) {
-	root, err := path.NewPath(c.NS)
-	if err != nil {
-		return nil, err
-	}
+func (c Cluster) Login(ctx context.Context) (auth.Session, capnp.ReleaseFunc) {
+	pk := c.Host.Peerstore().PrivKey(c.Host.ID())
+	signer := &auth.SignOnce{PrivKey: pk}
+	account := auth.Signer_ServerToClient(signer)
 
-	return &system.IPFS{
-		Ctx:  ctx,
-		Unix: c.IPFS.Unixfs(),
-		Root: root,
-	}, nil
+	f, release := c.System.Login(ctx, func(t auth.Terminal_login_Params) error {
+		return t.SetAccount(account)
+	})
+
+	return auth.Session{
+		Proc: f.Stdio(),
+		Sock: system.Socket{},
+	}, release
 }
 
-func (c Cluster) Compile(ctx context.Context, r wazero.Runtime, fs *system.IPFS) (wazero.CompiledModule, error) {
-	root, n, err := fs.Resolve(ctx, ".")
+func (c Cluster) Compile(ctx context.Context, r wazero.Runtime) (wazero.CompiledModule, error) {
+	_, n, err := c.UnixFS.Resolve(ctx, ".")
 	if err != nil {
 		return nil, err
 	}
 	defer n.Close()
-
-	slog.DebugContext(ctx, "resolved root",
-		"path", root)
 
 	return c.CompileNode(ctx, r, n)
 }
@@ -197,3 +207,45 @@ func (c Cluster) LoadByteCodeFromDir(ctx context.Context, d files.Directory) (b 
 }
 
 var errAbortWalk = errors.New("abort walk")
+
+type provide struct {
+	Stdio interface {
+		BindReader() auth.ReadPipe
+		BindWriter() auth.WritePipe
+		BindError() auth.WritePipe
+	}
+}
+
+func (p provide) BindPolicy(user crypto.PubKey, policy auth.Policy) error {
+	sock, err := policy.NewStdio()
+	if err == nil {
+		err = p.BindStdio(sock)
+	}
+
+	return err
+}
+
+func (p provide) BindStdio(sock auth.Socket) error {
+	return multierr.Combine(
+		sock.SetReader(p.Stdio.BindReader()),
+		sock.SetWriter(p.Stdio.BindWriter()),
+		sock.SetError(p.Stdio.BindError()))
+}
+
+type stdio struct {
+	Reader io.Reader
+	Writer io.WriteCloser
+	Error  io.WriteCloser
+}
+
+func (s stdio) BindReader() auth.ReadPipe {
+	return system.NewReadPipe(s.Reader)
+}
+
+func (s stdio) BindWriter() auth.WritePipe {
+	return system.NewWritePipe(s.Writer)
+}
+
+func (s stdio) BindError() auth.WritePipe {
+	return system.NewWritePipe(s.Error)
+}
