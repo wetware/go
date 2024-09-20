@@ -2,6 +2,8 @@ bazil.org/fuse v0.0.0-20200117225306-7b5117fecadc h1:utDghgcjE8u+EBjHOgYT+dJPcnD
 bazil.org/fuse v0.0.0-20200117225306-7b5117fecadc/go.mod h1:FbcW6z/2VytnFDhZfumh8Ss8zxHE6qpMP5sHTRe0EaM=
 capnproto.org/go/capnp/v3 v3.0.1-alpha.2 h1:W/cf+XEArUSwcBBE/9wS2NpWDkM5NLQOjmzEiHZpYi0=
 capnproto.org/go/capnp/v3 v3.0.1-alpha.2/go.mod h1:2vT5D2dtG8sJGEoEKU17e+j7shdaYp1Myl8X03B3hmc=
+capnproto.org/go/capnp/v3 v3.0.1-alpha.2.0.20240830165715-46ccd63a72af h1:A5wxH0ZidOtYYUGjhtBaRuB87M73bGfc06uWB8sHpg0=
+capnproto.org/go/capnp/v3 v3.0.1-alpha.2.0.20240830165715-46ccd63a72af/go.mod h1:2vT5D2dtG8sJGEoEKU17e+j7shdaYp1Myl8X03B3hmc=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.31.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
