@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
+	"github.com/wetware/go/fs/ipfs"
 	"github.com/wetware/go/system"
 )
 
@@ -113,20 +114,20 @@ func (c Cluster) Serve(ctx context.Context) error {
 }
 
 // NewFS returns an fs.FS.
-func (c Cluster) NewFS(ctx context.Context) (*system.IPFS, error) {
+func (c Cluster) NewFS(ctx context.Context) (*ipfs.UnixFS, error) {
 	root, err := path.NewPath(c.NS)
 	if err != nil {
 		return nil, err
 	}
 
-	return &system.IPFS{
+	return &ipfs.UnixFS{
 		Ctx:  ctx,
 		Unix: c.IPFS.Unixfs(),
 		Root: root,
 	}, nil
 }
 
-func (c Cluster) Compile(ctx context.Context, r wazero.Runtime, fs *system.IPFS) (wazero.CompiledModule, error) {
+func (c Cluster) Compile(ctx context.Context, r wazero.Runtime, fs *ipfs.UnixFS) (wazero.CompiledModule, error) {
 	root, n, err := fs.Resolve(ctx, ".")
 	if err != nil {
 		return nil, err
