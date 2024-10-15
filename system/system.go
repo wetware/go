@@ -1,36 +1,42 @@
 package system
 
 import (
-	"io"
-	"os"
+	"context"
+	"io/fs"
+	"strings"
+
+	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/pkg/errors"
 )
 
-type Streams struct {
-	Reader    io.Reader
-	Writer    io.WriteCloser
-	ErrWriter io.WriteCloser
+var _ fs.FS = (*FSConfig)(nil)
+
+type FSConfig struct {
+	Ctx  context.Context
+	Host host.Host
+	IPFS iface.CoreAPI
 }
 
-func (std Streams) Stdin() io.Reader {
-	if std.Reader == nil {
-		return os.Stdin
+func (fsc FSConfig) Open(name string) (fs.File, error) {
+	if strings.HasPrefix(name, "/p2p/") {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  errors.New("TODO"),
+		}
+
+		// TODO:  uncomment
+
+		// return PeerFS{
+		// 	Ctx:  fsc.Ctx,
+		// 	Host: fsc.Host,
+		// }.Open(name)
 	}
 
-	return std.Reader
-}
+	return IPFS{
+		Ctx:  fsc.Ctx,
+		Unix: fsc.IPFS.Unixfs(),
+	}.Open(name)
 
-func (std Streams) Stdout() io.WriteCloser {
-	if std.Writer == nil {
-		return os.Stdout
-	}
-
-	return std.Writer
-}
-
-func (std Streams) Stderr() io.WriteCloser {
-	if std.ErrWriter == nil {
-		return os.Stdout
-	}
-
-	return std.ErrWriter
 }

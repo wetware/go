@@ -2,66 +2,46 @@ package ww
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
-	"io"
-	"log/slog"
-	"path/filepath"
-	"runtime"
 
-	"github.com/ipfs/boxo/files"
-	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
-	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/thejerf/suture/v4"
-	"github.com/wetware/go/system"
+	"github.com/tetratelabs/wazero/sys"
 )
 
-const Proto = "/ww/0.0.0"
+const Version = "0.1.0"
+const Proto = "/ww/" + Version
 
-var _ suture.Service = (*Cluster)(nil)
+type ReleaseFunc func()
 
-type Config struct {
-	NS      string
-	IPFS    iface.CoreAPI
-	Host    host.Host
-	IO      system.Streams
-	Runtime wazero.RuntimeConfig
+type Loader interface {
+	Load(ctx context.Context) ([]byte, error)
 }
 
-func (config Config) Build() Cluster {
-	if config.Runtime == nil {
-		config.Runtime = wazero.NewRuntimeConfig().
-			// WithCompilationCache().
-			WithCloseOnContextDone(true)
+type Env struct {
+	IPFS   iface.CoreAPI
+	Host   host.Host
+	Boot   Loader
+	WASM   wazero.RuntimeConfig
+	Module wazero.ModuleConfig
+}
+
+func (env Env) Serve(ctx context.Context) error {
+	bytecode, err := env.Boot.Load(ctx)
+	if err != nil {
+		return err
 	}
 
-	// Use the public IPFS DHT for routing.
-	config.Host = routedhost.Wrap(
-		config.Host,
-		config.IPFS.Routing())
-
-	return Cluster{
-		Config: config,
-	}
+	return env.CompileAndServe(ctx, bytecode)
 }
 
-type Cluster struct {
-	Config
-}
-
-func (c Cluster) String() string {
-	return c.Config.NS
-}
-
-// Serve the cluster's root filesystem
-func (c Cluster) Serve(ctx context.Context) error {
-	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
-		WithCloseOnContextDone(true))
-	defer r.Close(ctx)
+// Compile and serve the supplied bytecode using the supplied runtime.
+func (env Env) CompileAndServe(ctx context.Context, bytecode []byte) error {
+	r := wazero.NewRuntimeWithConfig(ctx, env.WASM)
+	defer r.CloseWithExitCode(ctx, 0)
 
 	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 	if err != nil {
@@ -69,131 +49,75 @@ func (c Cluster) Serve(ctx context.Context) error {
 	}
 	defer wasi.Close(ctx)
 
-	sys, err := system.HostConfig{
-		NS:   c.NS,
-		Host: c.Host,
-	}.Instantiate(ctx, r)
+	cm, err := r.CompileModule(ctx, bytecode)
 	if err != nil {
 		return err
 	}
-	defer sys.Close(ctx)
+	defer cm.Close(ctx)
 
-	fs, err := c.NewFS(ctx)
-	if err != nil {
-		return err
-	}
-
-	compiled, err := c.Compile(ctx, r, fs)
-	if err != nil {
-		return err
-	}
-	defer compiled.Close(ctx)
-
-	mod, err := r.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().
-		WithStartFunctions(). // don't call _start automatically
-		WithName(compiled.Name()).
-		// WithArgs().
-		// WithEnv().
-		WithSysNanosleep().
-		WithSysNanotime().
-		WithSysWalltime().
-		WithRandSource(rand.Reader).
-		WithOsyield(runtime.Gosched).
-		WithStdin(c.IO.Stdin()).
-		WithStdout(c.IO.Stdout()).
-		WithStderr(c.IO.Stderr()).
-		WithFS(fs))
+	mod, err := r.InstantiateModule(ctx, cm, env.Module)
 	if err != nil {
 		return err
 	}
 	defer mod.Close(ctx)
 
-	_, err = mod.ExportedFunction("_start").Call(ctx)
+	return env.ServeProc(ctx, mod)
+}
+
+// ServeProc starts the process and blocks until it terminates or the
+// context is canceled.
+func (env Env) ServeProc(ctx context.Context, mod api.Module) error {
+	fn := mod.ExportedFunction("_start")
+	if fn == nil {
+		return errors.New("missing export: _start")
+	}
+
+	_, err := fn.Call(ctx)
+	switch e := err.(type) {
+	case interface{ ExitCode() uint32 }:
+		switch e.ExitCode() {
+		case 0:
+			err = nil
+		case sys.ExitCodeContextCanceled:
+			err = context.Canceled
+		case sys.ExitCodeDeadlineExceeded:
+			err = context.DeadlineExceeded
+		}
+	}
+
 	return err
 }
 
-// NewFS returns an fs.FS.
-func (c Cluster) NewFS(ctx context.Context) (*system.IPFS, error) {
-	root, err := path.NewPath(c.NS)
-	if err != nil {
-		return nil, err
-	}
+// func (env Env) BindSocket(ctx context.Context, mod api.Module, sock io.Writer) ReleaseFunc {
+// 	// Semaphore with max weight of 1 acts as an unbounded mpmc queue.
+// 	sem := semaphore.NewWeighted(1)
 
-	return &system.IPFS{
-		Ctx:  ctx,
-		Unix: c.IPFS.Unixfs(),
-		Root: root,
-	}, nil
-}
+// 	// Handler is called in its own goroutine for each incoming libp2p stream.
+// 	handler := func(s network.Stream) {
+// 		defer s.Close()
 
-func (c Cluster) Compile(ctx context.Context, r wazero.Runtime, fs *system.IPFS) (wazero.CompiledModule, error) {
-	root, n, err := fs.Resolve(ctx, ".")
-	if err != nil {
-		return nil, err
-	}
-	defer n.Close()
+// 		// did we get the lock?
+// 		if sem.Acquire(ctx, 1) == nil {
+// 			defer sem.Release(1)
 
-	slog.DebugContext(ctx, "resolved root",
-		"path", root)
+// 			if n, err := io.Copy(sock, s); err != nil {
+// 				slog.Warn("message delivery failed",
+// 					"bytes_written", n,
+// 					"reason", err)
+// 			}
+// 		}
+// 	}
 
-	return c.CompileNode(ctx, r, n)
-}
+// 	proto := env.Proto(mod)
+// 	matchPrefix := func(id protocol.ID) bool {
+// 		return strings.HasPrefix(string(id), string(proto))
+// 	}
 
-// CompileNode reads bytecode from an IPFS node and compiles it.
-func (c Cluster) CompileNode(ctx context.Context, r wazero.Runtime, node files.Node) (wazero.CompiledModule, error) {
-	bytecode, err := c.LoadByteCode(ctx, node)
-	if err != nil {
-		return nil, err
-	}
+// 	env.Host.SetStreamHandlerMatch(proto, matchPrefix, handler)
+// 	return func() { env.Host.RemoveStreamHandler(proto) }
+// }
 
-	return r.CompileModule(ctx, bytecode)
-}
-
-// LoadByteCode loads the bytecode from the provided IPFS node.
-// If the node is a directory, it will walk the directory and
-// load the bytecode from the first file named "main.wasm". If
-// the node is a file, it will attempt to load the bytecode from
-// the file.  An error from Wazero usually indicates that the
-// bytecode is invalid.
-func (c Cluster) LoadByteCode(ctx context.Context, node files.Node) ([]byte, error) {
-	switch node := node.(type) {
-	case files.File:
-		return io.ReadAll(node)
-
-	case files.Directory:
-		return c.LoadByteCodeFromDir(ctx, node)
-
-	default:
-		panic(node) // unreachable
-	}
-}
-
-func (c Cluster) LoadByteCodeFromDir(ctx context.Context, d files.Directory) (b []byte, err error) {
-	if err = files.Walk(d, func(fpath string, node files.Node) error {
-		// Note:  early returns are used to short-circuit the walk. These
-		// are signaled by returning errAbortWalk.
-
-		// Already have the bytecode?
-		if b != nil {
-			return errAbortWalk
-		}
-
-		// File named "main.wasm"?
-		if fname := filepath.Base(fpath); fname == "main.wasm" {
-			if b, err = c.LoadByteCode(ctx, node); err != nil {
-				return err
-			}
-
-			return errAbortWalk
-		}
-
-		// Keep walking.
-		return nil
-	}); err == errAbortWalk { // no error; we've just bottomed out
-		err = nil
-	}
-
-	return
-}
-
-var errAbortWalk = errors.New("abort walk")
+// func (env Env) Proto(mod interface{ Name() string }) protocol.ID {
+// 	id := filepath.Join(Proto, mod.Name())
+// 	return protocol.ID(id)
+// }

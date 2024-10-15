@@ -12,6 +12,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/pkg/errors"
+	"github.com/wetware/go/util"
 )
 
 var _ fs.FS = (*IPFS)(nil)
@@ -26,7 +27,6 @@ var _ fs.FS = (*IPFS)(nil)
 // correctness.
 type IPFS struct {
 	Ctx  context.Context
-	Root path.Path
 	Unix iface.UnixfsAPI
 }
 
@@ -40,7 +40,7 @@ type IPFS struct {
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
 func (f IPFS) Open(name string) (fs.File, error) {
-	path, node, err := f.Resolve(f.Ctx, name)
+	path, node, err := util.Resolve(f.Ctx, f.Unix, name)
 	if err != nil {
 		return nil, &fs.PathError{
 			Op:   "open",
@@ -53,40 +53,6 @@ func (f IPFS) Open(name string) (fs.File, error) {
 		Path: path,
 		Node: node,
 	}, nil
-}
-
-func (f IPFS) Resolve(ctx context.Context, name string) (path.Path, files.Node, error) {
-	if pathInvalid(name) {
-		return nil, nil, fs.ErrInvalid
-	}
-
-	p, err := path.Join(f.Root, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	node, err := f.Unix.Get(ctx, p)
-	return p, node, err
-}
-
-func pathInvalid(name string) bool {
-	return !fs.ValidPath(name)
-}
-
-func (f IPFS) Sub(dir string) (fs.FS, error) {
-	var root path.Path
-	var err error
-	if (f == IPFS{}) {
-		root, err = path.NewPath(dir)
-	} else {
-		root, err = path.Join(f.Root, dir)
-	}
-
-	return &IPFS{
-		Ctx:  f.Ctx,
-		Root: root,
-		Unix: f.Unix,
-	}, err
 }
 
 var (

@@ -2,42 +2,60 @@ package ww_test
 
 import (
 	"bytes"
-	context "context"
-	"io"
+	"context"
+	_ "embed"
 	"testing"
+	"time"
 
-	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/kubo/client/rpc"
+	"github.com/libp2p/go-libp2p"
 	"github.com/stretchr/testify/require"
-	"github.com/tetratelabs/wazero/sys"
+	"github.com/tetratelabs/wazero"
 	ww "github.com/wetware/go"
-	"github.com/wetware/go/system"
 )
 
-func TestService(t *testing.T) {
+//go:embed testdata/main.wasm
+var fileContent []byte
+
+func TestEcho(t *testing.T) {
 	t.Parallel()
 
-	root, err := path.NewPath("/ipfs/QmRecDLNaESeNY3oUFYZKK9ftdANBB8kuLaMdAXMD43yon")
-	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
 
 	ipfs, err := rpc.NewLocalApi()
 	require.NoError(t, err)
 
-	buf := new(bytes.Buffer)
-	cluster := ww.Config{
-		NS:   root.String(),
+	h, err := libp2p.New()
+	require.NoError(t, err)
+	defer h.Close()
+
+	stdin := bytes.NewBufferString(`test`)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	err = ww.Env{
 		IPFS: ipfs,
-		IO:   system.Streams{Writer: nopCloser{buf}},
-	}.Build()
+		Host: h,
+		Boot: bytecode(fileContent),
+		WASM: wazero.NewRuntimeConfig().
+			// WithDebugInfoEnabled(true).
+			WithCloseOnContextDone(true),
+		Module: wazero.NewModuleConfig().
+			WithArgs("/testdata/main.wasm").
+			WithStdin(stdin).
+			WithStdout(stdout).
+			WithStderr(stderr).
+			WithFSConfig(wazero.NewFSConfig().
+				WithDirMount("testdata", "/testdata/")),
+	}.Serve(ctx)
 
-	err = cluster.Serve(context.Background())
-	status := err.(*sys.ExitError).ExitCode()
-	require.Zero(t, status)
-
-	// Check that main.wasm wrote what we expect.
-	require.Equal(t, "test", buf.String())
+	require.NoError(t, err, "server failed")
+	require.Equal(t, "test", stdout.String(), "unexpected output")
 }
 
-type nopCloser struct{ io.Writer }
+type bytecode []byte
 
-func (nopCloser) Close() error { return nil }
+func (b bytecode) Load(context.Context) ([]byte, error) {
+	return b, nil
+}
