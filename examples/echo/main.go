@@ -3,9 +3,10 @@
 package main
 
 import (
+	"io"
 	"os"
 )
 
 func main() {
-	os.Exit(0)
+	io.Copy(os.Stdout, os.Stdin)
 }

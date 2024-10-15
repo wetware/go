@@ -14,7 +14,7 @@ import (
 	ww "github.com/wetware/go"
 )
 
-//go:embed testdata/main.wasm
+//go:embed examples/echo/main.wasm
 var fileContent []byte
 
 func TestEcho(t *testing.T) {
@@ -42,12 +42,12 @@ func TestEcho(t *testing.T) {
 			// WithDebugInfoEnabled(true).
 			WithCloseOnContextDone(true),
 		Module: wazero.NewModuleConfig().
-			WithArgs("/testdata/main.wasm").
+			WithArgs("/examples/echo/main.wasm").
 			WithStdin(stdin).
 			WithStdout(stdout).
 			WithStderr(stderr).
 			WithFSConfig(wazero.NewFSConfig().
-				WithDirMount("testdata", "/testdata/")),
+				WithDirMount("examples/echo", "/examples/echo/")),
 	}.Serve(ctx)
 
 	require.NoError(t, err, "server failed")

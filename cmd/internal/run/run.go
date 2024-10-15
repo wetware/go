@@ -79,12 +79,15 @@ func run() cli.ActionFunc {
 		}
 		defer d.Close()
 
+		// fetches <path> for `ww run <path>`
+		bootloader := unixFSNode{
+			Name: c.Args().First(),
+			Unix: ipfs.Unixfs()}
+
 		return ww.Env{
 			IPFS: ipfs,
 			Host: h,
-			Boot: unixFSNode{
-				Name: c.Args().Get(1),
-				Unix: ipfs.Unixfs()},
+			Boot: bootloader,
 			WASM: wazero.NewRuntimeConfig().
 				WithDebugInfoEnabled(c.Bool("debug")).
 				WithCloseOnContextDone(true),
