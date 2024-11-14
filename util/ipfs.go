@@ -62,10 +62,6 @@ func LoadByteCodeFromDir(ctx context.Context, d files.Directory) (b []byte, err 
 var errAbortWalk = errors.New("abort walk")
 
 func Resolve(ctx context.Context, unixfs iface.UnixfsAPI, name string) (path.Path, files.Node, error) {
-	if PathInvalid(name) {
-		return nil, nil, fs.ErrInvalid
-	}
-
 	p, err := path.NewPath(name)
 	if err != nil {
 		return nil, nil, err

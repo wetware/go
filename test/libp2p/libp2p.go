@@ -691,6 +691,20 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 	return m.recorder
 }
 
+// CanDial mocks base method.
+func (m *MockNetwork) CanDial(p peer.ID, addr multiaddr.Multiaddr) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CanDial", p, addr)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// CanDial indicates an expected call of CanDial.
+func (mr *MockNetworkMockRecorder) CanDial(p, addr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CanDial", reflect.TypeOf((*MockNetwork)(nil).CanDial), p, addr)
+}
+
 // Close mocks base method.
 func (m *MockNetwork) Close() error {
 	m.ctrl.T.Helper()

@@ -1,13 +1,8 @@
 package run
 
 import (
-	"context"
-	"fmt"
 	"io"
-	"io/fs"
-	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/kubo/client/rpc"
@@ -79,21 +74,32 @@ func run() cli.ActionFunc {
 		}
 		defer d.Close()
 
-		// fetches <path> for `ww run <path>`
-		bootloader := unixFSNode{
-			Name: c.Args().First(),
-			Unix: ipfs.Unixfs()}
+		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
+			// WithCompilationCache().
+			WithDebugInfoEnabled(c.Bool("debug")).
+			WithCloseOnContextDone(true))
+		defer r.Close(c.Context)
+
+		root, err := path.NewPath(c.Args().First())
+		if err != nil {
+			return err
+		}
+
+		unixFS := system.IPFS{
+			Ctx:  c.Context,
+			Unix: ipfs.Unixfs(),
+		}
 
 		return ww.Env{
-			IPFS: ipfs,
-			Host: h,
-			Boot: bootloader,
-			WASM: wazero.NewRuntimeConfig().
-				WithDebugInfoEnabled(c.Bool("debug")).
-				WithCloseOnContextDone(true),
-			Module: moduleConfig(c, system.FSConfig{
-				IPFS: ipfs,
-				Host: h}),
+			Args:    c.Args().Slice(),
+			Vars:    c.StringSlice("env"),
+			Stdin:   maybeStdin(c),
+			Stdout:  maybeStdout(c),
+			Stderr:  maybeStderr(c),
+			Host:    h,
+			Runtime: r,
+			Root:    root.String(),
+			FS:      unixFS,
 		}.Serve(c.Context)
 	}
 }
@@ -119,61 +125,9 @@ func (s peerStorer) HandlePeerFound(info peer.AddrInfo) {
 	}
 }
 
-type unixFSNode struct {
-	Name string
-	Unix iface.UnixfsAPI
-}
-
-func (u unixFSNode) Load(ctx context.Context) ([]byte, error) {
-	p, err := path.NewPath(u.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	n, err := u.Unix.Get(ctx, p)
-	if err != nil {
-		return nil, err
-	}
-	defer n.Close()
-
-	return io.ReadAll(n.(io.Reader))
-}
-
-func moduleConfig(c *cli.Context, fs fs.FS) wazero.ModuleConfig {
-	config := wazero.NewModuleConfig().
-		WithArgs(c.Args().Tail()...).
-		WithName(c.Args().Tail()[0]).
-		WithStdin(maybeStdin(c)).
-		WithStdout(maybeStdout(c)).
-		WithStderr(maybeStderr(c)).
-		WithFSConfig(wazero.NewFSConfig().
-			WithFSMount(fs, "/p2p/").
-			WithFSMount(fs, "/ipfs/").
-			WithFSMount(fs, "/ipns/").
-			WithFSMount(fs, "/ipld/"))
-	return withEnvironment(c, config)
-}
-
-func withEnvironment(c *cli.Context, config wazero.ModuleConfig) wazero.ModuleConfig {
-	version := fmt.Sprintf("WW_VERSION=%s", ww.Version)
-	root := fmt.Sprintf("WW_ROOT=%s", c.Args().First())
-	env := append(c.StringSlice("env"), version, root)
-
-	for _, v := range env {
-		if maybePair := strings.SplitN(v, "=", 2); len(maybePair) == 2 {
-			config = config.WithEnv(maybePair[0], maybePair[1])
-		} else {
-			slog.DebugContext(c.Context, "ignoring invalid environment variable",
-				"value", v)
-		}
-	}
-
-	return config
-}
-
 func maybeStdin(c *cli.Context) io.Reader {
 	if c.Bool("interactive") {
-		return c.App.Reader
+		return c.App.Reader // TODO:  wrap with libreadline
 	}
 
 	return nil
@@ -184,7 +138,7 @@ func maybeStdout(c *cli.Context) io.Writer {
 		return c.App.Writer
 	}
 
-	return nil
+	return io.Discard // TODO:  handle stdout
 }
 
 func maybeStderr(c *cli.Context) io.Writer {
@@ -192,5 +146,5 @@ func maybeStderr(c *cli.Context) io.Writer {
 		return c.App.ErrWriter
 	}
 
-	return nil
+	return io.Discard // TODO:  handle stderr
 }

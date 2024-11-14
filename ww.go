@@ -2,122 +2,97 @@ package ww
 
 import (
 	"context"
-	"errors"
+	"io"
+	"io/fs"
 
-	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/blang/semver/v4"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/sys"
+	"github.com/wetware/go/proc"
+	protoutils "github.com/wetware/go/util/proto"
 )
 
 const Version = "0.1.0"
-const Proto = "/ww/" + Version
 
-type ReleaseFunc func()
-
-type Loader interface {
-	Load(ctx context.Context) ([]byte, error)
+var Proto = protoutils.VersionedID{
+	ID:      "ww",
+	Version: semver.MustParse(Version),
 }
 
 type Env struct {
-	IPFS   iface.CoreAPI
-	Host   host.Host
-	Boot   Loader
-	WASM   wazero.RuntimeConfig
-	Module wazero.ModuleConfig
+	Args    []string
+	Vars    []string
+	Stdin   io.Reader
+	Stdout  io.Writer
+	Stderr  io.Writer
+	Host    host.Host
+	Runtime wazero.Runtime
+	Root    string
+	FS      fs.FS
 }
 
 func (env Env) Serve(ctx context.Context) error {
-	bytecode, err := env.Boot.Load(ctx)
+	f, err := env.FS.Open(env.Root)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
 
-	return env.CompileAndServe(ctx, bytecode)
+	return env.CompileAndServe(ctx, b)
 }
 
 // Compile and serve the supplied bytecode using the supplied runtime.
 func (env Env) CompileAndServe(ctx context.Context, bytecode []byte) error {
-	r := wazero.NewRuntimeWithConfig(ctx, env.WASM)
-	defer r.CloseWithExitCode(ctx, 0)
-
-	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, r)
+	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, env.Runtime)
 	if err != nil {
 		return err
 	}
 	defer wasi.Close(ctx)
 
-	cm, err := r.CompileModule(ctx, bytecode)
+	cm, err := env.Runtime.CompileModule(ctx, bytecode)
 	if err != nil {
 		return err
 	}
 	defer cm.Close(ctx)
 
-	mod, err := r.InstantiateModule(ctx, cm, env.Module)
+	// Instantiate and bind the root process.
+	var p proc.P
+	err = proc.Config{
+		Proto:   Proto.Unwrap(),
+		Args:    env.Args,
+		Env:     env.Vars,
+		Stdout:  env.Stdout,
+		Stderr:  env.Stderr,
+		Runtime: env.Runtime,
+		Module:  cm,
+	}.Bind(ctx, &p)
 	if err != nil {
 		return err
 	}
-	defer mod.Close(ctx)
+	defer p.Close(ctx)
 
-	return env.ServeProc(ctx, mod)
+	release := Bind(ctx, env.Host, &p)
+	defer release()
+
+	<-ctx.Done()
+	return ctx.Err()
 }
 
-// ServeProc starts the process and blocks until it terminates or the
-// context is canceled.
-func (env Env) ServeProc(ctx context.Context, mod api.Module) error {
-	fn := mod.ExportedFunction("_start")
-	if fn == nil {
-		return errors.New("missing export: _start")
-	}
+type ReleaseFunc func()
 
-	_, err := fn.Call(ctx)
-	switch e := err.(type) {
-	case interface{ ExitCode() uint32 }:
-		switch e.ExitCode() {
-		case 0:
-			err = nil
-		case sys.ExitCodeContextCanceled:
-			err = context.Canceled
-		case sys.ExitCodeDeadlineExceeded:
-			err = context.DeadlineExceeded
-		}
-	}
+func Bind(ctx context.Context, h host.Host, p *proc.P) ReleaseFunc {
+	handler := proc.StreamHandler{Proc: p}
+	proto := handler.Proto()
 
-	return err
+	h.SetStreamHandlerMatch(
+		proto,
+		handler.Match,
+		handler.Bind(ctx))
+	return func() { h.RemoveStreamHandler(proto) }
 }
-
-// func (env Env) BindSocket(ctx context.Context, mod api.Module, sock io.Writer) ReleaseFunc {
-// 	// Semaphore with max weight of 1 acts as an unbounded mpmc queue.
-// 	sem := semaphore.NewWeighted(1)
-
-// 	// Handler is called in its own goroutine for each incoming libp2p stream.
-// 	handler := func(s network.Stream) {
-// 		defer s.Close()
-
-// 		// did we get the lock?
-// 		if sem.Acquire(ctx, 1) == nil {
-// 			defer sem.Release(1)
-
-// 			if n, err := io.Copy(sock, s); err != nil {
-// 				slog.Warn("message delivery failed",
-// 					"bytes_written", n,
-// 					"reason", err)
-// 			}
-// 		}
-// 	}
-
-// 	proto := env.Proto(mod)
-// 	matchPrefix := func(id protocol.ID) bool {
-// 		return strings.HasPrefix(string(id), string(proto))
-// 	}
-
-// 	env.Host.SetStreamHandlerMatch(proto, matchPrefix, handler)
-// 	return func() { env.Host.RemoveStreamHandler(proto) }
-// }
-
-// func (env Env) Proto(mod interface{ Name() string }) protocol.ID {
-// 	id := filepath.Join(Proto, mod.Name())
-// 	return protocol.ID(id)
-// }

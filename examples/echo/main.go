@@ -1,4 +1,4 @@
-//go:generate env GOOS=wasip1 GOARCH=wasm go build -o main.wasm
+//go:generate tinygo build -o main.wasm -target=wasi -scheduler=none main.go
 
 package main
 
@@ -7,6 +7,11 @@ import (
 	"os"
 )
 
-func main() {
-	io.Copy(os.Stdout, os.Stdin)
+//export echo
+func echo() {
+	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+		panic(err)
+	}
 }
+
+func main() {}
