@@ -3,10 +3,12 @@ package proc
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"io"
 	"log/slog"
 	"path"
+	"runtime"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
@@ -35,7 +37,12 @@ func (cfg Config) Bind(ctx context.Context, p *P) (err error) {
 		WithStdin(&p.mailbox).
 		WithStdout(cfg.Stdout).
 		WithStderr(cfg.Stderr).
-		WithEnv("WW_PROTO", proto)
+		WithEnv("WW_PROTO", proto).
+		WithRandSource(rand.Reader).
+		WithOsyield(runtime.Gosched).
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime()
 
 	p.Mod, err = cfg.Runtime.InstantiateModule(ctx, cfg.Module,
 		cfg.WithEnv(mc))
@@ -122,11 +129,3 @@ func (p *P) ToWasmStack(stack capnp.UInt64List) []uint64 {
 
 	return p.stack
 }
-
-// rd      io.LimitedReader
-// func (p *P) ReadFrom(r io.Reader) (int64, error) {
-// 	p.buf.Reset()
-// 	p.rd.R = r
-// 	p.rd.N = 1<<32 - 1 // max uint32
-// 	return io.Copy(&p.buf, r)
-// }
