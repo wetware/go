@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 
+	"capnproto.org/go/capnp/v3"
 	"github.com/blang/semver/v4"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
@@ -77,11 +78,38 @@ func (env Env) CompileAndServe(ctx context.Context, bytecode []byte) error {
 	}
 	defer p.Close(ctx)
 
+	if err := env.Bootstrap(ctx, &p); err != nil {
+		return err
+	}
+
 	release := Bind(ctx, env.Host, &p)
 	defer release()
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func (env Env) Bootstrap(ctx context.Context, p *proc.P) error {
+	b, err := io.ReadAll(&io.LimitedReader{
+		R: env.Stdin,
+		N: int64(1<<32 - 1), // max u32
+	})
+	if err != nil {
+		return err
+	}
+
+	m, err := capnp.Unmarshal(b)
+	if err != nil {
+		return err
+	}
+	defer m.Release()
+
+	call, err := proc.ReadRootMethodCall(m)
+	if err != nil {
+		return err
+	}
+
+	return p.Deliver(ctx, call)
 }
 
 type ReleaseFunc func()
