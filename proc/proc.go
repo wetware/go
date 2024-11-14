@@ -24,11 +24,13 @@ type Config struct {
 }
 
 func (cfg Config) Bind(ctx context.Context, p *P) (err error) {
-	pid := NewPID()
-	proto := path.Join(string(cfg.Proto), pid.String()) // /ww/0.1.0/<pid>
+	// /ww/0.1.0/<pid>
+	proto := path.Join(
+		string(cfg.Proto), // /ww/<version>
+		NewPID().String()) // <pid>
 
 	mc := wazero.NewModuleConfig().
-		WithName(pid.String()).
+		WithName(proto).
 		WithArgs(cfg.Args...).
 		WithStdin(&p.mailbox).
 		WithStdout(cfg.Stdout).

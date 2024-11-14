@@ -4,9 +4,12 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"log/slog"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/blang/semver/v4"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -78,15 +81,56 @@ func (env Env) CompileAndServe(ctx context.Context, bytecode []byte) error {
 	}
 	defer p.Close(ctx)
 
-	if err := env.Bootstrap(ctx, &p); err != nil {
+	return env.ServeProc(ctx, &p)
+}
+
+func (env Env) ServeProc(ctx context.Context, p *proc.P) error {
+	sub, err := env.Host.EventBus().Subscribe([]any{
+		new(event.EvtLocalAddressesUpdated),
+		new(event.EvtLocalProtocolsUpdated)})
+	if err != nil {
 		return err
 	}
+	defer sub.Close()
 
-	release := Bind(ctx, env.Host, &p)
+	// if err := env.Bootstrap(ctx, &p); err != nil {
+	// 	return err
+	// }
+
+	// TODO:  client apps shouldn't listen for streams
+	release := env.Bind(ctx, p)
 	defer release()
 
-	<-ctx.Done()
-	return ctx.Err()
+	slog.InfoContext(ctx, "event loop started",
+		"peer", env.Host.ID(),
+		"proc", p.String())
+	defer slog.WarnContext(ctx, "event loop halted",
+		"peer", env.Host.ID(),
+		"proc", p.String())
+
+	for {
+		var v any
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case v = <-sub.Out(): // assign event to v
+		}
+
+		switch ev := v.(type) {
+		case *event.EvtLocalAddressesUpdated:
+			slog.InfoContext(ctx, "local addresses updated",
+				"peer", env.Host.ID(),
+				"current", ev.Current,
+				"removed", ev.Removed,
+				"diffs", ev.Diffs)
+
+		case *event.EvtLocalProtocolsUpdated:
+			slog.InfoContext(ctx, "local protocols updated",
+				"peer", env.Host.ID(),
+				"added", ev.Added,
+				"removed", ev.Removed)
+		}
+	}
 }
 
 func (env Env) Bootstrap(ctx context.Context, p *proc.P) error {
@@ -94,7 +138,7 @@ func (env Env) Bootstrap(ctx context.Context, p *proc.P) error {
 		R: env.Stdin,
 		N: int64(1<<32 - 1), // max u32
 	})
-	if err != nil {
+	if err != nil || len(b) == 0 {
 		return err
 	}
 
@@ -112,15 +156,22 @@ func (env Env) Bootstrap(ctx context.Context, p *proc.P) error {
 	return p.Deliver(ctx, call)
 }
 
-type ReleaseFunc func()
+func (env Env) Bind(ctx context.Context, p *proc.P) ReleaseFunc {
+	var timeout time.Duration // default 0
+	if dl, ok := ctx.Deadline(); ok {
+		timeout = time.Until(dl)
+	}
 
-func Bind(ctx context.Context, h host.Host, p *proc.P) ReleaseFunc {
-	handler := proc.StreamHandler{Proc: p}
+	handler := proc.StreamHandler{
+		Proc:               p,
+		MessageReadTimeout: timeout}
 	proto := handler.Proto()
 
-	h.SetStreamHandlerMatch(
+	env.Host.SetStreamHandlerMatch(
 		proto,
 		handler.Match,
 		handler.Bind(ctx))
-	return func() { h.RemoveStreamHandler(proto) }
+	return func() { env.Host.RemoveStreamHandler(proto) }
 }
+
+type ReleaseFunc func()
