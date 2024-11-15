@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ReleaseFunc func()
+
 var _ fs.FS = (*FSConfig)(nil)
 
 type FSConfig struct {

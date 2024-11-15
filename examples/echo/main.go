@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"io"
 	"os"
 )
@@ -14,4 +15,18 @@ func echo() {
 	}
 }
 
-func main() {}
+func main() {
+	stdin := flag.Bool("stdin", false, "read from standard input")
+	serve := flag.Bool("serve", false, "handle async method calls")
+	flag.Parse()
+
+	if *stdin {
+		echo()
+	}
+
+	if *serve {
+		// Signal to caller that this module is ready to handle
+		// incoming method calls.
+		os.Exit(0x00ff0000)
+	}
+}

@@ -3,18 +3,22 @@ package ww
 import (
 	"context"
 	"io"
-	"io/fs"
-	"log/slog"
-	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/blang/semver/v4"
-	"github.com/libp2p/go-libp2p/core/event"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/wetware/go/proc"
+	"github.com/wetware/go/system"
+
 	protoutils "github.com/wetware/go/util/proto"
+)
+
+// These special exit codes are reserved by Wetware.  It is assumed that a well-behaved WASM program
+// will not return these exit codes.  In general, we assume that the most-significant 16 bits are reserved
+// for Wetware.
+const (
+	// ExitCodePivot
+	ExitCodePivot uint32 = 0x00ff0000
 )
 
 const Version = "0.1.0"
@@ -25,153 +29,99 @@ var Proto = protoutils.VersionedID{
 }
 
 type Env struct {
-	Args    []string
-	Vars    []string
-	Stdin   io.Reader
-	Stdout  io.Writer
-	Stderr  io.Writer
-	Host    host.Host
-	Runtime wazero.Runtime
-	Root    string
-	FS      fs.FS
+	IO  system.IO
+	Net system.Net
+	FS  system.IPFS
 }
 
-func (env Env) Serve(ctx context.Context) error {
-	f, err := env.FS.Open(env.Root)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-
-	return env.CompileAndServe(ctx, b)
-}
-
-// Compile and serve the supplied bytecode using the supplied runtime.
-func (env Env) CompileAndServe(ctx context.Context, bytecode []byte) error {
-	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, env.Runtime)
-	if err != nil {
-		return err
-	}
-	defer wasi.Close(ctx)
-
-	cm, err := env.Runtime.CompileModule(ctx, bytecode)
-	if err != nil {
-		return err
-	}
-	defer cm.Close(ctx)
-
-	// Instantiate and bind the root process.
-	var p proc.P
-	err = proc.Config{
-		Proto:   Proto.Unwrap(),
-		Args:    env.Args,
-		Env:     env.Vars,
-		Stdout:  env.Stdout,
-		Stderr:  env.Stderr,
-		Runtime: env.Runtime,
-		Module:  cm,
-	}.Bind(ctx, &p)
+func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
+	p, err := env.Instantiate(ctx, r)
 	if err != nil {
 		return err
 	}
 	defer p.Close(ctx)
 
-	return env.ServeProc(ctx, &p)
-}
-
-func (env Env) ServeProc(ctx context.Context, p *proc.P) error {
-	sub, err := env.Host.EventBus().Subscribe([]any{
-		new(event.EvtLocalAddressesUpdated),
-		new(event.EvtLocalProtocolsUpdated)})
-	if err != nil {
-		return err
-	}
-	defer sub.Close()
-
-	// if err := env.Bootstrap(ctx, &p); err != nil {
-	// 	return err
-	// }
-
-	// TODO:  client apps shouldn't listen for streams
-	release := env.Bind(ctx, p)
+	release := env.Net.Bind(ctx, p)
 	defer release()
 
-	slog.InfoContext(ctx, "event loop started",
-		"peer", env.Host.ID(),
-		"proc", p.String())
-	defer slog.WarnContext(ctx, "event loop halted",
-		"peer", env.Host.ID(),
-		"proc", p.String())
-
-	for {
-		var v any
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case v = <-sub.Out(): // assign event to v
-		}
-
-		switch ev := v.(type) {
-		case *event.EvtLocalAddressesUpdated:
-			slog.InfoContext(ctx, "local addresses updated",
-				"peer", env.Host.ID(),
-				"current", ev.Current,
-				"removed", ev.Removed,
-				"diffs", ev.Diffs)
-
-		case *event.EvtLocalProtocolsUpdated:
-			slog.InfoContext(ctx, "local protocols updated",
-				"peer", env.Host.ID(),
-				"added", ev.Added,
-				"removed", ev.Removed)
-		}
-	}
-}
-
-func (env Env) Bootstrap(ctx context.Context, p *proc.P) error {
-	b, err := io.ReadAll(&io.LimitedReader{
-		R: env.Stdin,
-		N: int64(1<<32 - 1), // max u32
-	})
-	if err != nil || len(b) == 0 {
-		return err
-	}
-
-	m, err := capnp.Unmarshal(b)
+	// Call main() function (alias _start method)
+	m, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
 		return err
 	}
 	defer m.Release()
 
-	call, err := proc.ReadRootMethodCall(m)
+	call, err := proc.NewRootMethodCall(seg)
 	if err != nil {
+		return err
+	} else if err := call.SetName("_start"); err != nil {
+		return err
+	} else if b, err := io.ReadAll(env.IO.Stdin); err != nil {
+		return err
+	} else if err := call.SetCallData(b); err != nil {
 		return err
 	}
 
-	return p.Deliver(ctx, call)
-}
-
-func (env Env) Bind(ctx context.Context, p *proc.P) ReleaseFunc {
-	var timeout time.Duration // default 0
-	if dl, ok := ctx.Deadline(); ok {
-		timeout = time.Until(dl)
+	err = p.Deliver(ctx, call)
+	switch e := err.(type) {
+	case interface{ ExitCode() uint32 }:
+		switch e.ExitCode() {
+		case 0:
+			return nil
+		case ExitCodePivot:
+			return env.Net.ServeProc(ctx, p)
+		}
 	}
 
-	handler := proc.StreamHandler{
-		Proc:               p,
-		MessageReadTimeout: timeout}
-	proto := handler.Proto()
-
-	env.Host.SetStreamHandlerMatch(
-		proto,
-		handler.Match,
-		handler.Bind(ctx))
-	return func() { env.Host.RemoveStreamHandler(proto) }
+	return err
 }
 
-type ReleaseFunc func()
+func (env Env) Instantiate(ctx context.Context, r wazero.Runtime) (*proc.P, error) {
+	cm, err := env.LoadAndCompile(ctx, r, env.IO.Args[0]) // FIXME:  panic if len(args)=0
+	if err != nil {
+		return nil, err
+	}
+	defer cm.Close(ctx)
+
+	return proc.Config{
+		Args:   env.IO.Args,
+		Env:    env.IO.Env,
+		Stdin:  env.IO.Stdin,
+		Stdout: env.IO.Stdout,
+		Stderr: env.IO.Stderr,
+	}.Instantiate(ctx, r, cm)
+}
+
+func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string) (wazero.CompiledModule, error) {
+	b, err := env.ReadAll(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.CompileModule(ctx, b)
+}
+
+func (env Env) ReadAll(ctx context.Context, name string) ([]byte, error) {
+	f, err := env.FS.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return io.ReadAll(f)
+}
+
+// func (env Env) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
+// 	for _, s := range env.IO.Env {
+// 		ss := strings.SplitN(s, "=", 2)
+// 		if len(ss) != 2 {
+// 			slog.Warn("ignored unparsable environment variable",
+// 				"var", s)
+// 			continue
+// 		}
+
+// 		mc = mc.WithEnv(ss[0], ss[1])
+// 	}
+
+// 	return mc
+// }

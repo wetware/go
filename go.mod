@@ -12,6 +12,7 @@ require (
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.36.5
 	github.com/lmittmann/tint v1.0.4
+	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.9.0
@@ -100,7 +101,6 @@ require (
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.4.0 // indirect

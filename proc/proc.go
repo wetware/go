@@ -6,10 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
-	"log/slog"
-	"path"
 	"runtime"
-	"strings"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -18,54 +15,41 @@ import (
 )
 
 type Config struct {
-	Proto          protocol.ID
 	Args, Env      []string
+	Stdin          io.Reader
 	Stdout, Stderr io.Writer
-	Runtime        wazero.Runtime
-	Module         wazero.CompiledModule
 }
 
-func (cfg Config) Bind(ctx context.Context, p *P) (err error) {
-	// /ww/0.1.0/<pid>
-	proto := path.Join(
-		string(cfg.Proto), // /ww/<version>
-		NewPID().String()) // <pid>
+func (cfg Config) Instantiate(
+	ctx context.Context,
+	r wazero.Runtime,
+	cm wazero.CompiledModule,
+) (*P, error) {
+	var p P
 
-	mc := wazero.NewModuleConfig().
-		WithName(proto).
+	// /ww/<semver>/proc/<pid>
+	pid := NewPID().String()
+
+	var err error
+	p.Mod, err = r.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
+		WithName(pid).
 		WithArgs(cfg.Args...).
 		WithStdin(&p.mailbox).
 		WithStdout(cfg.Stdout).
 		WithStderr(cfg.Stderr).
-		WithEnv("WW_PROTO", proto).
+		WithEnv("WW_PID", pid).
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched).
 		WithSysNanosleep().
 		WithSysNanotime().
-		WithSysWalltime()
-
-	p.Mod, err = cfg.Runtime.InstantiateModule(ctx, cfg.Module,
-		cfg.WithEnv(mc))
-	return
-}
-
-func (cfg Config) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
-	for _, s := range cfg.Env {
-		ss := strings.SplitN(s, "=", 2)
-		if len(ss) != 2 {
-			slog.Warn("ignored unparsable environment variable",
-				"var", s)
-			continue
-		}
-
-		mc = mc.WithEnv(ss[0], ss[1])
-	}
-
-	return mc
+		WithSysWalltime().
+		WithStartFunctions())
+	return &p, err
 }
 
 type P struct {
-	Mod api.Module
+	Parent protocol.ID
+	Mod    api.Module
 
 	stack   []uint64
 	mailbox bytes.Reader

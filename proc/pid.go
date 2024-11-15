@@ -2,8 +2,10 @@ package proc
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"io"
+
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/mr-tron/base58/base58"
 )
 
 type PID [20]byte // 160bit opaque identifier
@@ -26,6 +28,19 @@ func ReadPID(r io.Reader) (pid PID, err error) {
 	return
 }
 
+func ParsePID(s string) (pid PID, err error) {
+	var buf []byte
+	if buf, err = base58.FastBase58Decoding(s); err == nil {
+		copy(pid[:], buf)
+	}
+	return
+}
+
 func (pid PID) String() string {
-	return hex.EncodeToString(pid[:])
+	return base58.FastBase58Encoding(pid[:])
+}
+
+func (pid PID) Proto() protocol.ID {
+	proto := pid.String()
+	return protocol.ID(proto)
 }

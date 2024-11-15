@@ -36,8 +36,8 @@ func (h StreamHandler) String() string {
 }
 
 func (h StreamHandler) Proto() protocol.ID {
-	name := h.Proc.Mod.Name()                     // process ID
-	return h.VersionedID.WithChild(name).Unwrap() // append
+	pid := protocol.ID(h.Proc.Mod.Name())
+	return protoutils.Join(h.Unwrap(), "proc", pid)
 }
 
 func (h StreamHandler) Match(id protocol.ID) bool {

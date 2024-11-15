@@ -37,14 +37,12 @@ func TestProc_echo(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	var p proc.P
-	err = proc.Config{
-		Stdout:  stdout,
-		Stderr:  stderr,
-		Runtime: r,
-		Module:  cm,
-	}.Bind(ctx, &p)
+	p, err := proc.Config{
+		Stdout: stdout,
+		Stderr: stderr,
+	}.Instantiate(ctx, r, cm)
 	require.NoError(t, err, "failed to instantiate process")
+	require.NotNil(t, p, "should return *proc.P")
 	defer p.Close(ctx)
 
 	msg, seg := capnp.NewSingleSegmentMessage(nil)
@@ -87,14 +85,12 @@ func TestProc_echo_repeated_calls(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	var p proc.P
-	err = proc.Config{
-		Stdout:  stdout,
-		Stderr:  stderr,
-		Runtime: r,
-		Module:  cm,
-	}.Bind(ctx, &p)
+	p, err := proc.Config{
+		Stdout: stdout,
+		Stderr: stderr,
+	}.Instantiate(ctx, r, cm)
 	require.NoError(t, err, "failed to instantiate process")
+	require.NotNil(t, p, "should return *proc.P")
 	defer p.Close(ctx)
 
 	for i := 0; i < 10; i++ {

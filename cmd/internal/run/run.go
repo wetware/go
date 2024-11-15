@@ -1,20 +1,24 @@
 package run
 
 import (
+	"bytes"
+	"context"
 	"io"
+	"log/slog"
 	"net/http"
 
-	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
+	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
 
@@ -43,12 +47,10 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_DEBUG"},
 				Usage:   "enable WASM debug values",
 			},
-			&cli.BoolFlag{
-				Name:    "interactive",
-				Aliases: []string{"i"},
-				EnvVars: []string{"WW_INTERACTIVE"},
-				Usage:   "bind to process stdio",
-			},
+			// &cli.BoolFlag{
+			// 	Name:  "listen",
+			// 	Usage: "serve network calls after main() exits",
+			// },
 		},
 		Action: run(),
 	}
@@ -68,39 +70,105 @@ func run() cli.ActionFunc {
 		defer h.Close()
 
 		// Create an mDNS service to discover peers on the local network
-		d := mdns.NewMdnsService(h, "ww.local", peerStorer{Peerstore: h.Peerstore()})
+		peerHook := system.StorePeer{Peerstore: h.Peerstore()}
+		d := mdns.NewMdnsService(h, "ww.local", peerHook)
 		if err := d.Start(); err != nil {
 			return err
 		}
 		defer d.Close()
 
+		// Set up WASM runtime and host modules
 		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
 			// WithCompilationCache().
 			WithDebugInfoEnabled(c.Bool("debug")).
 			WithCloseOnContextDone(true))
 		defer r.Close(c.Context)
 
-		root, err := path.NewPath(c.Args().First())
+		wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
 		if err != nil {
 			return err
 		}
-
-		unixFS := system.IPFS{
-			Ctx:  c.Context,
-			Unix: ipfs.Unixfs(),
-		}
+		defer wasi.Close(c.Context)
 
 		return ww.Env{
-			Args:    c.Args().Slice(),
-			Vars:    c.StringSlice("env"),
-			Stdin:   maybeStdin(c),
-			Stdout:  maybeStdout(c),
-			Stderr:  maybeStderr(c),
-			Host:    h,
-			Runtime: r,
-			Root:    root.String(),
-			FS:      unixFS,
-		}.Serve(c.Context)
+			IO: system.IO{
+				Args:   c.Args().Slice(),
+				Env:    c.StringSlice("env"),
+				Stdin:  stdin(c),
+				Stdout: c.App.Writer,
+				Stderr: c.App.ErrWriter,
+			},
+			Net: system.Net{
+				Host:    h,
+				Handler: handler(c, h),
+			},
+			FS: system.IPFS{
+				Ctx:  c.Context,
+				Unix: ipfs.Unixfs(),
+			},
+		}.Bind(c.Context, r)
+	}
+}
+
+func stdin(c *cli.Context) io.Reader {
+	if c.IsSet("stdin") && c.Bool("stdin") {
+		return c.App.Reader
+	}
+
+	return emptyReader
+}
+
+var emptyReader io.Reader = &bytes.Reader{}
+
+func handler(c *cli.Context, h host.Host) system.HandlerFunc {
+	return func(ctx context.Context, p *proc.P) error {
+		sub, err := h.EventBus().Subscribe([]any{
+			new(event.EvtLocalAddressesUpdated),
+			new(event.EvtLocalProtocolsUpdated)})
+		if err != nil {
+			return err
+		}
+		defer sub.Close()
+
+		// asynchronous event loop
+		slog.InfoContext(ctx, "wetware started",
+			"peer", h.ID(),
+			"path", c.Args().First(),
+			"proc", p.String(),
+			"proto", ww.Proto.String())
+		defer slog.WarnContext(ctx, "wetware stopped",
+			"peer", h.ID(),
+			"path", c.Args().First(),
+			"proc", p.String(),
+			"proto", ww.Proto.String())
+
+		for {
+			var v any
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+
+			case v = <-sub.Out():
+				// current event is assigned to v
+
+				switch ev := v.(type) {
+				case *event.EvtLocalAddressesUpdated:
+					// TODO(easy):  emit to libp2p topic
+					slog.InfoContext(ctx, "local addresses updated",
+						"peer", h.ID(),
+						"current", ev.Current,
+						"removed", ev.Removed,
+						"diffs", ev.Diffs)
+
+				case *event.EvtLocalProtocolsUpdated:
+					// TODO(easy):  emit to libp2p topic
+					slog.InfoContext(ctx, "local protocols updated",
+						"peer", h.ID(),
+						"added", ev.Added,
+						"removed", ev.Removed)
+				}
+			}
+		}
 	}
 }
 
@@ -113,38 +181,4 @@ func newIPFSClient(c *cli.Context) (ipfs iface.CoreAPI, err error) {
 	}
 
 	return
-}
-
-type peerStorer struct {
-	peerstore.Peerstore
-}
-
-func (s peerStorer) HandlePeerFound(info peer.AddrInfo) {
-	for _, addr := range info.Addrs {
-		s.AddAddr(info.ID, addr, peerstore.AddressTTL) // assume a dynamic environment
-	}
-}
-
-func maybeStdin(c *cli.Context) io.Reader {
-	if c.Bool("interactive") {
-		return c.App.Reader // TODO:  wrap with libreadline
-	}
-
-	return nil
-}
-
-func maybeStdout(c *cli.Context) io.Writer {
-	if c.Bool("interactive") {
-		return c.App.Writer
-	}
-
-	return io.Discard // TODO:  handle stdout
-}
-
-func maybeStderr(c *cli.Context) io.Writer {
-	if c.Bool("interactive") {
-		return c.App.ErrWriter
-	}
-
-	return io.Discard // TODO:  handle stderr
 }
