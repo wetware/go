@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -20,12 +21,25 @@ func (n Net) Bind(ctx context.Context, p *proc.P) ReleaseFunc {
 	handler := proc.StreamHandler{
 		VersionedID: n.Proto,
 		Proc:        p}
+	proto := handler.Proto()
+	pid := handler.String()
+	peer := n.Host.ID()
 
 	n.Host.SetStreamHandlerMatch(
-		handler.Proto(),
+		proto,
 		handler.Match,
 		handler.Bind(ctx))
-	return func() { n.Host.RemoveStreamHandler(handler.Proto()) }
+	slog.DebugContext(ctx, "attached process stream handlers",
+		"peer", peer,
+		"proto", proto,
+		"proc", pid)
+	return func() {
+		n.Host.RemoveStreamHandler(proto)
+		slog.DebugContext(ctx, "detached process stream handlers",
+			"peer", peer,
+			"proto", proto,
+			"proc", pid)
+	}
 }
 
 // StorePeer is a peer handler that inserts the peer in the

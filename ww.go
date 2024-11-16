@@ -57,7 +57,9 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 		return err
 	} else if err := call.SetName("_start"); err != nil {
 		return err
-	} else if b, err := io.ReadAll(env.IO.Stdin); err != nil {
+	}
+
+	if b, err := io.ReadAll(env.IO.Stdin); err != nil {
 		return err
 	} else if err := call.SetCallData(b); err != nil {
 		return err
@@ -84,10 +86,9 @@ func (env Env) Instantiate(ctx context.Context, r wazero.Runtime) (*proc.P, erro
 	}
 	defer cm.Close(ctx)
 
-	return proc.Config{
+	return proc.Command{
 		Args:   env.IO.Args,
 		Env:    env.IO.Env,
-		Stdin:  env.IO.Stdin,
 		Stdout: env.IO.Stdout,
 		Stderr: env.IO.Stderr,
 	}.Instantiate(ctx, r, cm)
@@ -111,18 +112,3 @@ func (env Env) ReadAll(ctx context.Context, name string) ([]byte, error) {
 
 	return io.ReadAll(f)
 }
-
-// func (env Env) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
-// 	for _, s := range env.IO.Env {
-// 		ss := strings.SplitN(s, "=", 2)
-// 		if len(ss) != 2 {
-// 			slog.Warn("ignored unparsable environment variable",
-// 				"var", s)
-// 			continue
-// 		}
-
-// 		mc = mc.WithEnv(ss[0], ss[1])
-// 	}
-
-// 	return mc
-// }

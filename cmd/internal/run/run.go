@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
@@ -43,14 +44,9 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_ENV"},
 			},
 			&cli.BoolFlag{
-				Name:    "debug",
-				EnvVars: []string{"WW_DEBUG"},
-				Usage:   "enable WASM debug values",
+				Name:  "stdin",
+				Usage: "bind stdin to wasm guest",
 			},
-			// &cli.BoolFlag{
-			// 	Name:  "listen",
-			// 	Usage: "serve network calls after main() exits",
-			// },
 		},
 		Action: run(),
 	}
@@ -95,8 +91,8 @@ func run() cli.ActionFunc {
 				Args:   c.Args().Slice(),
 				Env:    c.StringSlice("env"),
 				Stdin:  stdin(c),
-				Stdout: c.App.Writer,
-				Stderr: c.App.ErrWriter,
+				Stdout: stdout(c),
+				Stderr: stderr(c),
 			},
 			Net: system.Net{
 				Host:    h,
@@ -109,16 +105,6 @@ func run() cli.ActionFunc {
 		}.Bind(c.Context, r)
 	}
 }
-
-func stdin(c *cli.Context) io.Reader {
-	if c.IsSet("stdin") && c.Bool("stdin") {
-		return c.App.Reader
-	}
-
-	return emptyReader
-}
-
-var emptyReader io.Reader = &bytes.Reader{}
 
 func handler(c *cli.Context, h host.Host) system.HandlerFunc {
 	return func(ctx context.Context, p *proc.P) error {
@@ -181,4 +167,33 @@ func newIPFSClient(c *cli.Context) (ipfs iface.CoreAPI, err error) {
 	}
 
 	return
+}
+
+func stdin(c *cli.Context) io.Reader {
+	switch r := c.App.Reader.(type) {
+	case *os.File:
+		info, err := r.Stat()
+		if err != nil {
+			panic(err)
+		}
+
+		if info.Size() <= 0 {
+			break
+		}
+
+		return &io.LimitedReader{
+			R: c.App.Reader,
+			N: 1<<32 - 1, // max u32
+		}
+	}
+
+	return &bytes.Reader{} // empty buffer
+}
+
+func stdout(c *cli.Context) io.Writer {
+	return c.App.Writer
+}
+
+func stderr(c *cli.Context) io.Writer {
+	return c.App.ErrWriter
 }

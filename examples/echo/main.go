@@ -3,8 +3,10 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/wetware/go/std/system"
@@ -18,15 +20,30 @@ func echo() {
 }
 
 func main() {
-	stdin := flag.Bool("stdin", false, "read from standard input")
-	serve := flag.Bool("serve", false, "handle async method calls")
+	stdin := flag.Bool("stdin", false, "read data from stdin")
 	flag.Parse()
 
 	if *stdin {
-		echo()
+		if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+			slog.Error("failed echo stdin",
+				"reason", err)
+			os.Exit(1)
+		}
+
+	} else {
+		w := bufio.NewWriter(os.Stdout)
+		for _, arg := range os.Args[1:] {
+			w.WriteString(arg)
+			w.WriteString(" ")
+			if err := w.Flush(); err != nil {
+				slog.Error("failed to flush argument to stdout",
+					"reason", err)
+				os.Exit(1)
+			}
+		}
 	}
 
-	if *serve {
+	if serve() {
 		// Yield control to the scheduler.
 		os.Exit(system.StatusAwaiting)
 		// The caller will intercept interface{ExitCode() uint32} and
@@ -39,4 +56,13 @@ func main() {
 	// Implicit status code 0 works as expected.
 	// Caller will resolve to err = nil.
 	// Top-level CLI command will unblock.
+}
+
+func serve() bool {
+	switch os.Getenv("WW_SERVE") {
+	case "", "false", "0":
+		return false
+	default:
+		return true
+	}
 }

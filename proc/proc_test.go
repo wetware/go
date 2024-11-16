@@ -37,7 +37,7 @@ func TestProc_echo(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	p, err := proc.Config{
+	p, err := proc.Command{
 		Stdout: stdout,
 		Stderr: stderr,
 	}.Instantiate(ctx, r, cm)
@@ -85,7 +85,7 @@ func TestProc_echo_repeated_calls(t *testing.T) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	p, err := proc.Config{
+	p, err := proc.Command{
 		Stdout: stdout,
 		Stderr: stderr,
 	}.Instantiate(ctx, r, cm)
