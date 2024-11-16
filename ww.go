@@ -18,14 +18,6 @@ import (
 	protoutils "github.com/wetware/go/util/proto"
 )
 
-// These special exit codes are reserved by Wetware.  It is assumed that a well-behaved WASM program
-// will not return these exit codes.  In general, we assume that the most-significant 16 bits are reserved
-// for Wetware.
-const (
-	// ExitCodePivot
-	ExitCodePivot uint32 = 0x00ff0000
-)
-
 const Version = "0.1.0"
 
 var Proto = protoutils.VersionedID{
