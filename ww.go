@@ -2,10 +2,14 @@ package ww
 
 import (
 	"context"
+	"errors"
 	"io"
+	"path/filepath"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/blang/semver/v4"
+	"github.com/ipfs/boxo/files"
+	"github.com/ipfs/boxo/path"
 	"github.com/tetratelabs/wazero"
 	"github.com/wetware/go/proc"
 	guest "github.com/wetware/go/std/system"
@@ -95,20 +99,34 @@ func (env Env) Instantiate(ctx context.Context, r wazero.Runtime) (*proc.P, erro
 }
 
 func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string) (wazero.CompiledModule, error) {
-	b, err := env.ReadAll(ctx, name)
+	p, err := path.NewPath(name)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.CompileModule(ctx, b)
-}
-
-func (env Env) ReadAll(ctx context.Context, name string) ([]byte, error) {
-	f, err := env.FS.Open(name)
+	n, err := env.FS.Unix.Get(ctx, p)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer n.Close()
 
-	return io.ReadAll(f)
+	switch node := n.(type) {
+	case files.File:
+		b, err := io.ReadAll(node)
+		if err != nil {
+			return nil, err
+		}
+		return r.CompileModule(ctx, b)
+
+	case files.Directory:
+		it := node.Entries()
+		for it.Next() {
+			if it.Name() == "main.wasm" {
+				child := filepath.Join(p.String(), it.Name())
+				return env.LoadAndCompile(ctx, r, child)
+			}
+		}
+	}
+
+	return nil, errors.New("binary not found")
 }
