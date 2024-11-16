@@ -30,12 +30,9 @@ func main() {
 	defer f.Close()
 
 	var n int64
-	var status int
 	if n, err = io.Copy(f, os.Stdin); err != nil {
-		status = system.StatusFailed
 		err = fmt.Errorf("request: %w", err)
 	} else if n, err = io.Copy(os.Stdout, f); err != nil {
-		status = system.StatusFailed
 		err = fmt.Errorf("response: %w", err)
 	}
 
@@ -43,7 +40,9 @@ func main() {
 		slog.Error("failed to read message from stdin",
 			"reason", err,
 			"read", n)
+		os.Exit(system.StatusFailed)
 	}
 
-	os.Exit(status)
+	slog.Debug("delivered message",
+		"size", n)
 }
