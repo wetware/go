@@ -8,6 +8,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/tetratelabs/wazero"
 	"github.com/wetware/go/proc"
+	guest "github.com/wetware/go/std/system"
 	"github.com/wetware/go/system"
 
 	protoutils "github.com/wetware/go/util/proto"
@@ -68,7 +69,7 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 		switch e.ExitCode() {
 		case 0:
 			return nil
-		case ExitCodePivot:
+		case guest.StatusAwaiting:
 			return env.Net.ServeProc(ctx, p)
 		}
 	}
