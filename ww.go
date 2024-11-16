@@ -75,7 +75,7 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 		switch e.ExitCode() {
 		case 0:
 			return nil
-		case guest.StatusAwaiting:
+		case guest.StatusAsync:
 			return env.Net.ServeProc(ctx, p)
 		}
 	}

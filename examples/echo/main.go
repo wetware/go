@@ -45,7 +45,7 @@ func main() {
 
 	if serve() {
 		// Yield control to the scheduler.
-		os.Exit(system.StatusAwaiting)
+		os.Exit(system.StatusAsync)
 		// The caller will intercept interface{ExitCode() uint32} and
 		// check if e.ExitCode() == system.StatusAwaiting.
 		//
