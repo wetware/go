@@ -25,13 +25,13 @@ var Proto = protoutils.VersionedID{
 }
 
 type Env struct {
-	IO  system.IO
+	Cmd system.Cmd
 	Net system.Net
 	FS  system.FS
 }
 
 func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
-	cm, err := env.LoadAndCompile(ctx, r, env.IO.Args[0]) // FIXME:  panic if len(args)=0
+	cm, err := env.LoadAndCompile(ctx, r, env.Cmd.Path) // FIXME:  panic if len(args)=0
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 		return err
 	}
 
-	if b, err := io.ReadAll(env.IO.Stdin); err != nil {
+	if b, err := io.ReadAll(env.Cmd.Stdin); err != nil {
 		return err
 	} else if err := call.SetCallData(b); err != nil {
 		return err
@@ -78,10 +78,11 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 
 func (env Env) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*proc.P, error) {
 	return proc.Command{
-		Args:   env.IO.Args,
-		Env:    env.IO.Env,
-		Stdout: env.IO.Stdout,
-		Stderr: env.IO.Stderr,
+		Path:   env.Cmd.Path,
+		Args:   env.Cmd.Args,
+		Env:    env.Cmd.Env,
+		Stdout: env.Cmd.Stdout,
+		Stderr: env.Cmd.Stderr,
 	}.Instantiate(ctx, r, cm)
 }
 

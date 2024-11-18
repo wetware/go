@@ -17,6 +17,7 @@ import (
 )
 
 type Command struct {
+	Path           string
 	Args, Env      []string
 	Stdout, Stderr io.Writer
 }

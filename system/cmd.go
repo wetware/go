@@ -2,7 +2,8 @@ package system
 
 import "io"
 
-type IO struct {
+type Cmd struct {
+	Path           string
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
 	Args, Env      []string

@@ -77,8 +77,9 @@ func run() cli.ActionFunc {
 		defer wasi.Close(c.Context)
 
 		return ww.Env{
-			IO: system.IO{
-				Args:   c.Args().Slice(),
+			Cmd: system.Cmd{
+				Path:   c.Args().First(),
+				Args:   c.Args().Tail(),
 				Env:    c.StringSlice("env"),
 				Stdin:  stdin(c),
 				Stdout: c.App.Writer,
