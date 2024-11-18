@@ -12,7 +12,6 @@ import (
 	"github.com/ipfs/boxo/path"
 	"github.com/tetratelabs/wazero"
 	"github.com/wetware/go/proc"
-	guest "github.com/wetware/go/std/system"
 	"github.com/wetware/go/system"
 
 	protoutils "github.com/wetware/go/util/proto"
@@ -28,11 +27,17 @@ var Proto = protoutils.VersionedID{
 type Env struct {
 	IO  system.IO
 	Net system.Net
-	FS  system.IPFS
+	FS  system.FS
 }
 
 func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
-	p, err := env.Instantiate(ctx, r)
+	cm, err := env.LoadAndCompile(ctx, r, env.IO.Args[0]) // FIXME:  panic if len(args)=0
+	if err != nil {
+		return err
+	}
+	defer cm.Close(ctx)
+
+	p, err := env.Instantiate(ctx, r, cm)
 	if err != nil {
 		return err
 	}
@@ -62,26 +67,16 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 	}
 
 	err = p.Deliver(ctx, call)
-	switch e := err.(type) {
-	case interface{ ExitCode() uint32 }:
-		switch e.ExitCode() {
-		case 0:
-			return nil
-		case guest.StatusAsync:
-			return env.Net.ServeProc(ctx, p)
-		}
+	if e, ok := err.(system.ExitError); ok && e.ExitCode() != 0 {
+		return err
+	} else if err != nil {
+		return err
 	}
 
-	return err
+	return env.Net.ServeProc(ctx, p)
 }
 
-func (env Env) Instantiate(ctx context.Context, r wazero.Runtime) (*proc.P, error) {
-	cm, err := env.LoadAndCompile(ctx, r, env.IO.Args[0]) // FIXME:  panic if len(args)=0
-	if err != nil {
-		return nil, err
-	}
-	defer cm.Close(ctx)
-
+func (env Env) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*proc.P, error) {
 	return proc.Command{
 		Args:   env.IO.Args,
 		Env:    env.IO.Env,
@@ -96,7 +91,7 @@ func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string
 		return nil, err
 	}
 
-	n, err := env.FS.Unix.Get(ctx, p)
+	n, err := env.FS.OpenUnix(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +109,7 @@ func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string
 		it := node.Entries()
 		for it.Next() {
 			if it.Name() == "main.wasm" {
-				child := filepath.Join(p.String(), it.Name())
+				child := filepath.Join(name, it.Name())
 				return env.LoadAndCompile(ctx, r, child)
 			}
 		}

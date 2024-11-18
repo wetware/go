@@ -8,16 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-
-	"github.com/wetware/go/std/system"
 )
-
-//export echo
-func echo() {
-	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 	stdin := flag.Bool("stdin", false, "read data from stdin")
@@ -42,27 +33,11 @@ func main() {
 			}
 		}
 	}
-
-	if serve() {
-		// Yield control to the scheduler.
-		os.Exit(system.StatusAsync)
-		// The caller will intercept interface{ExitCode() uint32} and
-		// check if e.ExitCode() == system.StatusAwaiting.
-		//
-		// The top-level command will block until the runtime context
-		// expires.
-	}
-
-	// Implicit status code 0 works as expected.
-	// Caller will resolve to err = nil.
-	// Top-level CLI command will unblock.
 }
 
-func serve() bool {
-	switch os.Getenv("WW_SERVE") {
-	case "", "false", "0":
-		return false
-	default:
-		return true
+//export echo
+func echo() {
+	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+		panic(err)
 	}
 }

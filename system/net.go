@@ -5,8 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/wetware/go/proc"
 	protoutils "github.com/wetware/go/util/proto"
 )
@@ -42,16 +40,11 @@ func (n Net) Bind(ctx context.Context, p *proc.P) ReleaseFunc {
 	}
 }
 
-// StorePeer is a peer handler that inserts the peer in the
-// supplied Peerstore.
-type StorePeer struct {
-	peerstore.Peerstore
-}
-
-func (s StorePeer) HandlePeerFound(info peer.AddrInfo) {
-	for _, addr := range info.Addrs {
-		s.AddAddr(info.ID, addr, peerstore.AddressTTL) // assume a dynamic environment
+func (n Net) ServeProc(ctx context.Context, p *proc.P) (err error) {
+	if n.Handler != nil {
+		err = n.Handler.ServeProc(ctx, p)
 	}
+	return
 }
 
 type Handler interface {

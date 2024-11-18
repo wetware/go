@@ -49,38 +49,38 @@ func (f IPFS) Open(name string) (fs.File, error) {
 		}
 	}
 
-	return &ipfsNode{
+	return &UnixNode{
 		Path: path,
 		Node: node,
 	}, nil
 }
 
 var (
-	_ fs.FileInfo    = (*ipfsNode)(nil)
-	_ fs.ReadDirFile = (*ipfsNode)(nil)
-	_ fs.DirEntry    = (*ipfsNode)(nil)
+	_ fs.FileInfo    = (*UnixNode)(nil)
+	_ fs.ReadDirFile = (*UnixNode)(nil)
+	_ fs.DirEntry    = (*UnixNode)(nil)
 )
 
-// ipfsNode provides access to a single file. The fs.File interface is the minimum
+// UnixNode provides access to a single file. The fs.File interface is the minimum
 // implementation required of the file. Directory files should also implement [ReadDirFile].
 // A file may implement io.ReaderAt or io.Seeker as optimizations.
-type ipfsNode struct {
+type UnixNode struct {
 	Path path.Path
 	files.Node
 }
 
 // base name of the file
-func (n ipfsNode) Name() string {
+func (n UnixNode) Name() string {
 	segs := n.Path.Segments()
 	return segs[len(segs)-1] // last segment is name
 }
 
-func (n *ipfsNode) Stat() (fs.FileInfo, error) {
+func (n *UnixNode) Stat() (fs.FileInfo, error) {
 	return n, nil
 }
 
 // length in bytes for regular files; system-dependent for others
-func (n ipfsNode) Size() int64 {
+func (n UnixNode) Size() int64 {
 	size, err := n.Node.Size()
 	if err != nil {
 		slog.Error("failed to obtain file size",
@@ -92,7 +92,7 @@ func (n ipfsNode) Size() int64 {
 }
 
 // file mode bits
-func (n ipfsNode) Mode() fs.FileMode {
+func (n UnixNode) Mode() fs.FileMode {
 	switch n.Node.(type) {
 	case files.Directory:
 		return fs.ModeDir
@@ -102,21 +102,21 @@ func (n ipfsNode) Mode() fs.FileMode {
 }
 
 // modification time
-func (n ipfsNode) ModTime() time.Time {
+func (n UnixNode) ModTime() time.Time {
 	return time.Time{} // zero-value time
 }
 
 // abbreviation for Mode().IsDir()
-func (n ipfsNode) IsDir() bool {
+func (n UnixNode) IsDir() bool {
 	return n.Mode().IsDir()
 }
 
 // underlying data source (never returns nil)
-func (n ipfsNode) Sys() any {
+func (n UnixNode) Sys() any {
 	return n.Node
 }
 
-func (n ipfsNode) Read(b []byte) (int, error) {
+func (n UnixNode) Read(b []byte) (int, error) {
 	switch node := n.Node.(type) {
 	case io.Reader:
 		return node.Read(b)
@@ -140,7 +140,7 @@ func (n ipfsNode) Read(b []byte) (int, error) {
 // to the end of the directory), it returns the slice and a nil error.
 // If it encounters an error before the end of the directory,
 // ReadDir returns the DirEntry list read until that point and a non-nil error.
-func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
+func (n UnixNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 	root, ok := n.Node.(files.Directory)
 	if !ok {
 		return nil, errors.New("not a directory")
@@ -166,7 +166,7 @@ func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 			return
 		}
 
-		entries = append(entries, &ipfsNode{
+		entries = append(entries, &UnixNode{
 			Path: subpath,
 			Node: node})
 
@@ -194,13 +194,13 @@ func (n ipfsNode) ReadDir(max int) (entries []fs.DirEntry, err error) {
 // since the directory read, Info may return an error satisfying errors.Is(err, ErrNotExist).
 // If the entry denotes a symbolic link, Info reports the information about the link itself,
 // not the link's target.
-func (n *ipfsNode) Info() (fs.FileInfo, error) {
+func (n *UnixNode) Info() (fs.FileInfo, error) {
 	return n, nil
 }
 
 // Type returns the type bits for the entry.
 // The type bits are a subset of the usual FileMode bits, those returned by the FileMode.Type method.
-func (n ipfsNode) Type() fs.FileMode {
+func (n UnixNode) Type() fs.FileMode {
 	if n.Mode().IsDir() {
 		return fs.ModeDir
 	}
@@ -208,7 +208,7 @@ func (n ipfsNode) Type() fs.FileMode {
 	return 0
 }
 
-func (n ipfsNode) Write(b []byte) (int, error) {
+func (n UnixNode) Write(b []byte) (int, error) {
 	dst, ok := n.Node.(io.Writer)
 	if ok {
 		return dst.Write(b)

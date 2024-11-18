@@ -7,8 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-
-	"github.com/wetware/go/std/system"
 )
 
 func main() {
@@ -17,7 +15,7 @@ func main() {
 			"want", 1,
 			"got", nargs,
 			"args", os.Args)
-		os.Exit(system.StatusInvalidArgs)
+		os.Exit(1)
 	}
 
 	f, err := os.Open(os.Args[0])
@@ -25,7 +23,7 @@ func main() {
 		slog.Error("failed to open file",
 			"reason", err,
 			"name", os.Args[0])
-		os.Exit(system.StatusInvalidArgs)
+		os.Exit(1)
 	}
 	defer f.Close()
 
@@ -40,7 +38,7 @@ func main() {
 		slog.Error("failed to read message from stdin",
 			"reason", err,
 			"read", n)
-		os.Exit(system.StatusFailed)
+		os.Exit(2)
 	}
 
 	slog.Debug("delivered message",

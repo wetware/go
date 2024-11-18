@@ -13,6 +13,7 @@ import (
 	"github.com/wetware/go/cmd/internal/call"
 	"github.com/wetware/go/cmd/internal/export"
 	"github.com/wetware/go/cmd/internal/run"
+	"github.com/wetware/go/cmd/internal/serve"
 )
 
 func main() {
@@ -41,6 +42,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			run.Command(),
+			serve.Command(),
 			export.Command(),
 			call.Command(),
 		},
