@@ -15,17 +15,17 @@ import (
 	"github.com/wetware/go/util"
 )
 
-var _ fs.FS = (*IPFS)(nil)
+var _ fs.FS = (*UnixFS)(nil)
 
-// An IPFS provides access to a hierarchical file system.
+// An UnixFS provides access to a hierarchical file system.
 //
-// The IPFS interface is the minimum implementation required of the file system.
+// The UnixFS interface is the minimum implementation required of the file system.
 // A file system may implement additional interfaces,
 // such as [ReadFileFS], to provide additional or optimized functionality.
 //
-// [testing/fstest.TestFS] may be used to test implementations of an IPFS for
+// [testing/fstest.TestFS] may be used to test implementations of an UnixFS for
 // correctness.
-type IPFS struct {
+type UnixFS struct {
 	Ctx  context.Context
 	Unix iface.UnixfsAPI
 }
@@ -39,7 +39,7 @@ type IPFS struct {
 // Open should reject attempts to open names that do not satisfy
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
-func (f IPFS) Open(name string) (fs.File, error) {
+func (f UnixFS) Open(name string) (fs.File, error) {
 	path, node, err := util.Resolve(f.Ctx, f.Unix, name)
 	if err != nil {
 		return nil, &fs.PathError{

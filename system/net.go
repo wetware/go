@@ -2,57 +2,111 @@ package system
 
 import (
 	"context"
+	"io"
+	"io/fs"
 	"log/slog"
+	"strings"
 
+	"capnproto.org/go/capnp/v3"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/wetware/go/proc"
-	protoutils "github.com/wetware/go/util/proto"
 )
 
+type Handler interface {
+	ServeProc(context.Context, *proc.P) error
+}
+
 type Net struct {
-	Proto protoutils.VersionedID
+	Proto protocol.ID
 	Host  host.Host
 	Handler
 }
 
-func (n Net) Bind(ctx context.Context, p *proc.P) ReleaseFunc {
-	handler := proc.StreamHandler{
-		VersionedID: n.Proto,
-		Proc:        p}
-	proto := handler.Proto()
-	pid := handler.String()
-	peer := n.Host.ID()
+func (n Net) Match(id protocol.ID) bool {
+	proto := strings.TrimPrefix(string(id), string(n.Proto))
+	return strings.HasPrefix(proto, "/proc/")
+}
 
-	n.Host.SetStreamHandlerMatch(
-		proto,
-		handler.Match,
-		handler.Bind(ctx))
-	slog.DebugContext(ctx, "attached process stream handlers",
-		"peer", peer,
-		"proto", proto,
-		"proc", pid)
-	return func() {
-		n.Host.RemoveStreamHandler(proto)
-		slog.DebugContext(ctx, "detached process stream handlers",
-			"peer", peer,
-			"proto", proto,
-			"proc", pid)
+func (n Net) Bind(ctx context.Context, p *proc.P) network.StreamHandler {
+	log := slog.Default().With(
+		"peer", n.Host.ID(),
+		"pid", p.String())
+
+	return func(s network.Stream) {
+		defer s.Close()
+
+		// TODO:  handle context deadline
+
+		if call, err := ReadCall(s); err != nil {
+			log.ErrorContext(ctx, "failed to read method call",
+				"reason", err)
+		} else if err := p.Deliver(ctx, call); err != nil {
+			log.ErrorContext(ctx, "failed to deliver method call",
+				"reason", err)
+		}
 	}
 }
 
-func (n Net) ServeProc(ctx context.Context, p *proc.P) (err error) {
-	if n.Handler != nil {
-		err = n.Handler.ServeProc(ctx, p)
+func (n Net) ServeProc(ctx context.Context, p *proc.P) error {
+	if n.Handler == nil {
+		return nil
 	}
-	return
+
+	return n.Handler.ServeProc(ctx, p)
 }
 
-type Handler interface {
-	ServeProc(ctx context.Context, p *proc.P) error
+func ReadCall(r io.Reader) (proc.MethodCall, error) {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return proc.MethodCall{}, err
+	}
+
+	m, err := capnp.Unmarshal(b)
+	if err != nil {
+		return proc.MethodCall{}, err
+	}
+
+	return proc.ReadRootMethodCall(m)
+}
+
+// HostNode allows
+type HostNode struct {
+	Ctx  context.Context
+	Host host.Host
+}
+
+func (h HostNode) Open(name string) (fs.File, error) {
+	path, err := NewPath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.Walk(h.Ctx, path)
+}
+
+func (h HostNode) Walk(ctx context.Context, p Path) (fs.File, error) {
+	/*
+		Example path:  /ww/0.1.0/proc/<pid>
+	*/
+
+	id, err := p.Peer()
+	if err != nil {
+		return nil, err
+	}
+
+	proto, err := p.Proto()
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := h.Host.NewStream(ctx, id, proto)
+	return StreamNode{Stream: s}, err
 }
 
 type HandlerFunc func(context.Context, *proc.P) error
 
-func (handle HandlerFunc) ServeProc(ctx context.Context, p *proc.P) error {
-	return handle(ctx, p)
+func (serve HandlerFunc) ServeProc(ctx context.Context, p *proc.P) error {
+	return serve(ctx, p)
 }

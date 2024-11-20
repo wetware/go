@@ -4,22 +4,19 @@ import (
 	"context"
 	"path"
 
-	iface "github.com/ipfs/kubo/core/coreiface"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/wetware/go/system"
 )
 
 type Server struct {
-	IPFS          iface.CoreAPI
-	Host          host.Host
 	Env           Env
 	RuntimeConfig wazero.RuntimeConfig
 }
 
 func (s Server) String() string {
-	peer := string(s.Host.ID())
-	return path.Join("/p2p", peer, Proto.String())
+	peer := string(s.Env.Host.ID())
+	return path.Join("/p2p", peer, system.Proto.String())
 }
 
 func (s Server) Serve(ctx context.Context) error {

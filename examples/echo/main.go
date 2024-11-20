@@ -10,13 +10,25 @@ import (
 	"os"
 )
 
+//export echo
+func echo() {
+	if err := _echo(os.Stdout, os.Stdin); err != nil {
+		panic(err)
+	}
+}
+
+func _echo(dst io.Writer, src io.Reader) error {
+	_, err := io.Copy(dst, src)
+	return err
+}
+
 func main() {
 	stdin := flag.Bool("stdin", false, "read data from stdin")
 	flag.Parse()
 
 	if *stdin {
-		if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
-			slog.Error("failed echo stdin",
+		if err := _echo(os.Stdout, os.Stdin); err != nil {
+			slog.Error("failed to echo stdin",
 				"reason", err)
 			os.Exit(1)
 		}
@@ -32,12 +44,5 @@ func main() {
 				os.Exit(1)
 			}
 		}
-	}
-}
-
-//export echo
-func echo() {
-	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
-		panic(err)
 	}
 }

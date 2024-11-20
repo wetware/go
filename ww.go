@@ -3,35 +3,32 @@ package ww
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
 
 	"capnproto.org/go/capnp/v3"
-	"github.com/blang/semver/v4"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
+	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
-
-	protoutils "github.com/wetware/go/util/proto"
 )
 
-const Version = "0.1.0"
-
-var Proto = protoutils.VersionedID{
-	ID:      "ww",
-	Version: semver.MustParse(Version),
-}
-
 type Env struct {
-	Cmd system.Cmd
-	Net system.Net
-	FS  system.FS
+	IPFS iface.CoreAPI
+	Host host.Host
+	Cmd  system.Cmd
+	Net  system.Net
+	FS   system.Anchor
 }
 
 func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
-	cm, err := env.LoadAndCompile(ctx, r, env.Cmd.Path) // FIXME:  panic if len(args)=0
+	cm, err := env.LoadAndCompile(ctx, r, env.Cmd.Args[0]) // FIXME:  panic if len(args)=0
 	if err != nil {
 		return err
 	}
@@ -43,8 +40,13 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 	}
 	defer p.Close(ctx)
 
-	release := env.Net.Bind(ctx, p)
-	defer release()
+	// Bind libp2p streams that allow remote peers to send
+	// messages to p.
+	env.Host.SetStreamHandlerMatch(env.ProtoFor(p),
+		env.Net.Match,
+		env.Net.Bind(ctx, p))
+	defer env.Host.RemoveStreamHandler(env.ProtoFor(p))
+	slog.DebugContext(ctx, "attached process stream handlers")
 
 	// Call main() function (alias _start method)
 	m, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -67,9 +69,14 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 	}
 
 	err = p.Deliver(ctx, call)
-	if e, ok := err.(system.ExitError); ok && e.ExitCode() != 0 {
-		return err
-	} else if err != nil {
+	switch e := err.(type) {
+	case system.ExitError:
+		if e.ExitCode() == 0 {
+			err = nil
+		}
+	}
+
+	if err != nil {
 		return err
 	}
 
@@ -78,11 +85,11 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 
 func (env Env) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*proc.P, error) {
 	return proc.Command{
-		Path:   env.Cmd.Path,
 		Args:   env.Cmd.Args,
 		Env:    env.Cmd.Env,
 		Stdout: env.Cmd.Stdout,
 		Stderr: env.Cmd.Stderr,
+		FS:     env.FS,
 	}.Instantiate(ctx, r, cm)
 }
 
@@ -92,7 +99,7 @@ func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string
 		return nil, err
 	}
 
-	n, err := env.FS.OpenUnix(ctx, p)
+	n, err := env.OpenUnix(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -117,4 +124,14 @@ func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string
 	}
 
 	return nil, errors.New("binary not found")
+}
+
+func (env Env) OpenUnix(ctx context.Context, p path.Path) (files.Node, error) {
+	root := env.IPFS.Unixfs()
+	return root.Get(ctx, p)
+}
+
+func (env Env) ProtoFor(pid fmt.Stringer) protocol.ID {
+	proto := filepath.Join(system.Proto.String(), "proc", pid.String())
+	return protocol.ID(proto)
 }

@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	if nargs := len(os.Args); nargs < 1 {
+	args := os.Args[1:]
+	if nargs := len(args); nargs < 1 {
 		slog.Error("wrong number of arguments",
 			"want", 1,
 			"got", nargs,
@@ -18,11 +19,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	f, err := os.Open(os.Args[0])
+	f, err := os.Open(args[0])
 	if err != nil {
 		slog.Error("failed to open file",
 			"reason", err,
-			"name", os.Args[0])
+			"name", args[0])
 		os.Exit(1)
 	}
 	defer f.Close()

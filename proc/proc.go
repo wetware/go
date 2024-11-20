@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"runtime"
 	"strings"
@@ -17,9 +18,9 @@ import (
 )
 
 type Command struct {
-	Path           string
 	Args, Env      []string
 	Stdout, Stderr io.Writer
+	FS             fs.FS
 }
 
 func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*P, error) {
@@ -35,6 +36,7 @@ func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.
 		WithStdout(cmd.Stdout).
 		WithStderr(cmd.Stderr).
 		WithEnv("WW_PID", pid).
+		WithFS(cmd.FS).
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched).
 		WithSysNanosleep().

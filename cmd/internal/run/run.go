@@ -9,7 +9,6 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/host"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -77,28 +76,25 @@ func run() cli.ActionFunc {
 		defer wasi.Close(c.Context)
 
 		return ww.Env{
+			IPFS: ipfs,
+			Host: h,
 			Cmd: system.Cmd{
-				Path:   c.Args().First(),
-				Args:   c.Args().Tail(),
+				Args:   c.Args().Slice(),
 				Env:    c.StringSlice("env"),
 				Stdin:  stdin(c),
 				Stdout: c.App.Writer,
 				Stderr: c.App.ErrWriter},
 			Net: system.Net{
-				Proto: ww.Proto,
+				Proto: system.Proto.Unwrap(),
 				Host:  h,
 			},
-			FS: system.FS{
+			FS: system.Anchor{
 				Ctx:  c.Context,
 				Host: h,
 				IPFS: ipfs,
 			},
 		}.Bind(c.Context, r)
 	}
-}
-
-type procServer struct {
-	Host host.Host
 }
 
 func newIPFSClient(c *cli.Context) (ipfs iface.CoreAPI, err error) {
