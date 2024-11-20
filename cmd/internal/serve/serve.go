@@ -92,6 +92,7 @@ func serve() cli.ActionFunc {
 				Host:  h,
 				Handler: system.HandlerFunc(func(ctx context.Context, p *proc.P) error {
 					slog.InfoContext(ctx, "process started",
+						"peer", h.ID(),
 						"pid", p.String())
 
 					<-ctx.Done()
