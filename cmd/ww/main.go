@@ -14,6 +14,7 @@ import (
 	"github.com/wetware/go/cmd/internal/export"
 	"github.com/wetware/go/cmd/internal/run"
 	"github.com/wetware/go/cmd/internal/serve"
+	"github.com/wetware/go/system"
 )
 
 func main() {
@@ -56,7 +57,9 @@ func main() {
 }
 
 func setup(c *cli.Context) error {
-	slog.SetDefault(slog.New(logger(c)))
+	log := slog.New(logger(c)).With(
+		"version", system.Proto.Version)
+	slog.SetDefault(log)
 	return nil
 }
 
