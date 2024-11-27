@@ -16,7 +16,7 @@ type MDNS struct {
 
 // Serve mDNS to discover peers on the local network
 func (m MDNS) Serve(ctx context.Context) error {
-	d, err := m.New(ctx)
+	d, err := m.New()
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (m MDNS) Serve(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (m MDNS) New(ctx context.Context) (mdns.Service, error) {
+func (m MDNS) New() (mdns.Service, error) {
 	d := mdns.NewMdnsService(m.Host, "ww.local", m.Handler)
 	return d, d.Start()
 }

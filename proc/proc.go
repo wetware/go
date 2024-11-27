@@ -1,7 +1,6 @@
 package proc
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -11,40 +10,33 @@ import (
 	"runtime"
 	"strings"
 
-	"capnproto.org/go/capnp/v3"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"golang.org/x/sync/semaphore"
 )
 
 type Command struct {
+	PID            PID
 	Args, Env      []string
 	Stdout, Stderr io.Writer
 	FS             fs.FS
 }
 
 func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*P, error) {
-	var p P
-	var err error
-
-	// /ww/<semver>/proc/<pid>
-	pid := NewPID().String()
-	config := cmd.WithEnv(wazero.NewModuleConfig().
-		WithName(pid).
+	mod, err := r.InstantiateModule(ctx, cm, cmd.WithEnv(wazero.NewModuleConfig().
+		WithName(cmd.PID.String()).
 		WithArgs(cmd.Args...).
-		WithStdin(&p.mailbox).
 		WithStdout(cmd.Stdout).
 		WithStderr(cmd.Stderr).
-		WithEnv("WW_PID", pid).
+		WithEnv("WW_PID", cmd.PID.String()).
 		WithFS(cmd.FS).
 		WithRandSource(rand.Reader).
 		WithOsyield(runtime.Gosched).
 		WithSysNanosleep().
 		WithSysNanotime().
 		WithSysWalltime().
-		WithStartFunctions())
-	p.Mod, err = r.InstantiateModule(ctx, cm, config)
-	return &p, err
+		WithStartFunctions()))
+	return New(mod), err
 }
 
 func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
@@ -63,68 +55,54 @@ func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
 }
 
 type P struct {
-	Parent protocol.ID
-	Mod    api.Module
+	mod     api.Module
+	mailbox struct{ io.Reader }
+	sem     *semaphore.Weighted
+}
 
-	stack   []uint64
-	mailbox bytes.Reader
+func New(mod api.Module) *P {
+	return &P{
+		mod: mod,
+		sem: semaphore.NewWeighted(1),
+	}
 }
 
 func (p *P) String() string {
-	return p.Mod.Name()
+	return p.mod.Name()
 }
 
 func (p *P) Close(ctx context.Context) error {
-	return p.Mod.Close(ctx)
+	return p.mod.Close(ctx)
 }
 
-func (p *P) Deliver(ctx context.Context, call MethodCall) error {
-	// defensive; underlying slice owned by 'call', becomes invalid
-	// after caller releases the underlying capnp.Message.
-	defer p.mailbox.Reset(nil)
+func (p *P) Deliver(ctx context.Context, call *Call, r io.Reader) error {
+	p.mailbox.Reader = r                      // we found the method; last chance to hook in
+	defer func() { p.mailbox.Reader = nil }() // defensive; catch use-after-free
 
-	name, err := call.Name()
-	if err != nil {
-		return err
-	}
-	fn := p.Mod.ExportedFunction(name)
+	return call.Eval(ctx, p.mod)
+}
+
+type Call struct {
+	Method string
+	Stack  []uint64
+}
+
+func ParseCallData(s string) (*Call, error) {
+
+}
+
+func (call Call) Eval(ctx context.Context, mod api.Module) error {
+	fn := mod.ExportedFunction(call.Method)
 	if fn == nil {
-		return errors.New("missing export: " + name)
+		return errors.New("missing export: " + call.Method)
 	}
 
-	stack, err := call.Stack()
-	if err != nil {
-		return err
-	}
-
-	data, err := call.CallData()
-	if err != nil {
-		return err
-	}
-	p.mailbox.Reset(data) // reset stdin
-
-	err = fn.CallWithStack(ctx, p.ToWasmStack(stack))
+	err := fn.CallWithStack(ctx, call.Stack)
 	if errors.Is(err, context.Canceled) {
-		err = context.Canceled
+		return context.Canceled
 	} else if errors.Is(err, context.DeadlineExceeded) {
-		err = context.DeadlineExceeded
+		return context.DeadlineExceeded
 	}
 
 	return err
-}
-
-func (p *P) ToWasmStack(stack capnp.UInt64List) []uint64 {
-	if stack.Len() <= 0 {
-		return nil
-	} else if cap(p.stack) < stack.Len() {
-		p.stack = make([]uint64, stack.Len())
-	} else {
-		p.stack = p.stack[:stack.Len()]
-	}
-
-	for i := 0; i < stack.Len(); i++ {
-		p.stack[i] = stack.At(i)
-	}
-
-	return p.stack
 }

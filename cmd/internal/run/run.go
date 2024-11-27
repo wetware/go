@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/hashicorp/go-memdb"
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
-	"github.com/libp2p/go-libp2p"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -48,22 +48,13 @@ func run() cli.ActionFunc {
 			return err
 		}
 
-		h, err := libp2p.New()
+		// Start a multicast DNS service that searches for local
+		// peers in the background.
+		h, err := ww.NewP2PHostWithMDNS(c.Context)
 		if err != nil {
 			return err
 		}
 		defer h.Close()
-
-		// Start a multicast DNS service that searches for local
-		// peers in the background.
-		d, err := ww.MDNS{
-			Host:    h,
-			Handler: ww.StorePeer{Peerstore: h.Peerstore()},
-		}.New(c.Context)
-		if err != nil {
-			return err
-		}
-		defer d.Close()
 
 		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
 			WithDebugInfoEnabled(c.Bool("debug")).
@@ -75,24 +66,27 @@ func run() cli.ActionFunc {
 		}
 		defer wasi.Close(c.Context)
 
+		db, err := memdb.NewMemDB(&system.Schema)
+		if err != nil {
+			return err
+		}
+
 		return ww.Env{
 			IPFS: ipfs,
 			Host: h,
 			Cmd: system.Cmd{
+				Stdin:  stdin(c),
 				Args:   c.Args().Slice(),
 				Env:    c.StringSlice("env"),
-				Stdin:  stdin(c),
 				Stdout: c.App.Writer,
 				Stderr: c.App.ErrWriter},
 			Net: system.Net{
-				Proto: system.Proto.Unwrap(),
-				Host:  h,
-			},
+				Host:   h,
+				Router: db},
 			FS: system.Anchor{
 				Ctx:  c.Context,
 				Host: h,
-				IPFS: ipfs,
-			},
+				IPFS: ipfs},
 		}.Bind(c.Context, r)
 	}
 }

@@ -1,120 +1,42 @@
 package system
 
-import (
-	"fmt"
+// var _ memdb.Indexer = (*PathIndexer)(nil)
+// var _ memdb.MultiIndexer = (*PathIndexer)(nil)
 
-	"github.com/blang/semver/v4"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/mr-tron/base58/base58"
-	ma "github.com/multiformats/go-multiaddr"
-)
+// type PathIndexer struct{}
 
-const (
-	// TODO:  go back and pick good values for these
-	P_WW = 9001 + iota
-	P_PID
-)
+// // FromArgs is called to build the exact index key from a list of arguments.
+// func (i PathIndexer) FromArgs(args ...interface{}) ([]byte, error) {
+// 	panic("NOT IMPLEMENTED")
+// }
 
-var (
-	protoWW = ma.Protocol{
-		Name:       "ww",
-		Code:       P_WW,
-		VCode:      ma.CodeToVarint(P_WW),
-		Size:       ma.LengthPrefixedVarSize, // ww/<semver>
-		Transcoder: WwTranscoder{},
-	}
-	protoPID = ma.Protocol{
-		Name:       "pid",
-		Code:       P_PID,
-		VCode:      ma.CodeToVarint(P_PID),
-		Size:       20, // 160bit PID
-		Transcoder: PidTranscoder{},
-	}
-)
+// // FromObject extracts index values from an object. The return values
+// // are the same as a SingleIndexer except there can be multiple index
+// // values.
+// func (i PathIndexer) FromObject(raw interface{}) (ok bool, ixs [][]byte, err error) {
+// 	// switch p := raw.(type) {
+// 	// case interface{ Protocol() protocol.ID }:
+// 	// 	var path Path
+// 	// 	proto := string(p.Protocol())
+// 	// 	if path.Multiaddr, err = ma.NewMultiaddr(proto); err != nil {
+// 	// 		return
+// 	// 	}
 
-type WwTranscoder struct{}
+// 	// 	var host peer.ID
+// 	// 	if host, err = path.Peer(); err != nil {
+// 	// 		return
+// 	// 	}
 
-// Validates and encodes to bytes a multiaddr that's in the string representation.
-func (t WwTranscoder) StringToBytes(s string) ([]byte, error) {
-	return []byte(s), nil
-}
+// 	// 	var id protocol.ID
+// 	// 	if id, err = path.Proto(); err != nil {
+// 	// 		return
+// 	// 	}
 
-// Validates and decodes to a string a multiaddr that's in the bytes representation.
-func (t WwTranscoder) BytesToString(b []byte) (string, error) {
-	return string(b), nil
-}
+// 	// 	var version semver.Version
+// 	// 	if version, err = path.Version(); err != nil {
+// 	// 		return
+// 	// 	}
 
-// Validates bytes when parsing a multiaddr that's already in the bytes representation.
-func (t WwTranscoder) ValidateBytes(b []byte) error {
-	return nil
-}
-
-type PidTranscoder struct{}
-
-// Validates and encodes to bytes a multiaddr that's in the string representation.
-func (t PidTranscoder) StringToBytes(s string) ([]byte, error) {
-	return base58.FastBase58Decoding(s)
-}
-
-// Validates and decodes to a string a multiaddr that's in the bytes representation.
-func (t PidTranscoder) BytesToString(b []byte) (string, error) {
-	return base58.FastBase58Encoding(b), nil
-}
-
-// Validates bytes when parsing a multiaddr that's already in the bytes representation.
-func (t PidTranscoder) ValidateBytes(b []byte) error {
-	if size := len(b); size != 20 {
-		return fmt.Errorf("expected 20byte PID, got %d", size)
-	}
-
-	return nil
-}
-
-func init() {
-	for _, p := range []ma.Protocol{
-		protoWW,
-		protoPID,
-	} {
-		if err := ma.AddProtocol(p); err != nil {
-			panic(err)
-		}
-	}
-}
-
-type Path struct {
-	ma.Multiaddr
-}
-
-func NewPath(name string) (p Path, err error) {
-	p.Multiaddr, err = ma.NewMultiaddr(name)
-	return
-}
-
-func (p Path) Version() (semver.Version, error) {
-	s, err := p.ValueForProtocol(P_WW)
-	if err != nil {
-		return semver.Version{}, err
-	}
-
-	return semver.Parse(s)
-}
-
-func (p Path) Peer() (peer.ID, error) {
-	id, err := p.ValueForProtocol(ma.P_P2P)
-	if err != nil {
-		return "", err
-	}
-
-	return peer.Decode(id)
-}
-
-func (p Path) Proto() (protocol.ID, error) {
-	s, err := p.ValueForProtocol(P_PID)
-	if err != nil {
-		return "", err
-	}
-
-	proto := "/proc/" + s
-	return protocol.ID(proto), nil
-}
+// 	// }
+// 	panic("NOT IMPLEMENTED")
+// }

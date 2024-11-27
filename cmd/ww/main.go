@@ -10,7 +10,6 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/internal/call"
 	"github.com/wetware/go/cmd/internal/export"
 	"github.com/wetware/go/cmd/internal/run"
 	"github.com/wetware/go/cmd/internal/serve"
@@ -45,7 +44,6 @@ func main() {
 			run.Command(),
 			serve.Command(),
 			export.Command(),
-			call.Command(),
 		},
 	}
 

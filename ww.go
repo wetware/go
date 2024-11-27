@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"path/filepath"
 
-	"capnproto.org/go/capnp/v3"
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
@@ -18,6 +16,11 @@ import (
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
+
+type ExitError interface {
+	error
+	ExitCode() uint32
+}
 
 type Env struct {
 	IPFS iface.CoreAPI
@@ -40,37 +43,16 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 	}
 	defer p.Close(ctx)
 
-	// Bind libp2p streams that allow remote peers to send
-	// messages to p.
-	env.Host.SetStreamHandlerMatch(env.ProtoFor(p),
-		env.Net.Match,
-		env.Net.Bind(ctx, p))
-	defer env.Host.RemoveStreamHandler(env.ProtoFor(p))
-	slog.DebugContext(ctx, "attached process stream handlers")
-
-	// Call main() function (alias _start method)
-	m, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	release, err := env.Net.Bind(ctx, p /* TODO:  pass in 'ns' here */)
 	if err != nil {
 		return err
 	}
-	defer m.Release()
+	defer release()
 
-	call, err := proc.NewRootMethodCall(seg)
-	if err != nil {
-		return err
-	} else if err := call.SetName("_start"); err != nil {
-		return err
-	}
-
-	if b, err := io.ReadAll(env.Cmd.Stdin); err != nil {
-		return err
-	} else if err := call.SetCallData(b); err != nil {
-		return err
-	}
-
-	err = p.Deliver(ctx, call)
+	call := &proc.Call{Method: "_start"}
+	err = p.Deliver(ctx, call, env.Cmd.Stdin)
 	switch e := err.(type) {
-	case system.ExitError:
+	case ExitError:
 		if e.ExitCode() == 0 {
 			err = nil
 		}
@@ -85,6 +67,7 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 
 func (env Env) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*proc.P, error) {
 	return proc.Command{
+		PID:    proc.NewPID(),
 		Args:   env.Cmd.Args,
 		Env:    env.Cmd.Env,
 		Stdout: env.Cmd.Stdout,
