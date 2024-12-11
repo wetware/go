@@ -2,19 +2,15 @@ package ww
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"path/filepath"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
+	"github.com/wetware/go/util"
 )
 
 type ExitError interface {
@@ -31,7 +27,7 @@ type Env struct {
 }
 
 func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
-	cm, err := env.LoadAndCompile(ctx, r, env.Cmd.Args[0]) // FIXME:  panic if len(args)=0
+	cm, err := env.LoadAndCompile(ctx, r, env.Cmd.ExecPath())
 	if err != nil {
 		return err
 	}
@@ -43,11 +39,11 @@ func (env Env) Bind(ctx context.Context, r wazero.Runtime) error {
 	}
 	defer p.Close(ctx)
 
-	release, err := env.Net.Bind(ctx, p /* TODO:  pass in 'ns' here */)
+	net, err := env.Net.Bind(ctx, p /* TODO:  pass in 'ns' here */)
 	if err != nil {
 		return err
 	}
-	defer release()
+	defer net.Close(ctx)
 
 	call := &proc.Call{Method: "_start"}
 	err = p.Deliver(ctx, call, env.Cmd.Stdin)
@@ -88,33 +84,15 @@ func (env Env) LoadAndCompile(ctx context.Context, r wazero.Runtime, name string
 	}
 	defer n.Close()
 
-	switch node := n.(type) {
-	case files.File:
-		b, err := io.ReadAll(node)
-		if err != nil {
-			return nil, err
-		}
-		return r.CompileModule(ctx, b)
-
-	case files.Directory:
-		it := node.Entries()
-		for it.Next() {
-			if it.Name() == "main.wasm" {
-				child := filepath.Join(name, it.Name())
-				return env.LoadAndCompile(ctx, r, child)
-			}
-		}
+	b, err := util.LoadByteCode(ctx, n)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, errors.New("binary not found")
+	return r.CompileModule(ctx, b)
 }
 
 func (env Env) OpenUnix(ctx context.Context, p path.Path) (files.Node, error) {
 	root := env.IPFS.Unixfs()
 	return root.Get(ctx, p)
-}
-
-func (env Env) ProtoFor(pid fmt.Stringer) protocol.ID {
-	proto := filepath.Join(system.Proto.String(), "proc", pid.String())
-	return protocol.ID(proto)
 }

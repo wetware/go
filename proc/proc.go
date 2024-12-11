@@ -83,12 +83,8 @@ func (p *P) Deliver(ctx context.Context, call *Call, r io.Reader) error {
 }
 
 type Call struct {
-	Method string
-	Stack  []uint64
-}
-
-func ParseCallData(s string) (*Call, error) {
-
+	Method string   `json:"method,omitempty" cbor:"method,omitempty"`
+	Stack  []uint64 `json:"stack,omitempty" cbor:"stack,omitempty"`
 }
 
 func (call Call) Eval(ctx context.Context, mod api.Module) error {

@@ -4,12 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/fs"
 	"path/filepath"
 
 	"github.com/ipfs/boxo/files"
-	"github.com/ipfs/boxo/path"
-	iface "github.com/ipfs/kubo/core/coreiface"
 )
 
 // LoadByteCode loads the bytecode from the provided IPFS node.
@@ -60,17 +57,3 @@ func LoadByteCodeFromDir(ctx context.Context, d files.Directory) (b []byte, err 
 }
 
 var errAbortWalk = errors.New("abort walk")
-
-func Resolve(ctx context.Context, unixfs iface.UnixfsAPI, name string) (path.Path, files.Node, error) {
-	p, err := path.NewPath(name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	node, err := unixfs.Get(ctx, p)
-	return p, node, err
-}
-
-func PathInvalid(name string) bool {
-	return !fs.ValidPath(name)
-}

@@ -10,6 +10,7 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
+	"github.com/wetware/go/cmd/internal/client"
 	"github.com/wetware/go/cmd/internal/export"
 	"github.com/wetware/go/cmd/internal/run"
 	"github.com/wetware/go/cmd/internal/serve"
@@ -39,11 +40,18 @@ func main() {
 				Value:   "info",
 				Usage:   "logging level: debug, info, warn, error",
 			},
+			&cli.StringFlag{
+				Name:    "ipfs",
+				EnvVars: []string{"WW_IPFS"},
+				Usage:   "multi`addr` of IPFS node, or \"local\"",
+				Value:   "local",
+			},
 		},
 		Commands: []*cli.Command{
 			run.Command(),
 			serve.Command(),
 			export.Command(),
+			client.Command(),
 		},
 	}
 

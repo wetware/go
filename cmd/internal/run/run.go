@@ -9,11 +9,15 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
+	"github.com/wetware/go/boot"
 	"github.com/wetware/go/system"
 )
 
@@ -48,13 +52,36 @@ func run() cli.ActionFunc {
 			return err
 		}
 
-		// Start a multicast DNS service that searches for local
-		// peers in the background.
-		h, err := ww.NewP2PHostWithMDNS(c.Context)
+		// Set up libp2p host and DHT
+		////
+		h, err := libp2p.New()
 		if err != nil {
 			return err
 		}
 		defer h.Close()
+
+		dht, err := dual.New(c.Context, h)
+		if err != nil {
+			return err
+		}
+		defer dht.Close()
+
+		h = routedhost.Wrap(h, dht)
+
+		// Start a multicast DNS service that searches for local
+		// peers in the background.
+		////
+		d, err := boot.MDNS{
+			Host: h,
+			Handler: boot.PeerHandler{
+				Peerstore:    h.Peerstore(),
+				Bootstrapper: dht,
+			},
+		}.New()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
 
 		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
 			WithDebugInfoEnabled(c.Bool("debug")).

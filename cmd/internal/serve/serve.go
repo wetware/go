@@ -11,11 +11,16 @@ import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/event"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/urfave/cli/v2"
 	ww "github.com/wetware/go"
+	"github.com/wetware/go/boot"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
@@ -46,18 +51,43 @@ func Command() *cli.Command {
 
 func serve() cli.ActionFunc {
 	return func(c *cli.Context) error {
+		// Set up IPFS client
+		////
 		ipfs, err := newIPFSClient(c)
 		if err != nil {
 			return err
 		}
 
-		// Start a multicast DNS service that searches for local
-		// peers in the background.
-		h, err := ww.NewP2PHostWithMDNS(c.Context)
+		// Set up libp2p host and DHT
+		////
+		h, err := libp2p.New()
 		if err != nil {
 			return err
 		}
 		defer h.Close()
+
+		dht, err := dual.New(c.Context, h)
+		if err != nil {
+			return err
+		}
+		defer dht.Close()
+
+		h = routedhost.Wrap(h, dht)
+
+		// Start a multicast DNS service that searches for local
+		// peers in the background.
+		////
+		d, err := boot.MDNS{
+			Host: h,
+			Handler: boot.PeerHandler{
+				Peerstore:    h.Peerstore(),
+				Bootstrapper: dht,
+			},
+		}.New()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
 
 		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
 			WithDebugInfoEnabled(c.Bool("debug")).
@@ -74,6 +104,22 @@ func serve() cli.ActionFunc {
 			return err
 		}
 
+		// Subscribe to events.  These will be handled
+		// by env.Net.Handler.
+		sub, err := h.EventBus().Subscribe([]any{
+			new(event.EvtLocalAddressesUpdated),
+			new(event.EvtLocalProtocolsUpdated),
+			new(event.EvtLocalReachabilityChanged),
+			new(event.EvtNATDeviceTypeChanged),
+			new(event.EvtPeerConnectednessChanged),
+			new(event.EvtPeerIdentificationCompleted),
+			new(event.EvtPeerIdentificationFailed),
+			new(event.EvtPeerProtocolsUpdated)})
+		if err != nil {
+			return err
+		}
+		defer sub.Close()
+
 		return ww.Env{
 			IPFS: ipfs,
 			Host: h,
@@ -86,19 +132,76 @@ func serve() cli.ActionFunc {
 			Net: system.Net{
 				Host:   h,
 				Router: db,
-				Handler: system.HandlerFunc(func(ctx context.Context, p *proc.P) error {
-					slog.InfoContext(ctx, "process started",
-						"peer", h.ID(),
-						"pid", p.String())
-
-					<-ctx.Done()
-					return ctx.Err()
-				})},
+				Handler: Handler{
+					Log: slog.With(
+						"peer", h.ID()),
+					Sub: sub}},
 			FS: system.Anchor{
 				Ctx:  c.Context,
 				Host: h,
 				IPFS: ipfs,
 			}}.Bind(c.Context, r)
+	}
+}
+
+var _ system.Handler = (*Handler)(nil)
+
+type Handler struct {
+	Log *slog.Logger
+	Sub event.Subscription
+}
+
+func (h Handler) ServeProc(ctx context.Context, p *proc.P) error {
+	defer h.Sub.Close()
+
+	log := h.Log.With("pid", p.String())
+	log.InfoContext(ctx, "process started")
+
+	var v any
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case v = <-h.Sub.Out():
+			// v was modified
+		}
+
+		// handle the event
+		switch ev := v.(type) {
+		case *event.EvtLocalAddressesUpdated:
+			log.InfoContext(ctx, "local addresses updated")
+			// ignore the event fields; they're noisy
+
+		case *event.EvtLocalProtocolsUpdated:
+			// ...
+
+		case *event.EvtLocalReachabilityChanged:
+			log.InfoContext(ctx, "local reachability changed",
+				"status", ev.Reachability)
+
+		case *event.EvtNATDeviceTypeChanged:
+			log.InfoContext(ctx, "nat device type changed",
+				"device", ev.NatDeviceType,
+				"transport", ev.TransportProtocol)
+
+		case *event.EvtPeerConnectednessChanged:
+			log.InfoContext(ctx, "peer connection changed",
+				"peer", ev.Peer,
+				"status", ev.Connectedness)
+
+		case *event.EvtPeerIdentificationCompleted:
+			log.DebugContext(ctx, "peer identification completed",
+				"peer", ev.Peer,
+				"proto-version", ev.ProtocolVersion,
+				"agent-version", ev.AgentVersion,
+				"conn", ev.Conn.ID())
+
+		case *event.EvtPeerIdentificationFailed:
+			// ...
+
+		case *event.EvtPeerProtocolsUpdated:
+			// ...
+		}
 	}
 }
 

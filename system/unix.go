@@ -12,7 +12,6 @@ import (
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/pkg/errors"
-	"github.com/wetware/go/util"
 )
 
 var _ fs.FS = (*UnixFS)(nil)
@@ -40,7 +39,24 @@ type UnixFS struct {
 // fs.ValidPath(name), returning a *fs.PathError with Err set to
 // fs.ErrInvalid or fs.ErrNotExist.
 func (f UnixFS) Open(name string) (fs.File, error) {
-	path, node, err := util.Resolve(f.Ctx, f.Unix, name)
+	if PathInvalid(name) {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  fs.ErrInvalid,
+		}
+	}
+
+	p, err := path.NewPath(name)
+	if err != nil {
+		return nil, &fs.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  err,
+		}
+	}
+
+	n, err := f.Unix.Get(f.Ctx, p)
 	if err != nil {
 		return nil, &fs.PathError{
 			Op:   "open",
@@ -50,9 +66,13 @@ func (f UnixFS) Open(name string) (fs.File, error) {
 	}
 
 	return &UnixNode{
-		Path: path,
-		Node: node,
+		Path: p,
+		Node: n,
 	}, nil
+}
+
+func PathInvalid(name string) bool {
+	return !fs.ValidPath(name)
 }
 
 var (

@@ -11,7 +11,7 @@ require (
 	github.com/ipfs/boxo v0.24.0
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.36.5
-	github.com/libp2p/go-msgio v0.3.0
+	github.com/libp2p/go-libp2p-kad-dht v0.26.1
 	github.com/lmittmann/tint v1.0.4
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.13.0
@@ -20,11 +20,11 @@ require (
 	github.com/tetratelabs/wazero v1.8.1
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/urfave/cli/v2 v2.27.3
-	go.uber.org/multierr v1.11.0
 	golang.org/x/sync v0.8.0
 )
 
 require (
+	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/alecthomas/units v0.0.0-20240626203959-61d1e3462e30 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -86,10 +86,10 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
-	github.com/libp2p/go-libp2p-kad-dht v0.26.1 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.6.4 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4 // indirect
+	github.com/libp2p/go-msgio v0.3.0 // indirect
 	github.com/libp2p/go-nat v0.2.0 // indirect
 	github.com/libp2p/go-netroute v0.2.1 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
@@ -160,6 +160,7 @@ require (
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.22.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.27.0 // indirect

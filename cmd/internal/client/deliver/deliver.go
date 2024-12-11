@@ -3,13 +3,20 @@ package deliver
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"path"
 
+	"github.com/ipfs/kubo/client/rpc"
+	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
-	ww "github.com/wetware/go"
+	"github.com/wetware/go/boot"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
@@ -31,13 +38,40 @@ func Command() *cli.Command {
 }
 
 func deliver(c *cli.Context) error {
-	// 1. Set up libp2p and peer discovery
+	// ipfs, err := newIPFSClient(c)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// Set up libp2p host and DHT
 	////
-	h, err := ww.NewP2PHostWithMDNS(c.Context)
+	h, err := libp2p.New()
 	if err != nil {
 		return err
 	}
 	defer h.Close()
+
+	dht, err := dual.New(c.Context, h)
+	if err != nil {
+		return err
+	}
+	defer dht.Close()
+
+	h = routedhost.Wrap(h, dht)
+
+	fmt.Println("FOO")
+
+	// Start a multicast DNS service that searches for local
+	// peers in the background and bootstraps the DHT.
+	////
+	d, err := boot.MDNS{
+		Host:    h,
+		Handler: boot.PeerHandler{Bootstrapper: dht},
+	}.New()
+	if err != nil {
+		return err
+	}
+	defer d.Close()
 
 	// 2. Open a stream to peer
 	////
@@ -53,11 +87,13 @@ func deliver(c *cli.Context) error {
 }
 
 func roundTrip(c *cli.Context, s network.Stream) error {
+	fmt.Println("BAR")
+
 	if n, err := io.Copy(s, c.App.Reader); err != nil { // Request
 		return fmt.Errorf("wrote %d bytes: %w", n, err)
-	} else if n, err := io.Copy(c.App.Writer, s); err != nil { // Response
+	} /* else if n, err := io.Copy(c.App.Writer, s); err != nil { // Response
 		return fmt.Errorf("read %d bytes: %w", n, err)
-	}
+	} */
 
 	return nil
 }
@@ -69,8 +105,8 @@ type Args struct {
 }
 
 func (a *Args) Bind(c *cli.Context) (err error) {
-	arg0 := c.Args().Get(0)
-	arg1 := c.Args().Get(1)
+	arg0 := c.Args().Get(0) // peer
+	arg1 := c.Args().Get(1) // method
 
 	a.Call = proc.Call{
 		Method: c.Args().Get(2),
@@ -91,4 +127,15 @@ func (a Args) Protocol() protocol.ID {
 	pid := "/pid/" + a.PID.String()
 	proto := path.Join(p2p, system.Proto.String(), pid)
 	return protocol.ID(proto)
+}
+
+func newIPFSClient(c *cli.Context) (ipfs iface.CoreAPI, err error) {
+	var a ma.Multiaddr
+	if s := c.String("ipfs"); s == "local" {
+		ipfs, err = rpc.NewLocalApi()
+	} else if a, err = ma.NewMultiaddr(s); err == nil {
+		ipfs, err = rpc.NewApiWithClient(a, http.DefaultClient)
+	}
+
+	return
 }

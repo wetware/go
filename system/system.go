@@ -1,6 +1,10 @@
+// //go:generate capnp compile -I $GOPATH/src/capnproto.org/go/capnp/std -ogo system.capnp
+
 package system
 
 import (
+	"context"
+
 	"github.com/blang/semver/v4"
 	"github.com/hashicorp/go-memdb"
 	"github.com/wetware/go/proc"
@@ -32,4 +36,10 @@ var Schema = memdb.DBSchema{
 			},
 		},
 	},
+}
+
+type CloserFunc func(context.Context) error
+
+func (close CloserFunc) Close(ctx context.Context) error {
+	return close(ctx)
 }
