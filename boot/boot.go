@@ -2,13 +2,13 @@ package boot
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/ipfs/go-cid"
+	"github.com/ipfs/boxo/path"
+	"github.com/libp2p/go-libp2p-kad-dht/amino"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/lthibault/jitterbug/v2"
-	"github.com/multiformats/go-multihash"
 	"github.com/wetware/go/system"
 )
 
@@ -49,7 +49,7 @@ func (dht DHT) MinTTL() time.Duration {
 
 func (dht DHT) Serve(ctx context.Context) error {
 	if dht.TTL <= 0 {
-		dht.TTL = time.Hour * 24
+		dht.TTL = amino.DefaultProviderAddrTTL
 	}
 
 	dht.Log().DebugContext(ctx, "service started")
@@ -63,7 +63,7 @@ func (dht DHT) Serve(ctx context.Context) error {
 		if err := dht.Announce(ctx); err != nil {
 			return err
 		}
-		dht.Log().DebugContext(ctx, "announced peer")
+		dht.Log().InfoContext(ctx, "announced peer")
 
 		select {
 		case <-timer.C:
@@ -76,11 +76,11 @@ func (dht DHT) Serve(ctx context.Context) error {
 }
 
 func (dht DHT) Announce(ctx context.Context) error {
-	b, err := multihash.Encode([]byte(dht.Name()), multihash.BLAKE3)
-	if err != nil {
-		return fmt.Errorf("encode: %w", err)
-	}
+	id := dht.Env.Host.ID()
+	r := dht.Env.IPFS.Routing()
 
-	key := cid.NewCidV1(multihash.BLAKE3, b)
-	return dht.Env.DHT.Provide(ctx, key, true)
+	cid := peer.ToCid(id)
+	p := path.FromCid(cid)
+
+	return r.Provide(ctx, p)
 }

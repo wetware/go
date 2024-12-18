@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
 	ma "github.com/multiformats/go-multiaddr"
@@ -82,12 +81,7 @@ func setup(c *cli.Context) (err error) {
 	} else if env.Host, err = libp2p.New(); err != nil {
 		return
 	}
-
-	// Set up DHT routing
-	////
-	if env.DHT, err = dual.New(c.Context, env.Host); err == nil {
-		env.Host = routedhost.Wrap(env.Host, env.DHT)
-	}
+	env.Host = routedhost.Wrap(env.Host, env.IPFS.Routing())
 
 	return
 }
