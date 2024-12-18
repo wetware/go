@@ -82,5 +82,5 @@ func (dht DHT) Announce(ctx context.Context) error {
 	}
 
 	key := cid.NewCidV1(multihash.BLAKE3, b)
-	return dht.Env.DHT.Provide(ctx, key, false)
+	return dht.Env.DHT.Provide(ctx, key, true)
 }
