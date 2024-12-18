@@ -3,19 +3,26 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/ipfs/kubo/client/rpc"
+	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 
 	"github.com/wetware/go/cmd/internal/client"
-	"github.com/wetware/go/cmd/internal/export"
-	"github.com/wetware/go/cmd/internal/run"
 	"github.com/wetware/go/cmd/internal/serve"
 	"github.com/wetware/go/system"
 )
+
+var env system.Env
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(),
@@ -24,10 +31,11 @@ func main() {
 	defer cancel()
 
 	app := &cli.App{
-		Name:      "wetware",
-		Copyright: "2020 The Wetware Project",
-		Before:    setup,
-		// DefaultCommand: "shell",
+		Name:           "wetware",
+		Copyright:      "2020 The Wetware Project",
+		Before:         setup,
+		After:          teardown,
+		DefaultCommand: "serve",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",
@@ -48,10 +56,10 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			run.Command(),
-			serve.Command(),
-			export.Command(),
-			client.Command(),
+			serve.Command(&env),
+			client.Command(&env),
+			// export.Command(&env),
+			// run.Command(&env),
 		},
 	}
 
@@ -62,10 +70,34 @@ func main() {
 	}
 }
 
-func setup(c *cli.Context) error {
+func setup(c *cli.Context) (err error) {
 	log := slog.New(logger(c)).With(
 		"version", system.Proto.Version)
 	slog.SetDefault(log)
+
+	// Set up IPFS and libp2p
+	////
+	if env.IPFS, err = newIPFSClient(c); err != nil {
+		return
+	} else if env.Host, err = libp2p.New(); err != nil {
+		return
+	}
+
+	// Set up DHT routing
+	////
+	if env.DHT, err = dual.New(c.Context, env.Host); err == nil {
+		env.Host = routedhost.Wrap(env.Host, env.DHT)
+	}
+
+	return
+}
+
+func teardown(c *cli.Context) error {
+	// host was started?
+	if env.Host != nil {
+		return env.Host.Close()
+	}
+
 	return nil
 }
 
@@ -95,4 +127,17 @@ func loglvl(c *cli.Context) slog.Leveler {
 	}
 
 	return slog.LevelInfo
+}
+
+func newIPFSClient(c *cli.Context) (iface.CoreAPI, error) {
+	if !c.IsSet("ipfs") {
+		return rpc.NewLocalApi()
+	}
+
+	a, err := ma.NewMultiaddr(c.String("ipfs"))
+	if err != nil {
+		return nil, err
+	}
+
+	return rpc.NewApiWithClient(a, http.DefaultClient)
 }

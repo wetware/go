@@ -4,9 +4,16 @@ package system
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/hashicorp/go-memdb"
+	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/wetware/go/proc"
 	protoutils "github.com/wetware/go/util/proto"
 )
@@ -42,4 +49,27 @@ type CloserFunc func(context.Context) error
 
 func (close CloserFunc) Close(ctx context.Context) error {
 	return close(ctx)
+}
+
+type Env struct {
+	IPFS iface.CoreAPI
+	Host host.Host
+	DHT  *dual.DHT
+}
+
+func (env Env) Log() *slog.Logger {
+	return slog.With("peer", env.Host.ID())
+}
+
+func (env Env) HandlePeerFound(info peer.AddrInfo) {
+	pstore := env.Host.Peerstore()
+	pstore.AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+	env.Log().Info("peer discovered", "found", info.ID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	if err := env.DHT.Bootstrap(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to bootstrap dht")
+	}
 }

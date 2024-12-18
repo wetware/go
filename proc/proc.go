@@ -1,3 +1,5 @@
+//go:generate mockgen -source=proc.go -destination=mock_test.go -package=proc_test
+
 package proc
 
 import (
@@ -9,11 +11,18 @@ import (
 	"log/slog"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"golang.org/x/sync/semaphore"
 )
+
+var ErrMethodNotFound = errors.New("method not found")
+
+type Method interface {
+	CallWithStack(context.Context, []uint64) error
+}
 
 type Command struct {
 	PID            PID
@@ -36,7 +45,7 @@ func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.
 		WithSysNanotime().
 		WithSysWalltime().
 		WithStartFunctions()))
-	return New(mod), err
+	return &P{Mod: mod}, err
 }
 
 func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
@@ -55,50 +64,113 @@ func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
 }
 
 type P struct {
-	mod     api.Module
-	mailbox struct{ io.Reader }
-	sem     *semaphore.Weighted
-}
+	Mailbox struct{ io.Reader }
+	Mod     api.Module
 
-func New(mod api.Module) *P {
-	return &P{
-		mod: mod,
-		sem: semaphore.NewWeighted(1),
-	}
+	once sync.Once
+	sem  *semaphore.Weighted
 }
 
 func (p *P) String() string {
-	return p.mod.Name()
+	return p.Mod.Name()
 }
 
 func (p *P) Close(ctx context.Context) error {
-	return p.mod.Close(ctx)
+	return p.Mod.Close(ctx)
 }
 
-func (p *P) Deliver(ctx context.Context, call *Call, r io.Reader) error {
-	p.mailbox.Reader = r                      // we found the method; last chance to hook in
-	defer func() { p.mailbox.Reader = nil }() // defensive; catch use-after-free
+func (p *P) Reserve(ctx context.Context, body io.Reader) error {
+	p.once.Do(func() {
+		p.sem = semaphore.NewWeighted(1)
+	})
 
-	return call.Eval(ctx, p.mod)
+	return p.sem.Acquire(ctx, 1)
 }
 
-type Call struct {
-	Method string   `json:"method,omitempty" cbor:"method,omitempty"`
-	Stack  []uint64 `json:"stack,omitempty" cbor:"stack,omitempty"`
+func (p *P) Release() {
+	defer p.sem.Release(1)
+	p.Mailbox.Reader = nil
 }
 
-func (call Call) Eval(ctx context.Context, mod api.Module) error {
-	fn := mod.ExportedFunction(call.Method)
-	if fn == nil {
-		return errors.New("missing export: " + call.Method)
-	}
-
-	err := fn.CallWithStack(ctx, call.Stack)
-	if errors.Is(err, context.Canceled) {
-		return context.Canceled
-	} else if errors.Is(err, context.DeadlineExceeded) {
-		return context.DeadlineExceeded
-	}
-
-	return err
+func (p *P) Method(name string) Method {
+	return p.Mod.ExportedFunction(name)
 }
+
+// func (p *P) Deliver(ctx context.Context, body io.Reader) ([]uint64, error) {
+// 	// Acquire a lock on the process
+// 	////
+// 	err := p.sem.Acquire(ctx, 1)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer p.sem.Release(-1)
+
+// 	// Assign stream to mailbox and call method with stack.
+// 	////
+// 	p.Mailbox.Reader = body                   // we found the method; last chance to hook in
+// 	defer func() { p.Mailbox.Reader = nil }() // defensive; catch use-after-free
+
+// 	err = method.CallWithStack(ctx, stack)
+// 	if errors.Is(err, context.Canceled) {
+// 		err = context.Canceled
+// 	} else if errors.Is(err, context.DeadlineExceeded) {
+// 		err = context.DeadlineExceeded
+// 	}
+
+// 	return stack, err
+// }
+
+// func (p *P) ReadCallData(r io.Reader) (method api.Function, stack []uint64, err error) {
+// 	rd := bufio.NewReader(r)
+// 	if method, err = p.ReadAndLoadMethod(rd); err != nil {
+// 		return
+// 	} else if method == nil {
+// 		err = ErrMethodNotFound
+// 		return
+// 	}
+
+// 	stack, err = ReadStack(rd)
+// 	return
+// }
+
+// func (p *P) ReadAndLoadMethod(rd io.ByteReader) (api.Function, error) {
+// 	// Length prefix
+// 	n, err := binary.ReadUvarint(rd)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var b byte
+// 	var s strings.Builder
+// 	for i := uint64(0); i < n; i++ {
+// 		if b, err = rd.ReadByte(); err != nil {
+// 			break
+// 		} else if err = s.WriteByte(b); err != nil {
+// 			break
+// 		}
+// 	}
+
+// 	method := p.Mod.ExportedFunction(s.String())
+// 	return method, err
+// }
+
+// func ReadStack(rd io.ByteReader) ([]uint64, error) {
+// 	// Length prefix
+// 	n, err := binary.ReadUvarint(rd)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Read n words from the stack
+// 	var word uint64
+// 	var stack []uint64
+// 	for i := uint64(0); i < n; i++ {
+// 		if word, err = binary.ReadUvarint(rd); err != nil {
+// 			break
+// 		}
+
+// 		stack = append(stack, word)
+// 	}
+
+// 	return stack, err
+// }

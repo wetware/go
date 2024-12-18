@@ -158,10 +158,9 @@ func (s StreamNode) Sys() any {
 var _ fs.File = (*StreamNode)(nil)
 
 type ProcNode struct {
-	Ctx  context.Context
-	Call *proc.Call
-	P    *proc.P
-	Buf  *bytes.Buffer
+	Ctx context.Context
+	P   *proc.P
+	Buf *bytes.Buffer
 }
 
 // fs.File methods
@@ -182,7 +181,8 @@ func (p ProcNode) Write(b []byte) (int, error) {
 // Close flushes the data in the buffer, delivering it to the process,
 // Close() DOES NOT close the underlying process.
 func (p ProcNode) Close() error {
-	return p.P.Deliver(p.Ctx, p.Call, p.Buf)
+	// return p.P.Deliver(p.Ctx, p.Buf)
+	panic("NOT IMPLEMENTED")
 }
 
 // fs.FileInfo methods

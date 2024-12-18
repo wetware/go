@@ -147,9 +147,10 @@ func (h HostNode) Open(name string) (fs.File, error) {
 		return nil, err
 	}
 
-	return ProcNode{
-		P: v.(*proc.P),
-	}, nil
+	panic("NOT IMPLEMENTED")
+	// return ProcNode{
+	// 	P: v.(*proc.P),
+	// }, nil
 }
 
 type HandlerFunc func(context.Context, *proc.P) error
