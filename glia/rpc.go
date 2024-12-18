@@ -21,64 +21,64 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrU16Overflow = errors.New("varint overflows u16")
 
-type RPC struct {
+type P2P struct {
 	Env    *system.Env
 	Router Router
 }
 
-func (rpc RPC) Log() *slog.Logger {
-	return rpc.Env.Log().With(
-		"service", rpc.String())
+func (p2p P2P) Log() *slog.Logger {
+	return p2p.Env.Log().With(
+		"service", p2p.String())
 }
 
-func (rpc RPC) String() string {
-	return "rpc"
+func (p2p P2P) String() string {
+	return "p2p"
 }
 
-func (rpc RPC) Protocol() protocol.ID {
+func (p2p P2P) Protocol() protocol.ID {
 	return system.Proto.Unwrap()
 }
 
-func (rpc RPC) Match(id protocol.ID) bool {
+func (p2p P2P) Match(id protocol.ID) bool {
 	prefix := system.Proto.String()
 	return strings.HasPrefix(string(id), prefix)
 }
 
-func (rpc RPC) Serve(ctx context.Context) error {
-	proto := rpc.Protocol()
-	rpc.Env.Host.SetStreamHandlerMatch(proto, rpc.Match, func(s network.Stream) {
+func (p2p P2P) Serve(ctx context.Context) error {
+	proto := p2p.Protocol()
+	p2p.Env.Host.SetStreamHandlerMatch(proto, p2p.Match, func(s network.Stream) {
 		defer s.Close()
 
 		if dl, ok := ctx.Deadline(); ok {
 			if err := s.SetDeadline(dl); err != nil {
-				rpc.Log().WarnContext(ctx, "failed to set deadline",
+				p2p.Log().WarnContext(ctx, "failed to set deadline",
 					"reason", err)
 				// non-fatal; continue along...
 			}
 		}
 
-		if err := rpc.ServeStream(ctx, s); err != nil {
-			rpc.Log().ErrorContext(ctx, "failed to serve stream",
+		if err := p2p.ServeStream(ctx, s); err != nil {
+			p2p.Log().ErrorContext(ctx, "failed to serve stream",
 				"reason", err,
 				"stream", s.ID())
 		}
 	})
-	defer rpc.Env.Host.RemoveStreamHandler(proto)
-	rpc.Log().DebugContext(ctx, "service started")
+	defer p2p.Env.Host.RemoveStreamHandler(proto)
+	p2p.Log().DebugContext(ctx, "service started")
 
 	<-ctx.Done()
 	return nil
 
-	// children := suture.New(rpc.String(), suture.Spec{
+	// children := suture.New(p2p.String(), suture.Spec{
 	// 	EventHook: util.EventHookWithContext(ctx),
 	// })
-	// children.Add(&HTTPServer{Env: rpc.Env})
-	// children.Add(&UnixServer{Env: rpc.Env})
+	// children.Add(&HTTPServer{Env: p2p.Env})
+	// children.Add(&UnixServer{Env: p2p.Env})
 
 	// return children.Serve(ctx)
 }
 
-func (rpc RPC) ServeStream(ctx context.Context, s network.Stream) error {
+func (p2p P2P) ServeStream(ctx context.Context, s network.Stream) error {
 	// Glia RPC is a synchronous RPC protocol models one round-trip
 	// (request-response) between a server and a client.  The round-
 	// trip models a synchronous method call on an object.
@@ -100,10 +100,10 @@ func (rpc RPC) ServeStream(ctx context.Context, s network.Stream) error {
 
 	// 3. Serve the request.
 	////
-	return rpc.ServeP2P(w, req)
+	return p2p.ServeP2P(w, req)
 }
 
-func (rpc RPC) ServeP2P(w io.WriteCloser, req *Request) error {
+func (p2p P2P) ServeP2P(w io.WriteCloser, req *Request) error {
 	// We always return a result of some kind.  The first task
 	// is to set up a response arena for the request. All data
 	// written to this arena is ultimately sent to the remote
@@ -118,7 +118,7 @@ func (rpc RPC) ServeP2P(w io.WriteCloser, req *Request) error {
 		return err
 	}
 
-	if r := rpc.Bind(req); r != nil {
+	if r := p2p.Bind(req); r != nil {
 		if err := r.Render(req.Ctx, res); err != nil {
 			return err
 		}
@@ -133,8 +133,8 @@ func (rpc RPC) ServeP2P(w io.WriteCloser, req *Request) error {
 	return err
 }
 
-func (rpc RPC) Bind(req *Request) Renderer {
-	p, err := rpc.Router.GetProc(req.PID)
+func (p2p P2P) Bind(req *Request) Renderer {
+	p, err := p2p.Router.GetProc(req.PID)
 	if err != nil {
 		return RoutingError(err)
 	}

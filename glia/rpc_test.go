@@ -84,7 +84,7 @@ func TestRPC_ServeStream(t *testing.T) {
 		Return(p, nil).
 		Times(1)
 
-	rpc := glia.RPC{
+	rpc := glia.P2P{
 		Env:    env,
 		Router: r,
 	}
