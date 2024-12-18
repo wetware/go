@@ -154,7 +154,9 @@ func serve(env *system.Env) cli.ActionFunc {
 					"conn", ev.Conn.ID())
 
 			case *event.EvtPeerIdentificationFailed:
-				// ...
+				log.WarnContext(ctx, "peer identification failed",
+					"peer", ev.Peer,
+					"reason", ev.Reason)
 
 			case *event.EvtPeerProtocolsUpdated:
 				// ...
