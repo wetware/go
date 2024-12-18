@@ -32,9 +32,12 @@ type Command struct {
 }
 
 func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*P, error) {
-	mod, err := r.InstantiateModule(ctx, cm, cmd.WithEnv(wazero.NewModuleConfig().
+	var p P
+	var err error
+	p.Mod, err = r.InstantiateModule(ctx, cm, cmd.WithEnv(wazero.NewModuleConfig().
 		WithName(cmd.PID.String()).
 		WithArgs(cmd.Args...).
+		WithStdin(&p.Mailbox).
 		WithStdout(cmd.Stdout).
 		WithStderr(cmd.Stderr).
 		WithEnv("WW_PID", cmd.PID.String()).
@@ -45,7 +48,7 @@ func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.
 		WithSysNanotime().
 		WithSysWalltime().
 		WithStartFunctions()))
-	return &P{Mod: mod}, err
+	return &p, err
 }
 
 func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
