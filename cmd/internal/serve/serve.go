@@ -47,25 +47,26 @@ func Command(env *system.Env) *cli.Command {
 
 func setup(env *system.Env) cli.BeforeFunc {
 	return func(c *cli.Context) error {
+		// Initialize STM
+		////
 		db, err := memdb.NewMemDB(&system.Schema)
 		if err != nil {
 			return err
 		}
 		r := &Router{DB: db}
 
-		// Bind services to the supervisor.  These will be started
-		// in the background by setup().
+		// Bind services to the supervisor.
 		////
 		for _, s := range []suture.Service{
 			&boot.MDNS{Env: env},
-			&boot.DHT{Env: env},
 			&glia.P2P{Env: env, Router: r},
-			// &glia.HTTP{Env: env, Router: r},
+			&glia.HTTP{Env: env, Router: r},
 		} {
 			app.Add(s)
 		}
 
 		// Start services in the background
+		////
 		errs = app.ServeBackground(c.Context)
 		select {
 		case err = <-errs:
