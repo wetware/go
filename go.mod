@@ -7,14 +7,13 @@ toolchain go1.23.2
 require (
 	capnproto.org/go/capnp/v3 v3.0.1-alpha.2
 	github.com/blang/semver/v4 v4.0.0
+	github.com/go-chi/chi/v5 v5.2.0
 	github.com/golang/mock v1.6.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/ipfs/boxo v0.24.3
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.37.0
-	github.com/libp2p/go-libp2p-kad-dht v0.28.1
 	github.com/lmittmann/tint v1.0.4
-	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.13.0
 	github.com/pkg/errors v0.9.1
@@ -88,6 +87,7 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
+	github.com/libp2p/go-libp2p-kad-dht v0.28.1 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.6.4 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4 // indirect
