@@ -61,6 +61,7 @@ func setup(env *system.Env) cli.BeforeFunc {
 			&boot.MDNS{Env: env},
 			&glia.P2P{Env: env, Router: r},
 			&glia.HTTP{Env: env, Router: r},
+			// &glia.Unix{Env: env, Router: r, Sched: s},
 		} {
 			app.Add(s)
 		}
