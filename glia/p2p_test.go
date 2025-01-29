@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/golang/mock/gomock"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/glia"
 	"github.com/wetware/go/proc"
@@ -15,58 +17,84 @@ import (
 	test_libp2p "github.com/wetware/go/test/libp2p"
 )
 
-func TestP2P(t *testing.T) {
+func TestGliaRPC(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.TODO()
+	// Set up our mocking infrastructure.  We'll be mocking
+	// three major interfaces:
+	//  1. host.Host
+	//  2. glia.Router
+	//  3. glia.Proc
+	////
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// Initialize libp2p mocks.
 	h := test_libp2p.NewMockHost(ctrl)
 	env := &system.Env{
 		Host: h,
 	}
 
-	var body io.Reader
+	// Initialize wetware mocks.  Note the initialization in
+	// reverse-call-order.  This is because we are testing a
+	// 'happens after' ordering (>) such that:
+	//    release > method > reserve
 	p := NewMockProc(ctrl)
-	p.EXPECT().
-		Reserve(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, r io.Reader) error {
-			body = r
-			return nil
-		}).
+	reserve := p.EXPECT().
+		Reserve(gomock.Any(), gomock.Any()). // context.Context, io.Reader
+		Return(nil).                         // error
 		Times(1)
-
-	call := p.EXPECT().
-		Method("test").
-		DoAndReturn(func(name string) proc.Method {
-			if name != "test" {
-				return nil
-			}
-			return &mockMethod{Body: body}
-		}).
+	method := p.EXPECT().
+		Method(gomock.Any()). // context.Context
+		Return(nil).          // error
+		After(reserve).
 		Times(1)
-
 	p.EXPECT().
 		Release().
-		After(call).
+		After(method).
 		Times(1)
 
 	r := NewMockRouter(ctrl)
 	r.EXPECT().
-		GetProc("test-pid").
+		GetProc("test-proc").
 		Return(p, nil).
 		Times(1)
 
-	rpc := glia.P2P{
+	// Instantiate glia P2P runtime and populate it with
+	// the mock router.
+	p2p := glia.P2P{
 		Env:    env,
 		Router: r,
 	}
 
-	g := glia.P2P{
-		// Env
-		Router: r,
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	m, seg := capnp.NewSingleSegmentMessage(nil)
+	defer m.Release()
+
+	hdr, err := glia.NewRootHeader(seg)
+	require.NoError(t, err)
+
+	id, err := peer.Decode("12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw")
+	require.NoError(t, err)
+
+	require.NoError(t, hdr.SetPeer([]byte(id)))
+	require.NoError(t, hdr.SetProc("test-proc"))
+	require.NoError(t, hdr.SetMethod("test-method"))
+	// hdr.SetStack()
+
+	body := "hello, Wetware!"
+
+	req := glia.Request{
+		Ctx:    ctx,
+		Header: hdr,
 	}
+	req.Body.Reset(strings.NewReader(body))
+
+	w := &bytes.Buffer{}
+	err = p2p.ServeP2P(w, &req)
+	require.NoError(t, err)
 }
 
 func TestReadRequest(t *testing.T) {

@@ -119,12 +119,12 @@ type Header capnp.Struct
 const Header_TypeID = 0xb00b0243e9bd824d
 
 func NewHeader(s *capnp.Segment) (Header, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 4})
 	return Header(st), err
 }
 
 func NewRootHeader(s *capnp.Segment) (Header, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 4})
 	return Header(st), err
 }
 
@@ -160,53 +160,66 @@ func (s Header) Message() *capnp.Message {
 func (s Header) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Header) Proc() (string, error) {
+func (s Header) Peer() ([]byte, error) {
 	p, err := capnp.Struct(s).Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Header) HasPeer() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Header) SetPeer(v []byte) error {
+	return capnp.Struct(s).SetData(0, v)
+}
+
+func (s Header) Proc() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
 	return p.Text(), err
 }
 
 func (s Header) HasProc() bool {
-	return capnp.Struct(s).HasPtr(0)
+	return capnp.Struct(s).HasPtr(1)
 }
 
 func (s Header) ProcBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(0)
+	p, err := capnp.Struct(s).Ptr(1)
 	return p.TextBytes(), err
 }
 
 func (s Header) SetProc(v string) error {
-	return capnp.Struct(s).SetText(0, v)
+	return capnp.Struct(s).SetText(1, v)
 }
 
 func (s Header) Method() (string, error) {
-	p, err := capnp.Struct(s).Ptr(1)
+	p, err := capnp.Struct(s).Ptr(2)
 	return p.Text(), err
 }
 
 func (s Header) HasMethod() bool {
-	return capnp.Struct(s).HasPtr(1)
+	return capnp.Struct(s).HasPtr(2)
 }
 
 func (s Header) MethodBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(1)
+	p, err := capnp.Struct(s).Ptr(2)
 	return p.TextBytes(), err
 }
 
 func (s Header) SetMethod(v string) error {
-	return capnp.Struct(s).SetText(1, v)
+	return capnp.Struct(s).SetText(2, v)
 }
 
 func (s Header) Stack() (capnp.UInt64List, error) {
-	p, err := capnp.Struct(s).Ptr(2)
+	p, err := capnp.Struct(s).Ptr(3)
 	return capnp.UInt64List(p.List()), err
 }
 
 func (s Header) HasStack() bool {
-	return capnp.Struct(s).HasPtr(2)
+	return capnp.Struct(s).HasPtr(3)
 }
 
 func (s Header) SetStack(v capnp.UInt64List) error {
-	return capnp.Struct(s).SetPtr(2, v.ToPtr())
+	return capnp.Struct(s).SetPtr(3, v.ToPtr())
 }
 
 // NewStack sets the stack field to a newly
@@ -216,7 +229,7 @@ func (s Header) NewStack(n int32) (capnp.UInt64List, error) {
 	if err != nil {
 		return capnp.UInt64List{}, err
 	}
-	err = capnp.Struct(s).SetPtr(2, l.ToPtr())
+	err = capnp.Struct(s).SetPtr(3, l.ToPtr())
 	return l, err
 }
 
@@ -225,7 +238,7 @@ type Header_List = capnp.StructList[Header]
 
 // NewHeader creates a new list of Header.
 func NewHeader_List(s *capnp.Segment, sz int32) (Header_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 4}, sz)
 	return capnp.StructList[Header](l), err
 }
 
@@ -424,38 +437,40 @@ func NewResult_Status_List(s *capnp.Segment, sz int32) (Result_Status_List, erro
 	return capnp.NewEnumList[Result_Status](s, sz)
 }
 
-const schema_f381800d6f8057ad = "x\xdat\xd1Ak\xd4@\x1c\x05\xf0\xf7fv[K" +
-	"[\xc3\x98\x82 H{P\xa1\x15\x8b\x16\x14-\x94\xad" +
-	"\xb4[\xba\xe0\x96\x9d*\xe8J\x05\xc3n\\\xd7\xc6d" +
-	"M&\x0a\x1e\xa4\x0a\"\x88 \xf4\xe6M\xbc\x17\xf5\xe0" +
-	"\xd1\xa3\x14\xf4\x0bx\x14\xc1\x83g?@d\xb2n\xbb" +
-	"+z\xca$y\xf9\xbf_fNOq\xb1pf|" +
-	"W@\xe8\xa9\xe2Pv\xf2\xd3\xcb\x17\xdf\x82sO\xa1" +
-	"G\xc9l\xe7\xeaV4\xbe\xf5\xf8\x17\x8ab\x18p+" +
-	"\xdcv5\x0f\x03n\x9do\xc1\xac\xfa\xe4\xe3\xcf%1" +
-	"\xfa\x0ej\xb4?+m\x96b\xdb\x1d\xc9\xbf*\x0a\x9b" +
-	"\xfd\xfa}\xe3\x99\xfe\xd2\xf8;\x9b'v\xc4\x1b\xf7C" +
-	"\xbez/\x1e\x80\xd9\xf3W\x8fN\xbc\x96\xde\x0f\xa8C" +
-	"b_\x04\xbaG\xe5gw:\x1f\x7f\\\xee\xe2T\xd6" +
-	"\x0a\xda\xdel\xc3\xeb0\xec\xcc\xaf\xfbI\x1a\xd0\xe8\x02" +
-	"\xfb\x07p\xbet\xd9x&M\xf4\x98,\x00\x05\x02\xaa" +
-	"<\x07\xe8EI\xbd!HN\xd0>\xab\xcf\x03\xfa\x8a" +
-	"\xa4\xbe)\xa8\x04'(\x00uc\x06\xd0\xd7$uS" +
-	"p21^c\x93\x07\xc1\x9a$G \xec\xb2\x94\xe4" +
-	"\xb3\xe9\xec7\x82t@\xa7\x1d\xde\x8a8\x06\xc11p" +
-	"\x80\xb9\xea{M\x9fq\x8d\xec\x17\xcd\xfc\x11]\x12T" +
-	"=R\xc5\x92\x96%u\xcd\x92D\x97T\xb5\xf6\xd5." +
-	"\xc9\xe9\xc4Q\xa3WR\xba\xeb\x9b\xdbQ\xb3w\xfbO" +
-	"\xee\x00d\xc9\x0b\x82\xe5a\xcfx\x96r`\x8f2m" +
-	"\x0b\x8eI\xea\xc5>\xca\x82\xa5\x9c\x97\xd4\xcb\xff\xdb\x88" +
-	"\xc1\xf6\xbd\"\xd1;\x183\xdb=\x06\xc0\xd6M\xe5\xff" +
-	"R\x9f\xb3\xbb\xa5\xf4\x11\x80BU\x1e\x02\x94\xaa|\x07" +
-	"`A]\xb4\x97\xa2Z\x88\x01\x0e\xa9\x0b\xf6\xdd\xb0:" +
-	"{\x1d\x98L\xc3\xc472\xda\xcc\xda\xe1}/h7" +
-	"\xd7Q\xf2\xef\xa5~b\xb28JM;l\x95\xe1\xc4" +
-	"q\x14gvw\xd6\"\xb3\x02'J\xc3f/^\xc5" +
-	"dN\xcd\xba\xe2\xb5\x08%\xb3\x92\x07ZvH9\x8e" +
-	"!\xa3\xf8w\x00\x00\x00\xff\xff{\x85\xb7\xdb"
+const schema_f381800d6f8057ad = "x\xdat\x91Ok\x14A\x10\xc5\xdf\xeb\xdeM\x0c\xc9" +
+	":\xb6\x13\x10\xbc$\x07\x11T\x8c\x1aP4\x106\x92" +
+	"l0\x87\x84t\x14t%B\x9a\xdd1\x193\x99Y" +
+	"gz\x14<H\x14E\x10A\xc8\xcd\x9bx\x17\xfd\x02" +
+	"\x1e%\xa0_\xc0\xa3\x08\"9x\x10?\xc0HO\xd8" +
+	"\xfc\x11=uu\xf5\xebz\xbf\xaa:{\x86\x13\x95s" +
+	"\xb5M\x01\xa1\x87\xab=\xc5\xa9\x8f/_|\x8d.<" +
+	"\x85\xee'\x8b\xb7\xd7\xd7\x93\xda\xfa\xa3\xdf\xa8\x8a^\xc0" +
+	"\x9f\xe1\x86\xafy\x04\xf0\x9b|\x07\x16\xb3\x8f?lM" +
+	"\x8a\xfe\xf7P\xfd{\xb5\x15\xa7\xa5\xd8\xf0\xfb\xca_U" +
+	"\xf1\x03,\xbe|[|\xa6?\xb7\xfe\xd6\x96\x8a-\xf1" +
+	"\xc6\xffUF?\xc5}\xb0x\xfe\xea\xe1\xf1\xd7\xd2|" +
+	"\x87:,v\x89@\xbf)?\xf9\x81tB#7q" +
+	"\xbaX\x8eB3\xd22\x1d\xc6\x9d\xb1\x85 \xcb#Z" +
+	"]\xe1\xde\x02\x1c\xab_\xb5\xc6\xe6\x99\x1e\x90\x15\xa0B" +
+	"@5F\x01=!\xa9\x17\x05\xc9A\xba\\s\x0c\xd0" +
+	"\xd7$\xf5\x92\xa0\x12\x1c\xa4\x00\xd4\xad\x93\x80\xbe!\xa9" +
+	"\xdb\x82C\x995\xadU\x1e\x04\xe7%\xd9\x07\xe1\xc2z" +
+	"V\xd6\xa6\xb7\xeb\x08\xd2\x03\xbd0\xbe\x9dp\x00\x82\x03" +
+	"\xe0>\xcc+\x81i\x07L\xe7I}h\x87\xc88\xa3" +
+	"EI\xbd\"\xa8\xbaH\x81K.I\xea\xc8!\x89m" +
+	"\xa4\xd0q\xb6%uGPI9H\x09\xa85\xd7\xd0" +
+	"\x8a\xa4~\"\xe8u\x82 e\x0d\x825\xd0\xeb\xa4I" +
+	"\xab\x8bQ_\x0b\xecJ\xd2\xee^\xff\xd9\xd0>\xd4I" +
+	"\x13ES\xbd\xc6\x1a\x07{`\x07\xf6\x84s;&\xa9" +
+	"'\xf6\xc0\x8e;\xae\x8b\x92z\xea\x7f\xa3\xda\xef\xbec" +
+	"$\xba\xab\xb3#\xdb\x8b\x02\x9c\xddp\xd9ms\xd4\xcd" +
+	"S\xe9\xa3\x00\x85\x9ay\x00P\xaa\xc6\x1d\x80\x15u\xd9" +
+	"\x1dU5\x9e\x02\xecQ\x97\xdc[\xaf:\x7f\x13\x18\xca" +
+	"\xe3,\xb02Y-\xc2\xf8\x9e\x89\xc2\xf6\x02\xea\xc1\xdd" +
+	"<\xc8l\x91&\xb9\x0d\xe3\xe5\x06\xbc4M\xd2\xc2M" +
+	"g.\xb1\xd3\xf0\x92<nw\xe5\xb3\x18*Q\x8bm" +
+	"\xe2\xb9\x04u;]\x0a\x96]\x91F\x9aB&\xe9\x9f" +
+	"\x00\x00\x00\xff\xff\xf9\x8e\xbe\xc1"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{

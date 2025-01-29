@@ -65,9 +65,10 @@ func setup(env *system.Env) cli.BeforeFunc {
 		////
 		p2p := glia.P2P{Env: env, Router: r} // core p2p service
 		for _, s := range []suture.Service{
-			&boot.MDNS{Env: env},
-			// &glia.Unix{P2P: p2p},
+			p2p,
+			// &glia.Unix{P2P: p2p, Path c.String("unix")},
 			&glia.HTTP{P2P: p2p, ListenAddr: c.String("http")},
+			&boot.MDNS{Env: env /*NS: c.String("ns")*/},
 		} {
 			app.Add(s)
 		}

@@ -179,6 +179,10 @@ func ReadRequest(ctx context.Context, s network.Stream) (*Request, error) {
 	return req, err
 }
 
+// func (req Request) Render(ctx context.Context, res Result) error {
+
+// }
+
 type ResponseWriter struct {
 	Stream interface {
 		io.Writer

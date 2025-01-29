@@ -14,9 +14,9 @@ struct CallData {
 
 struct Header {
     peer   @0 :Data;
-    proc   @0 :Text;
-    method @1 :Text;
-    stack  @2 :List(UInt64);
+    proc   @1 :Text;
+    method @2 :Text;
+    stack  @3 :List(UInt64);
 }
 
 
