@@ -30,7 +30,7 @@ func TestRender(t *testing.T) {
 
 	t.Run("expect-succeed/status-guestError", func(t *testing.T) {
 		r := func(ctx context.Context, r glia.Result) error {
-			r.SetStatus(glia.Status_guestError)
+			r.SetStatus(glia.Result_Status_guestError)
 			return nil
 		}
 		err = glia.Render(context.TODO(), res, glia.RenderFunc(r))
@@ -61,7 +61,7 @@ func TestOk(t *testing.T) {
 		require.NoError(t, err)
 
 		// check status
-		assert.Equal(t, glia.Status_ok, res.Status())
+		assert.Equal(t, glia.Result_Status_ok, res.Status())
 
 		t.Run("stack", func(t *testing.T) {
 			stack, err := res.Stack()

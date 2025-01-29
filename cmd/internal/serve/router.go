@@ -5,8 +5,6 @@ import (
 	"github.com/wetware/go/glia"
 )
 
-var _ glia.Router = (*Router)(nil)
-
 type Router struct {
 	DB *memdb.MemDB
 }

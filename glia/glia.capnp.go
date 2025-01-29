@@ -8,80 +8,6 @@ import (
 	schemas "capnproto.org/go/capnp/v3/schemas"
 )
 
-type Status uint16
-
-// Status_TypeID is the unique identifier for the type Status.
-const Status_TypeID = 0xa522fe15565ea6a9
-
-// Values of Status.
-const (
-	Status_unset          Status = 0
-	Status_ok             Status = 1
-	Status_invalidRequest Status = 2
-	Status_routingError   Status = 3
-	Status_procNotFound   Status = 4
-	Status_invalidMethod  Status = 5
-	Status_methodNotFound Status = 6
-	Status_guestError     Status = 7
-)
-
-// String returns the enum's constant name.
-func (c Status) String() string {
-	switch c {
-	case Status_unset:
-		return "unset"
-	case Status_ok:
-		return "ok"
-	case Status_invalidRequest:
-		return "invalidRequest"
-	case Status_routingError:
-		return "routingError"
-	case Status_procNotFound:
-		return "procNotFound"
-	case Status_invalidMethod:
-		return "invalidMethod"
-	case Status_methodNotFound:
-		return "methodNotFound"
-	case Status_guestError:
-		return "guestError"
-
-	default:
-		return ""
-	}
-}
-
-// StatusFromString returns the enum value with a name,
-// or the zero value if there's no such value.
-func StatusFromString(c string) Status {
-	switch c {
-	case "unset":
-		return Status_unset
-	case "ok":
-		return Status_ok
-	case "invalidRequest":
-		return Status_invalidRequest
-	case "routingError":
-		return Status_routingError
-	case "procNotFound":
-		return Status_procNotFound
-	case "invalidMethod":
-		return Status_invalidMethod
-	case "methodNotFound":
-		return Status_methodNotFound
-	case "guestError":
-		return Status_guestError
-
-	default:
-		return 0
-	}
-}
-
-type Status_List = capnp.EnumList[Status]
-
-func NewStatus_List(s *capnp.Segment, sz int32) (Status_List, error) {
-	return capnp.NewEnumList[Status](s, sz)
-}
-
 type CallData capnp.Struct
 
 // CallData_TypeID is the unique identifier for the type CallData.
@@ -187,6 +113,130 @@ func (f CallData_Future) Struct() (CallData, error) {
 	return CallData(p.Struct()), err
 }
 
+type Header capnp.Struct
+
+// Header_TypeID is the unique identifier for the type Header.
+const Header_TypeID = 0xb00b0243e9bd824d
+
+func NewHeader(s *capnp.Segment) (Header, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Header(st), err
+}
+
+func NewRootHeader(s *capnp.Segment) (Header, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Header(st), err
+}
+
+func ReadRootHeader(msg *capnp.Message) (Header, error) {
+	root, err := msg.Root()
+	return Header(root.Struct()), err
+}
+
+func (s Header) String() string {
+	str, _ := text.Marshal(0xb00b0243e9bd824d, capnp.Struct(s))
+	return str
+}
+
+func (s Header) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Header) DecodeFromPtr(p capnp.Ptr) Header {
+	return Header(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Header) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Header) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Header) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Header) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Header) Proc() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Header) HasProc() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Header) ProcBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Header) SetProc(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Header) Method() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Header) HasMethod() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Header) MethodBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Header) SetMethod(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Header) Stack() (capnp.UInt64List, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return capnp.UInt64List(p.List()), err
+}
+
+func (s Header) HasStack() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s Header) SetStack(v capnp.UInt64List) error {
+	return capnp.Struct(s).SetPtr(2, v.ToPtr())
+}
+
+// NewStack sets the stack field to a newly
+// allocated capnp.UInt64List, preferring placement in s's segment.
+func (s Header) NewStack(n int32) (capnp.UInt64List, error) {
+	l, err := capnp.NewUInt64List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp.UInt64List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(2, l.ToPtr())
+	return l, err
+}
+
+// Header_List is a list of Header.
+type Header_List = capnp.StructList[Header]
+
+// NewHeader creates a new list of Header.
+func NewHeader_List(s *capnp.Segment, sz int32) (Header_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
+	return capnp.StructList[Header](l), err
+}
+
+// Header_Future is a wrapper for a Header promised by a client call.
+type Header_Future struct{ *capnp.Future }
+
+func (f Header_Future) Struct() (Header, error) {
+	p, err := f.Future.Ptr()
+	return Header(p.Struct()), err
+}
+
 type Result capnp.Struct
 
 // Result_TypeID is the unique identifier for the type Result.
@@ -257,11 +307,11 @@ func (s Result) NewStack(n int32) (capnp.UInt64List, error) {
 	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
 	return l, err
 }
-func (s Result) Status() Status {
-	return Status(capnp.Struct(s).Uint16(0))
+func (s Result) Status() Result_Status {
+	return Result_Status(capnp.Struct(s).Uint16(0))
 }
 
-func (s Result) SetStatus(v Status) {
+func (s Result) SetStatus(v Result_Status) {
 	capnp.Struct(s).SetUint16(0, uint16(v))
 }
 
@@ -300,41 +350,121 @@ func (f Result_Future) Struct() (Result, error) {
 	return Result(p.Struct()), err
 }
 
-const schema_f381800d6f8057ad = "x\xdat\x90\xc1k\x13A\x14\xc6\xbfo&i\x94\xa4" +
-	"\xae\xc3\xd6\x8b(Q\xd1\x83\x8a\x82\x05E\x0b%\x11\x9b" +
-	"B\x0f-\x9d*j\xa5\x8aK\xb2\xc6\xb5\xebN\xdc\x9d" +
-	"U\xf0T\x0f\xe2E\x10\xfa'\x08\x0a\x1eD\xff\x09\x11" +
-	"\x11\x0f\xde\x04/\xe2\xbf\xe0\xdd\x91Y\x89\xa5HO\xef" +
-	"c\xe6{\xef}\xef\xb7\xf7{\xb7vf\xd2\x08\x08}" +
-	"\xa0>\xe1N~x\xf1\xfcGz\xee)t\x93to" +
-	"\xafm\x98\xc9\x8d'\xbfP\x17\x0d <\xc8\xcd\xf0\x18" +
-	"\xbd:\xccw\xa0{\xf3\xfa\xd6\xd5}\xbf\x8f\xbc\x82j" +
-	"\x8a-/\x18~\xe2f\xf8\xb52~\xe1G\xd0}\xfb" +
-	"\xb9\xf6L\x7f\xee\xbf\x87j\xfe7tA\xbc\x0cu\xa5" +
-	"\x16\xc5#\x9cr\xc34\x89N\xf7\xa3\x11\xb3\xd1\xccJ" +
-	"\\\x94)\xed2\xa9[\xb2\x06\xd4\x08\xa8\xde4\xa0\xbb" +
-	"\x92zM\x90\x9c\xa2\x7f[\x9d\x01\xf4\x15I}[P" +
-	"\x09NQ\x00\xea\xe6\x09@_\x97\xd4\x03\xc1va\xa3" +
-	"\xfe:\xf7\x80\xcb\x92\xdc\x0d\xe1e\xa7\xb0\x91-\x0b\x06" +
-	"[\x97\x80\x0c\xc0 \xc9\xee\x18\xb6 \xd8\x02\xb7%\xba" +
-	"\xec;X\xf8D\x87\xaa%\xab\xd3\xbeG\xe9\xfd\x00\x85" +
-	"Zx\x0cP\xaa\xde=\x805u\xd1\x97\xba\x9a\xcd\x01" +
-	"N\xa8\x0b\xfe\xaf\xa1\xce\xde\x00\xdaeV\xc4V\x9au" +
-	"\x97d\x0f\xa34\x19\xac\xa0\x13?(\xe3\xc2\xba\xdc\x94" +
-	"6\xc9\x86=\x04ynr7\xcaM\x7f\xc9\xd8y\x04" +
-	"\xa6\xcc\x06c\xfb\"\xda\xb1\xbdk\x06\xee~U\x96\x0c" +
-	":v\xbe2\x0c\xfd\x90^\x9eC\x9a|[\xf0KQ" +
-	"\x9a\xce5\"\x1b\xf9\xe8\xbb\xfe\xc1<\xeea\x1e\x95\xd4" +
-	"]A5\xa69\xebi\x9e\x97\xd4s;\x81\xfb\xbbw" +
-	"L\xe8O\x00\x00\x00\xff\xff\xdb\xc7\x8dX"
+type Result_Status uint16
+
+// Result_Status_TypeID is the unique identifier for the type Result_Status.
+const Result_Status_TypeID = 0xe56103a0267e998a
+
+// Values of Result_Status.
+const (
+	Result_Status_unset          Result_Status = 0
+	Result_Status_ok             Result_Status = 1
+	Result_Status_invalidRequest Result_Status = 2
+	Result_Status_routingError   Result_Status = 3
+	Result_Status_procNotFound   Result_Status = 4
+	Result_Status_invalidMethod  Result_Status = 5
+	Result_Status_methodNotFound Result_Status = 6
+	Result_Status_guestError     Result_Status = 7
+)
+
+// String returns the enum's constant name.
+func (c Result_Status) String() string {
+	switch c {
+	case Result_Status_unset:
+		return "unset"
+	case Result_Status_ok:
+		return "ok"
+	case Result_Status_invalidRequest:
+		return "invalidRequest"
+	case Result_Status_routingError:
+		return "routingError"
+	case Result_Status_procNotFound:
+		return "procNotFound"
+	case Result_Status_invalidMethod:
+		return "invalidMethod"
+	case Result_Status_methodNotFound:
+		return "methodNotFound"
+	case Result_Status_guestError:
+		return "guestError"
+
+	default:
+		return ""
+	}
+}
+
+// Result_StatusFromString returns the enum value with a name,
+// or the zero value if there's no such value.
+func Result_StatusFromString(c string) Result_Status {
+	switch c {
+	case "unset":
+		return Result_Status_unset
+	case "ok":
+		return Result_Status_ok
+	case "invalidRequest":
+		return Result_Status_invalidRequest
+	case "routingError":
+		return Result_Status_routingError
+	case "procNotFound":
+		return Result_Status_procNotFound
+	case "invalidMethod":
+		return Result_Status_invalidMethod
+	case "methodNotFound":
+		return Result_Status_methodNotFound
+	case "guestError":
+		return Result_Status_guestError
+
+	default:
+		return 0
+	}
+}
+
+type Result_Status_List = capnp.EnumList[Result_Status]
+
+func NewResult_Status_List(s *capnp.Segment, sz int32) (Result_Status_List, error) {
+	return capnp.NewEnumList[Result_Status](s, sz)
+}
+
+const schema_f381800d6f8057ad = "x\xdat\xd1Ak\xd4@\x1c\x05\xf0\xf7fv[K" +
+	"[\xc3\x98\x82 H{P\xa1\x15\x8b\x16\x14-\x94\xad" +
+	"\xb4[\xba\xe0\x96\x9d*\xe8J\x05\xc3n\\\xd7\xc6d" +
+	"M&\x0a\x1e\xa4\x0a\"\x88 \xf4\xe6M\xbc\x17\xf5\xe0" +
+	"\xd1\xa3\x14\xf4\x0bx\x14\xc1\x83g?@d\xb2n\xbb" +
+	"+z\xca$y\xf9\xbf_fNOq\xb1pf|" +
+	"W@\xe8\xa9\xe2Pv\xf2\xd3\xcb\x17\xdf\x82sO\xa1" +
+	"G\xc9l\xe7\xeaV4\xbe\xf5\xf8\x17\x8ab\x18p+" +
+	"\xdcv5\x0f\x03n\x9do\xc1\xac\xfa\xe4\xe3\xcf%1" +
+	"\xfa\x0ej\xb4?+m\x96b\xdb\x1d\xc9\xbf*\x0a\x9b" +
+	"\xfd\xfa}\xe3\x99\xfe\xd2\xf8;\x9b'v\xc4\x1b\xf7C" +
+	"\xbez/\x1e\x80\xd9\xf3W\x8fN\xbc\x96\xde\x0f\xa8C" +
+	"b_\x04\xbaG\xe5gw:\x1f\x7f\\\xee\xe2T\xd6" +
+	"\x0a\xda\xdel\xc3\xeb0\xec\xcc\xaf\xfbI\x1a\xd0\xe8\x02" +
+	"\xfb\x07p\xbet\xd9x&M\xf4\x98,\x00\x05\x02\xaa" +
+	"<\x07\xe8EI\xbd!HN\xd0>\xab\xcf\x03\xfa\x8a" +
+	"\xa4\xbe)\xa8\x04'(\x00uc\x06\xd0\xd7$uS" +
+	"p21^c\x93\x07\xc1\x9a$G \xec\xb2\x94\xe4" +
+	"\xb3\xe9\xec7\x82t@\xa7\x1d\xde\x8a8\x06\xc11p" +
+	"\x80\xb9\xea{M\x9fq\x8d\xec\x17\xcd\xfc\x11]\x12T" +
+	"=R\xc5\x92\x96%u\xcd\x92D\x97T\xb5\xf6\xd5." +
+	"\xc9\xe9\xc4Q\xa3WR\xba\xeb\x9b\xdbQ\xb3w\xfbO" +
+	"\xee\x00d\xc9\x0b\x82\xe5a\xcfx\x96r`\x8f2m" +
+	"\x0b\x8eI\xea\xc5>\xca\x82\xa5\x9c\x97\xd4\xcb\xff\xdb\x88" +
+	"\xc1\xf6\xbd\"\xd1;\x183\xdb=\x06\xc0\xd6M\xe5\xff" +
+	"R\x9f\xb3\xbb\xa5\xf4\x11\x80BU\x1e\x02\x94\xaa|\x07" +
+	"`A]\xb4\x97\xa2Z\x88\x01\x0e\xa9\x0b\xf6\xdd\xb0:" +
+	"{\x1d\x98L\xc3\xc472\xda\xcc\xda\xe1}/h7" +
+	"\xd7Q\xf2\xef\xa5~b\xb28JM;l\x95\xe1\xc4" +
+	"q\x14gvw\xd6\"\xb3\x02'J\xc3f/^\xc5" +
+	"dN\xcd\xba\xe2\xb5\x08%\xb3\x92\x07ZvH9\x8e" +
+	"!\xa3\xf8w\x00\x00\x00\xff\xff{\x85\xb7\xdb"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_f381800d6f8057ad,
 		Nodes: []uint64{
 			0x85366ce08c8fc52b,
-			0xa522fe15565ea6a9,
+			0xb00b0243e9bd824d,
 			0xb063cb51875ce2d8,
+			0xe56103a0267e998a,
 		},
 		Compressed: true,
 	})

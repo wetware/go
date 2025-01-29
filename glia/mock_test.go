@@ -7,6 +7,7 @@ package glia_test
 import (
 	context "context"
 	io "io"
+	slog "log/slog"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -141,4 +142,41 @@ func (m *MockRouter) GetProc(pid string) (glia.Proc, error) {
 func (mr *MockRouterMockRecorder) GetProc(pid interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProc", reflect.TypeOf((*MockRouter)(nil).GetProc), pid)
+}
+
+// MockEnv is a mock of Env interface.
+type MockEnv struct {
+	ctrl     *gomock.Controller
+	recorder *MockEnvMockRecorder
+}
+
+// MockEnvMockRecorder is the mock recorder for MockEnv.
+type MockEnvMockRecorder struct {
+	mock *MockEnv
+}
+
+// NewMockEnv creates a new mock instance.
+func NewMockEnv(ctrl *gomock.Controller) *MockEnv {
+	mock := &MockEnv{ctrl: ctrl}
+	mock.recorder = &MockEnvMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockEnv) EXPECT() *MockEnvMockRecorder {
+	return m.recorder
+}
+
+// Log mocks base method.
+func (m *MockEnv) Log() *slog.Logger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Log")
+	ret0, _ := ret[0].(*slog.Logger)
+	return ret0
+}
+
+// Log indicates an expected call of Log.
+func (mr *MockEnvMockRecorder) Log() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockEnv)(nil).Log))
 }

@@ -38,6 +38,12 @@ func Command(env *system.Env) *cli.Command {
 				EnvVars: []string{"WW_WASM_DEBUG"},
 				Usage:   "enable wasm debug symbols",
 			},
+			&cli.StringFlag{
+				Name:    "http",
+				EnvVars: []string{"WW_HTTP"},
+				Usage:   "bind API server to `HOST`:`PORT`",
+				Value:   "localhost:2080",
+			},
 		},
 		Before: setup(env),
 		Action: serve(env),
@@ -47,7 +53,7 @@ func Command(env *system.Env) *cli.Command {
 
 func setup(env *system.Env) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		// Initialize STM
+		// Initialize STM and construct the router.
 		////
 		db, err := memdb.NewMemDB(&system.Schema)
 		if err != nil {
@@ -57,11 +63,11 @@ func setup(env *system.Env) cli.BeforeFunc {
 
 		// Bind services to the supervisor.
 		////
+		p2p := glia.P2P{Env: env, Router: r} // core p2p service
 		for _, s := range []suture.Service{
 			&boot.MDNS{Env: env},
-			&glia.P2P{Env: env, Router: r},
-			&glia.HTTP{Env: env, Router: r},
-			// &glia.Unix{Env: env, Router: r, Sched: s},
+			// &glia.Unix{P2P: p2p},
+			&glia.HTTP{P2P: p2p, ListenAddr: c.String("http")},
 		} {
 			app.Add(s)
 		}
@@ -132,7 +138,7 @@ func serve(env *system.Env) cli.ActionFunc {
 				// ignore the event fields; they're noisy
 
 			case *event.EvtLocalProtocolsUpdated:
-				// ...
+				log.InfoContext(ctx, "local protocols updated")
 
 			case *event.EvtLocalReachabilityChanged:
 				log.InfoContext(ctx, "local reachability changed",
@@ -161,7 +167,8 @@ func serve(env *system.Env) cli.ActionFunc {
 					"reason", ev.Reason)
 
 			case *event.EvtPeerProtocolsUpdated:
-				// ...
+				log.InfoContext(ctx, "peer protocols updated",
+					"peer", ev.Peer)
 
 			}
 		}

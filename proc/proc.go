@@ -25,10 +25,10 @@ type Method interface {
 }
 
 type Command struct {
-	PID            PID
-	Args, Env      []string
-	Stdout, Stderr io.Writer
-	FS             fs.FS
+	PID       PID
+	Args, Env []string
+	Stderr    io.Writer
+	FS        fs.FS
 }
 
 func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*P, error) {
@@ -38,7 +38,7 @@ func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.
 		WithName(cmd.PID.String()).
 		WithArgs(cmd.Args...).
 		WithStdin(&p.Mailbox).
-		WithStdout(cmd.Stdout).
+		WithStdout(&p.SendQueue).
 		WithStderr(cmd.Stderr).
 		WithEnv("WW_PID", cmd.PID.String()).
 		WithFS(cmd.FS).
@@ -67,8 +67,9 @@ func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
 }
 
 type P struct {
-	Mailbox struct{ io.Reader }
-	Mod     api.Module
+	Mailbox   struct{ io.Reader }
+	SendQueue struct{ io.Writer }
+	Mod       api.Module
 
 	once sync.Once
 	sem  *semaphore.Weighted
@@ -87,12 +88,19 @@ func (p *P) Reserve(ctx context.Context, body io.Reader) error {
 		p.sem = semaphore.NewWeighted(1)
 	})
 
-	return p.sem.Acquire(ctx, 1)
+	err := p.sem.Acquire(ctx, 1)
+	if err == nil {
+		p.Mailbox.Reader = body
+		// p.SendQueue.Writer = ...  // TODO
+	}
+
+	return err
 }
 
 func (p *P) Release() {
 	defer p.sem.Release(1)
 	p.Mailbox.Reader = nil
+	p.SendQueue.Writer = nil
 }
 
 func (p *P) Method(name string) Method {

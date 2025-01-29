@@ -59,6 +59,10 @@ func (env Env) Log() *slog.Logger {
 }
 
 func (env Env) HandlePeerFound(info peer.AddrInfo) {
+	// TODO:  do we want to move this to boot/mdns.go?   Currently, this
+	// callback is used exclusively by the MDNS discovery system, but it
+	// can be used by other discovery systems in principle.
+
 	pstore := env.Host.Peerstore()
 	pstore.AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
 	env.Log().Info("peer discovered", "found", info.ID)

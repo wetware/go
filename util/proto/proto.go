@@ -15,7 +15,7 @@ type VersionedID struct {
 func (v VersionedID) String() string {
 	proto := string(v.ID)
 	version := v.Version.String()
-	return path.Join("/", proto, version)
+	return path.Join(proto, version)
 }
 
 func (v VersionedID) Unwrap() protocol.ID {

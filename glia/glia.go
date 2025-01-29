@@ -6,6 +6,7 @@ package glia
 import (
 	"context"
 	"io"
+	"log/slog"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/wetware/go/proc"
@@ -22,4 +23,8 @@ type Proc interface {
 
 type Router interface {
 	GetProc(pid string) (Proc, error)
+}
+
+type Env interface {
+	Log() *slog.Logger
 }

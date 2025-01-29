@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"path"
 	"strings"
 
 	capnp "capnproto.org/go/capnp/v3"
@@ -18,7 +17,6 @@ import (
 	"github.com/wetware/go/system"
 )
 
-var ErrNotFound = errors.New("not found")
 var ErrU16Overflow = errors.New("varint overflows u16")
 
 type P2P struct {
@@ -35,18 +33,14 @@ func (p2p P2P) String() string {
 	return "p2p"
 }
 
-func (p2p P2P) Protocol() protocol.ID {
-	return system.Proto.Unwrap()
-}
-
 func (p2p P2P) Match(id protocol.ID) bool {
 	prefix := system.Proto.String()
 	return strings.HasPrefix(string(id), prefix)
 }
 
 func (p2p P2P) Serve(ctx context.Context) error {
-	proto := p2p.Protocol()
-	p2p.Env.Host.SetStreamHandlerMatch(proto, p2p.Match, func(s network.Stream) {
+	proto := system.Proto.Unwrap()
+	p2p.Env.Host.SetStreamHandler(proto, func(s network.Stream) {
 		defer s.Close()
 
 		if dl, ok := ctx.Deadline(); ok {
@@ -103,7 +97,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s network.Stream) error {
 	return p2p.ServeP2P(w, req)
 }
 
-func (p2p P2P) ServeP2P(w io.WriteCloser, req *Request) error {
+func (p2p P2P) ServeP2P(w io.Writer, req *Request) error {
 	// We always return a result of some kind.  The first task
 	// is to set up a response arena for the request. All data
 	// written to this arena is ultimately sent to the remote
@@ -134,12 +128,17 @@ func (p2p P2P) ServeP2P(w io.WriteCloser, req *Request) error {
 }
 
 func (p2p P2P) Bind(req *Request) Renderer {
-	p, err := p2p.Router.GetProc(req.PID)
+	pid, err := req.Header.Proc()
+	if err != nil {
+		return InvalidProc(err)
+	}
+
+	p, err := p2p.Router.GetProc(pid)
 	if err != nil {
 		return RoutingError(err)
 	}
 
-	name, err := req.Call.Method()
+	name, err := req.Header.Method()
 	if err != nil {
 		return InvalidMethod(err)
 	}
@@ -150,7 +149,7 @@ func (p2p P2P) Bind(req *Request) Renderer {
 		Body:   &req.Body,
 	}
 
-	stack, err := req.Call.Stack()
+	stack, err := req.Header.Stack()
 	if err != nil {
 		return InvalidCallStack(err)
 	}
@@ -162,15 +161,13 @@ func (p2p P2P) Bind(req *Request) Renderer {
 }
 
 type Request struct {
-	Ctx  context.Context
-	PID  string
-	Call CallData
-	Body bufio.Reader
+	Ctx    context.Context
+	Header Header
+	Body   bufio.Reader
 }
 
 func ReadRequest(ctx context.Context, s network.Stream) (*Request, error) {
-	pid := path.Base(string(s.Protocol()))
-	req := &Request{Ctx: ctx, PID: pid}
+	req := &Request{Ctx: ctx}
 	req.Body.Reset(s)
 
 	m, err := ReadMessage(&req.Body)
@@ -178,7 +175,7 @@ func ReadRequest(ctx context.Context, s network.Stream) (*Request, error) {
 		return nil, err
 	}
 
-	req.Call, err = ReadRootCallData(m)
+	req.Header, err = ReadRootHeader(m)
 	return req, err
 }
 

@@ -24,7 +24,7 @@ func Render(ctx context.Context, res Result, r Renderer) error {
 
 	// Check that the renderer set a status, else the result is
 	// invalid for transmission.
-	if res.Status() == Status_unset {
+	if res.Status() == Result_Status_unset {
 		return ErrStatusNotSet
 	}
 
@@ -34,7 +34,7 @@ func Render(ctx context.Context, res Result, r Renderer) error {
 type Ok []uint64 // stack
 
 func (stack Ok) Render(_ context.Context, res Result) error {
-	defer res.SetStatus(Status_ok)
+	defer res.SetStatus(Result_Status_ok)
 
 	if size := int32(len(stack)); size > 0 {
 		list, err := res.NewStack(size)
@@ -51,7 +51,7 @@ func (stack Ok) Render(_ context.Context, res Result) error {
 
 type Failure struct {
 	Stack  []uint64
-	Status Status
+	Status Result_Status
 	Err    error
 }
 
@@ -85,7 +85,7 @@ func (f Failure) Render(res Result) error {
 func RoutingError(err error) RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_routingError,
+			Status: Result_Status_routingError,
 			Err:    err,
 		}.Render(res)
 	}
@@ -94,7 +94,16 @@ func RoutingError(err error) RenderFunc {
 func ProcNotFound() RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_procNotFound,
+			Status: Result_Status_procNotFound,
+		}.Render(res)
+	}
+}
+
+func InvalidProc(err error) RenderFunc {
+	return func(ctx context.Context, res Result) error {
+		return Failure{
+			Status: Result_Status_invalidRequest,
+			Err:    err,
 		}.Render(res)
 	}
 }
@@ -102,7 +111,7 @@ func ProcNotFound() RenderFunc {
 func InvalidCallStack(err error) RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_invalidRequest,
+			Status: Result_Status_invalidRequest,
 			Err:    err,
 		}.Render(res)
 	}
@@ -111,7 +120,7 @@ func InvalidCallStack(err error) RenderFunc {
 func InvalidMethod(err error) RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_invalidMethod,
+			Status: Result_Status_invalidMethod,
 			Err:    err,
 		}.Render(res)
 	}
@@ -120,7 +129,7 @@ func InvalidMethod(err error) RenderFunc {
 func MethodNotFound() RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_methodNotFound,
+			Status: Result_Status_methodNotFound,
 		}.Render(res)
 	}
 }
@@ -128,7 +137,7 @@ func MethodNotFound() RenderFunc {
 func GuestError(err error) RenderFunc {
 	return func(ctx context.Context, res Result) error {
 		return Failure{
-			Status: Status_guestError,
+			Status: Result_Status_guestError,
 			Err:    err,
 		}.Render(res)
 	}

@@ -9,63 +9,147 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/url"
 	"path"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-chi/chi/v5"
-	"github.com/mr-tron/base58/base58"
-	"github.com/thejerf/suture/v4"
+	"github.com/go-chi/render"
+	"github.com/mr-tron/base58"
 	"github.com/wetware/go/system"
 )
 
-var httpPathPrefix = system.Proto.String() + "/proc/"
+const DefaultListenAddr = "ww.local:8020"
+
+var ErrNotFound = errors.New("not found")
 
 type HTTP struct {
-	Env          *system.Env
-	Router       Router
+	P2P P2P
+
+	once         sync.Once
 	ListenConfig *net.ListenConfig
 	ListenAddr   string
+	Router       chi.Router
 }
 
-func (HTTP) String() string {
+func (*HTTP) String() string {
 	return "http"
 }
 
-func (h HTTP) Log() *slog.Logger {
-	return h.Env.Log().With(
+func (h *HTTP) Log() *slog.Logger {
+	return h.P2P.Env.Log().With(
 		"service", h.String(),
-		"url", h.URL())
+		"addr", h.ListenAddr)
 }
 
-func (h HTTP) URL() *url.URL {
-	return &url.URL{
-		Scheme: "http",
-		Host:   h.ListenAddr,
-		Path:   httpPathPrefix,
-	}
+func (h *HTTP) Init() {
+	h.once.Do(func() {
+		if h.ListenConfig == nil {
+			h.ListenConfig = &net.ListenConfig{}
+		}
+
+		if h.ListenAddr == "" {
+			h.ListenAddr = DefaultListenAddr
+		}
+
+		if h.Router == nil {
+			h.Router = h.DefaultRouter()
+		}
+	})
 }
 
-func (h HTTP) Serve(ctx context.Context) error {
+func (h *HTTP) DefaultRouter() chi.Router {
+	r := chi.NewRouter()
+	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.WriteHeader(http.StatusNoContent)
+	})
+	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		protoVersion := system.Proto.String()
+		if n, err := io.Copy(w, strings.NewReader(protoVersion)); err == nil {
+			h.Log().Debug("failed to write response",
+				"endpoint", "/version",
+				"wrote", n,
+				"reason", err)
+		}
+	})
+
+	path := path.Join("/", system.Proto.String(), ":host/:proc/:method")
+	r.Post(path, func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		defer io.Copy(io.Discard, r.Body)
+
+		// Bind request data
+		////
+		m, seg := capnp.NewSingleSegmentMessage(nil)
+		defer m.Release()
+
+		req, err := NewMessageRoutingRequest(r, seg)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := render.Bind(r, &req); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Render the request
+		////
+		if err := h.P2P.ServeP2P(w, &req.GliaRequest); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	})
+
+	return r
+}
+
+func (h *HTTP) Serve(ctx context.Context) error {
 	l, err := h.Listen(ctx)
 	if errors.Is(err, syscall.EADDRINUSE) {
-		return suture.ErrDoNotRestart // another instance is serving the namespace
+		// Another wetware instance is serving the HTTP API on
+		// this address.
+		//
+		// Let it Fail (TM)
+		//
+		// The service is restarted with exponential backoff, so
+		// if the other process fails, this one will eventually
+		// take over.
+		//
+		// This isn't a failure, so log the event and swallow the
+		// error.
+		////
+		h.Log().Info("disabled HTTP service",
+			"reason", err)
+		return nil
+
 	} else if err != nil {
+		// Something actually went wrong and we need to fail
+		// the service, e.g. a context cancellation.
+		////
 		return fmt.Errorf("listen: %w", err)
 	}
 	defer l.Close()
 
-	r := chi.NewRouter()
-	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		w.WriteHeader(http.StatusOK)
-	})
-	r.Mount(h.URL().Path, &h)
-
 	s := &http.Server{
-		Handler: r,
+		Handler: h.Router,
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
@@ -106,90 +190,48 @@ func (h HTTP) Serve(ctx context.Context) error {
 }
 
 func (h *HTTP) Listen(ctx context.Context) (net.Listener, error) {
-	if h.ListenConfig == nil {
-		h.ListenConfig = new(net.ListenConfig)
-	}
-	if h.ListenAddr == "" {
-		h.ListenAddr = "127.0.0.1:2080"
-	}
-
+	h.Init()
 	return h.ListenConfig.Listen(ctx, "tcp", h.ListenAddr)
 }
 
-func (h HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	defer io.Copy(io.Discard, r.Body)
+type MessageRoutingRequest struct {
+	GliaRequest Request
+}
 
-	// note trailing slash; we expect a b58 PID after it
-	if !strings.HasPrefix(r.URL.Path, httpPathPrefix) {
-		// 404 - Not Found
-		http.Error(w, httpPathPrefix+" "+http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
+func NewMessageRoutingRequest(r *http.Request, seg *capnp.Segment) (MessageRoutingRequest, error) {
+	hdr, err := NewRootHeader(seg)
+	return MessageRoutingRequest{GliaRequest: Request{Header: hdr}}, err
+}
+
+func (req *MessageRoutingRequest) Bind(r *http.Request) error {
+	if err := req.GliaRequest.Header.SetProc(chi.URLParam(r, "proc")); err != nil {
+		return fmt.Errorf("set proc: %w", err)
+	}
+	if err := req.GliaRequest.Header.SetMethod(chi.URLParam(r, "method")); err != nil {
+		return fmt.Errorf("set method: %w", err)
 	}
 
-	if r.Method != http.MethodPost {
-		// 405 - Method Not Allowed
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
+	pushVals := r.URL.Query()["push"]
+	stackSize := int32(len(pushVals))
+	stack, err := req.GliaRequest.Header.NewStack(stackSize)
+	if err != nil {
+		return fmt.Errorf("new stack: %w", err)
 	}
-
-	pid := path.Base(r.URL.Path)
-	p, err := h.Router.GetProc(pid)
-	if errors.Is(err, ErrNotFound) {
-		// 404 - Not Found
-		http.Error(w, "Proc "+http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	} else if err != nil {
-		// 500 - Internal Server Error
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	if err := p.Reserve(r.Context(), r.Body); err != nil {
-		// 500 - Internal Server Error
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	defer p.Release()
-
-	name := r.URL.Query().Get("method")
-	method := p.Method(name)
-	if method == nil {
-		// 400 - Bad Request
-		http.Error(w, fmt.Sprintf("missing export: %s", name), http.StatusBadRequest)
-		return
-	}
-
-	var stack []uint64
-	for i, word := range r.URL.Query()["push"] {
+	for i, word := range pushVals {
 		buf, err := base58.FastBase58Decoding(word)
 		if err != nil {
-			// 400 - Bad Request
-			http.Error(w, fmt.Sprintf("stack[%d]: %v", i, err), http.StatusBadRequest)
-			return
+			return fmt.Errorf("stack[%d]: %w", i, err)
 		}
 
 		u, n := binary.Uvarint(buf)
-		if n <= len(buf) {
-			// 400 - Bad Request
-			http.Error(w, fmt.Sprintf("stack[%d]: invalid uvarint", i), http.StatusBadRequest)
-			return
+		if n <= 0 {
+			return fmt.Errorf("stack[%d]: invalid uvarint", i)
 		}
 
-		stack = append(stack, u)
+		stack.Set(i, u)
 	}
 
-	if err := method.CallWithStack(r.Context(), stack); err != nil {
-		// 5XX - Server Error
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			// 504 - Gateway Timeout
-			http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
-		} else {
-			// 502 - Bad Gateway
-			http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
-		}
-	} else {
-		// 204 - No Content
-		w.WriteHeader(http.StatusNoContent) // TODO:  make this 200 - OK when we're able to return results
-	}
+	req.GliaRequest.Ctx = r.Context()
+	req.GliaRequest.Body.Reset(r.Body)
+	return nil
 }

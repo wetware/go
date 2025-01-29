@@ -15,30 +15,83 @@ import (
 	test_libp2p "github.com/wetware/go/test/libp2p"
 )
 
+func TestP2P(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	h := test_libp2p.NewMockHost(ctrl)
+	env := &system.Env{
+		Host: h,
+	}
+
+	var body io.Reader
+	p := NewMockProc(ctrl)
+	p.EXPECT().
+		Reserve(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, r io.Reader) error {
+			body = r
+			return nil
+		}).
+		Times(1)
+
+	call := p.EXPECT().
+		Method("test").
+		DoAndReturn(func(name string) proc.Method {
+			if name != "test" {
+				return nil
+			}
+			return &mockMethod{Body: body}
+		}).
+		Times(1)
+
+	p.EXPECT().
+		Release().
+		After(call).
+		Times(1)
+
+	r := NewMockRouter(ctrl)
+	r.EXPECT().
+		GetProc("test-pid").
+		Return(p, nil).
+		Times(1)
+
+	rpc := glia.P2P{
+		Env:    env,
+		Router: r,
+	}
+
+	g := glia.P2P{
+		// Env
+		Router: r,
+	}
+}
+
 func TestReadRequest(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	call := newCallData()
+	hdr := newTestHeader()
 
 	s := test_libp2p.NewMockStream(ctrl)
 	s.EXPECT().
-		Protocol().
-		Return(system.Proto.Unwrap() + "/test-pid").
-		Times(1)
-	s.EXPECT().
 		Read(gomock.Any()).
 		DoAndReturn(func(p []byte) (n int, err error) {
-			return call.Read(p)
+			return hdr.Read(p)
 		}).
 		MinTimes(1)
 
 	req, err := glia.ReadRequest(context.TODO(), s)
 	require.NoError(t, err)
 	require.NotNil(t, req)
-	require.Equal(t, "test-pid", req.PID)
+
+	pid, err := req.Header.Proc()
+	require.NoError(t, err)
+	require.Equal(t, "test-pid", pid)
 }
 
 func TestRPC_ServeStream(t *testing.T) {
@@ -89,18 +142,14 @@ func TestRPC_ServeStream(t *testing.T) {
 		Router: r,
 	}
 
-	calldata := newCallData()
+	hdr := newTestHeader()
 	resdata := new(bytes.Buffer)
 
 	s := test_libp2p.NewMockStream(ctrl)
 	s.EXPECT().
-		Protocol().
-		Return(system.Proto.Unwrap() + "/test-pid").
-		Times(1)
-	s.EXPECT().
 		Read(gomock.Any()).
 		DoAndReturn(func(p []byte) (n int, err error) {
-			return calldata.Read(p)
+			return hdr.Read(p)
 		}).
 		MinTimes(1)
 	write := s.EXPECT().
@@ -123,14 +172,21 @@ func TestRPC_ServeStream(t *testing.T) {
 	res, err := glia.ReadRootResult(m)
 	require.NoError(t, err)
 	require.NotZero(t, res)
-	require.Equal(t, glia.Status_ok, res.Status())
+	require.Equal(t, glia.Result_Status_ok, res.Status())
 }
 
-func newCallData() *bytes.Buffer {
+// newTestHeader returns a buffer containing a pre-populated
+// header.  The caller is responsible for releasing m.
+func newTestHeader() *bytes.Buffer {
 	m, s := capnp.NewSingleSegmentMessage(nil)
+	// m is released by caller
 
-	cd, err := glia.NewRootCallData(s)
+	cd, err := glia.NewRootHeader(s)
 	if err != nil {
+		panic(err)
+	}
+
+	if err := cd.SetProc("test-pid"); err != nil {
 		panic(err)
 	}
 
