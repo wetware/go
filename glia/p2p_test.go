@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+	"github.com/thejerf/suture/v4"
 	"github.com/wetware/go/glia"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
@@ -95,6 +96,99 @@ func TestGliaRPC(t *testing.T) {
 	w := &bytes.Buffer{}
 	err = p2p.ServeP2P(w, &req)
 	require.NoError(t, err)
+}
+
+func TestP2P(t *testing.T) {
+	t.Parallel()
+
+	// Set up our mocking infrastructure.  We'll be mocking
+	// three major interfaces:
+	//  1. host.Host
+	//  2. glia.Router
+	//  3. glia.Proc
+	////
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Initialize libp2p mocks.
+	h := test_libp2p.NewMockHost(ctrl)
+	env := &system.Env{
+		Host: h,
+	}
+
+	// Initialize wetware mocks.  Note the initialization in
+	// reverse-call-order.  This is because we are testing a
+	// 'happens after' ordering (>) such that:
+	//    release > method > reserve
+	p := NewMockProc(ctrl)
+	reserve := p.EXPECT().
+		Reserve(gomock.Any(), gomock.Any()). // context.Context, io.Reader
+		Return(nil).                         // error
+		Times(1)
+	method := p.EXPECT().
+		Method(gomock.Any()). // context.Context
+		Return(nil).          // error
+		After(reserve).
+		Times(1)
+	p.EXPECT().
+		Release().
+		After(method).
+		Times(1)
+
+	r := NewMockRouter(ctrl)
+	r.EXPECT().
+		GetProc("test-proc").
+		Return(p, nil).
+		Times(1)
+
+	// Instantiate glia P2P runtime and populate it with
+	// the mock router.
+	p2p := glia.P2P{
+		Env:    env,
+		Router: r,
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	m, seg := capnp.NewSingleSegmentMessage(nil)
+	defer m.Release()
+
+	hdr, err := glia.NewRootHeader(seg)
+	require.NoError(t, err)
+
+	id, err := peer.Decode("12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw")
+	require.NoError(t, err)
+
+	require.NoError(t, hdr.SetPeer([]byte(id)))
+	require.NoError(t, hdr.SetProc("test-proc"))
+	require.NoError(t, hdr.SetMethod("test-method"))
+	// hdr.SetStack()
+
+	suture.NewSimple("test-proc")
+
+	body := "hello, Wetware!"
+
+	req := glia.Request{
+		Ctx:    ctx,
+		Header: hdr,
+	}
+	req.Body.Reset(strings.NewReader(body))
+
+	w := &bytes.Buffer{}
+	err = p2p.ServeP2P(w, &req)
+	require.NoError(t, err)
+
+	m, err = capnp.Unmarshal(w.Bytes())
+	require.NoError(t, err)
+	defer m.Release()
+
+	res, err := glia.ReadRootResult(m)
+	require.NoError(t, err)
+	require.NotZero(t, res)
+
+	// TODO:  eventually, we should investigate the contents of
+	// the result
 }
 
 func TestReadRequest(t *testing.T) {
