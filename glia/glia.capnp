@@ -6,12 +6,6 @@ $Go.package("glia");
 $Go.import("github.com/wetware/go/glia");
 
 
-struct CallData {
-    stack  @0 :List(UInt64);
-    method @1 :Text;
-}
-
-
 struct Header {
     peer   @0 :Data;
     proc   @1 :Text;

@@ -8,111 +8,6 @@ import (
 	schemas "capnproto.org/go/capnp/v3/schemas"
 )
 
-type CallData capnp.Struct
-
-// CallData_TypeID is the unique identifier for the type CallData.
-const CallData_TypeID = 0xb063cb51875ce2d8
-
-func NewCallData(s *capnp.Segment) (CallData, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return CallData(st), err
-}
-
-func NewRootCallData(s *capnp.Segment) (CallData, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return CallData(st), err
-}
-
-func ReadRootCallData(msg *capnp.Message) (CallData, error) {
-	root, err := msg.Root()
-	return CallData(root.Struct()), err
-}
-
-func (s CallData) String() string {
-	str, _ := text.Marshal(0xb063cb51875ce2d8, capnp.Struct(s))
-	return str
-}
-
-func (s CallData) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
-	return capnp.Struct(s).EncodeAsPtr(seg)
-}
-
-func (CallData) DecodeFromPtr(p capnp.Ptr) CallData {
-	return CallData(capnp.Struct{}.DecodeFromPtr(p))
-}
-
-func (s CallData) ToPtr() capnp.Ptr {
-	return capnp.Struct(s).ToPtr()
-}
-func (s CallData) IsValid() bool {
-	return capnp.Struct(s).IsValid()
-}
-
-func (s CallData) Message() *capnp.Message {
-	return capnp.Struct(s).Message()
-}
-
-func (s CallData) Segment() *capnp.Segment {
-	return capnp.Struct(s).Segment()
-}
-func (s CallData) Stack() (capnp.UInt64List, error) {
-	p, err := capnp.Struct(s).Ptr(0)
-	return capnp.UInt64List(p.List()), err
-}
-
-func (s CallData) HasStack() bool {
-	return capnp.Struct(s).HasPtr(0)
-}
-
-func (s CallData) SetStack(v capnp.UInt64List) error {
-	return capnp.Struct(s).SetPtr(0, v.ToPtr())
-}
-
-// NewStack sets the stack field to a newly
-// allocated capnp.UInt64List, preferring placement in s's segment.
-func (s CallData) NewStack(n int32) (capnp.UInt64List, error) {
-	l, err := capnp.NewUInt64List(capnp.Struct(s).Segment(), n)
-	if err != nil {
-		return capnp.UInt64List{}, err
-	}
-	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
-	return l, err
-}
-func (s CallData) Method() (string, error) {
-	p, err := capnp.Struct(s).Ptr(1)
-	return p.Text(), err
-}
-
-func (s CallData) HasMethod() bool {
-	return capnp.Struct(s).HasPtr(1)
-}
-
-func (s CallData) MethodBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(1)
-	return p.TextBytes(), err
-}
-
-func (s CallData) SetMethod(v string) error {
-	return capnp.Struct(s).SetText(1, v)
-}
-
-// CallData_List is a list of CallData.
-type CallData_List = capnp.StructList[CallData]
-
-// NewCallData creates a new list of CallData.
-func NewCallData_List(s *capnp.Segment, sz int32) (CallData_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
-	return capnp.StructList[CallData](l), err
-}
-
-// CallData_Future is a wrapper for a CallData promised by a client call.
-type CallData_Future struct{ *capnp.Future }
-
-func (f CallData_Future) Struct() (CallData, error) {
-	p, err := f.Future.Ptr()
-	return CallData(p.Struct()), err
-}
-
 type Header capnp.Struct
 
 // Header_TypeID is the unique identifier for the type Header.
@@ -437,40 +332,36 @@ func NewResult_Status_List(s *capnp.Segment, sz int32) (Result_Status_List, erro
 	return capnp.NewEnumList[Result_Status](s, sz)
 }
 
-const schema_f381800d6f8057ad = "x\xdat\x91Ok\x14A\x10\xc5\xdf\xeb\xdeM\x0c\xc9" +
-	":\xb6\x13\x10\xbc$\x07\x11T\x8c\x1aP4\x106\x92" +
-	"l0\x87\x84t\x14t%B\x9a\xdd1\x193\x99Y" +
-	"gz\x14<H\x14E\x10A\xc8\xcd\x9bx\x17\xfd\x02" +
-	"\x1e%\xa0_\xc0\xa3\x08\"9x\x10?\xc0HO\xd8" +
-	"\xfc\x11=uu\xf5\xebz\xbf\xaa:{\x86\x13\x95s" +
-	"\xb5M\x01\xa1\x87\xab=\xc5\xa9\x8f/_|\x8d.<" +
-	"\x85\xee'\x8b\xb7\xd7\xd7\x93\xda\xfa\xa3\xdf\xa8\x8a^\xc0" +
-	"\x9f\xe1\x86\xafy\x04\xf0\x9b|\x07\x16\xb3\x8f?lM" +
-	"\x8a\xfe\xf7P\xfd{\xb5\x15\xa7\xa5\xd8\xf0\xfb\xca_U" +
-	"\xf1\x03,\xbe|[|\xa6?\xb7\xfe\xd6\x96\x8a-\xf1" +
-	"\xc6\xffUF?\xc5}\xb0x\xfe\xea\xe1\xf1\xd7\xd2|" +
-	"\x87:,v\x89@\xbf)?\xf9\x81tB#7q" +
-	"\xbaX\x8eB3\xd22\x1d\xc6\x9d\xb1\x85 \xcb#Z" +
-	"]\xe1\xde\x02\x1c\xab_\xb5\xc6\xe6\x99\x1e\x90\x15\xa0B" +
-	"@5F\x01=!\xa9\x17\x05\xc9A\xba\\s\x0c\xd0" +
-	"\xd7$\xf5\x92\xa0\x12\x1c\xa4\x00\xd4\xad\x93\x80\xbe!\xa9" +
-	"\xdb\x82C\x995\xadU\x1e\x04\xe7%\xd9\x07\xe1\xc2z" +
-	"V\xd6\xa6\xb7\xeb\x08\xd2\x03\xbd0\xbe\x9dp\x00\x82\x03" +
-	"\xe0>\xcc+\x81i\x07L\xe7I}h\x87\xc88\xa3" +
-	"EI\xbd\"\xa8\xbaH\x81K.I\xea\xc8!\x89m" +
-	"\xa4\xd0q\xb6%uGPI9H\x09\xa85\xd7\xd0" +
-	"\x8a\xa4~\"\xe8u\x82 e\x0d\x825\xd0\xeb\xa4I" +
-	"\xab\x8bQ_\x0b\xecJ\xd2\xee^\xff\xd9\xd0>\xd4I" +
-	"\x13ES\xbd\xc6\x1a\x07{`\x07\xf6\x84s;&\xa9" +
-	"'\xf6\xc0\x8e;\xae\x8b\x92z\xea\x7f\xa3\xda\xef\xbec" +
-	"$\xba\xab\xb3#\xdb\x8b\x02\x9c\xddp\xd9ms\xd4\xcd" +
-	"S\xe9\xa3\x00\x85\x9ay\x00P\xaa\xc6\x1d\x80\x15u\xd9" +
-	"\x1dU5\x9e\x02\xecQ\x97\xdc[\xaf:\x7f\x13\x18\xca" +
-	"\xe3,\xb02Y-\xc2\xf8\x9e\x89\xc2\xf6\x02\xea\xc1\xdd" +
-	"<\xc8l\x91&\xb9\x0d\xe3\xe5\x06\xbc4M\xd2\xc2M" +
-	"g.\xb1\xd3\xf0\x92<nw\xe5\xb3\x18*Q\x8bm" +
-	"\xe2\xb9\x04u;]\x0a\x96]\x91F\x9aB&\xe9\x9f" +
-	"\x00\x00\x00\xff\xff\xf9\x8e\xbe\xc1"
+const schema_f381800d6f8057ad = "x\xdal\x90\xc1k\x13A\x18\xc5\xdf\x9b\xd9\xb4H\x12" +
+	"\xb7\xe3\x06\x04Q\xe2E\x0fJ\x0b\x16\x14\x0cH*\x92" +
+	"\xa2\x87\x96N\x15\xb4R\xa1KvM\xd6\xa6;qw" +
+	"\xd6\x83\x07\xa9\xa2\x17\x11\x84\xde\xbc\xf9\x0f\x88\xfe\x03=" +
+	"\x16\xd1\xbb\x07\x0f\x82\x17\x11\xcf\x9eee\x12\xd2V\xf0" +
+	"\xb4\xdf~\xf3x\xef\xf7\xbe\x99?\x0b\xde\x85\xba\x11\x10" +
+	"\xfade\xaa<\xbf\xf7\xfa\xd5\xf7\xc1\xa5\x17\xd0U\xb2" +
+	"|w{\xdb\xd4\xb7\x9f\xfeFEL\x03\xc1)\xee\x04" +
+	"gx\x1c\x08f\xf9\x1e,\x97\x9e\xed\xfe\xba&\xaa\x1f" +
+	"\xa0\xaa\x87\xb5\x9e\xd3~\xe1N\xf0\x8dn\xfa\xca\x9f`" +
+	"\xf9\xf2\xcd\x93\xb3oe\xf8\x03\xea\x988H\x01\x83]" +
+	"\xf19\xf84\xb2\xdf\x13\x1f1[\xf6\x06I8\xd7\x0d" +
+	"\x87L\x87\xad\xd58/\x06\xb4\xda\xe3a\x03\xb6\xda7" +
+	"mh\x8b\\\xd7\xa4\x07x\x04Tg\x1e\xd0\x0b\x92z" +
+	"]\x90l\xd0\xed\xd6Z\x80\xbe%\xa97\x04\x95`\x83" +
+	"\x02P\xf7\xce\x01\xfa\x8e\xa4\x8e\x04\x9b\xb9\x0d\xbb\x9b<" +
+	"\x0a\xaeH\xf2\x08\x84\x1b\xdb\xf9\xc8\x9b\xfeA\"H\x1f" +
+	"\xf4\x93\xf4\xbea\x0d\x825\xf0\x1f\xcc\xebq\x18\xc5\xcc" +
+	"VH=\xb3O\x14\xba\xa0uI\xdd\x17T\x13\xa4\xd8" +
+	"-7$\xf5\xc0!\x891R\xe28#I=\x14T" +
+	"R6(\x01\xb5\xe5\x0a\xf5%\xf5sA\x7f\x18\xc7\x19" +
+	"\xeb\x10\xac\x83\xfe03\xdd\x09F{+\xb6}\x13M" +
+	"~\xff[h\x1fUL.j\xe7\xc6\xf7\x03\x1c\xf2\xe9" +
+	"\x11\xc4\xda\xbc\xab\xa9\xf4\x09\x80B\xddx\x0cP\xaa\xce" +
+	"\x03\x80\x9e\xba\xea>\x15u%\x038\xa5.\xbb\xb7i" +
+	"u\xf1.\xd0,\xd2<\xb6\xd2l\x96I\xfa(\x1c$" +
+	"\xd1*\xda\xf1\xc3\"\xcem\x99\x99\xc2&i\xaf\x03?" +
+	"\xcbLV:\xe8ec\x17\xe1\x9b\"\x8d&\xf2%4" +
+	"G\xfc\xe5\xb8\xc6\xb2A\xdb.\x8e\x04=g\xd2\xc92" +
+	"H\x93\xfd\x0d\x00\x00\xff\xff\xaa\xff\xa1t"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
@@ -478,7 +369,6 @@ func RegisterSchema(reg *schemas.Registry) {
 		Nodes: []uint64{
 			0x85366ce08c8fc52b,
 			0xb00b0243e9bd824d,
-			0xb063cb51875ce2d8,
 			0xe56103a0267e998a,
 		},
 		Compressed: true,
