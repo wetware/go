@@ -209,6 +209,10 @@ func NewMessageRoutingRequest(r *http.Request, seg *capnp.Segment) (MessageRouti
 }
 
 func (req *MessageRoutingRequest) Bind(r *http.Request) error {
+	if err := req.GliaRequest.Header.SetPeer([]byte(chi.URLParam(r, "peer"))); err != nil {
+		return fmt.Errorf("set peer: %w", err)
+	}
+
 	if err := req.GliaRequest.Header.SetProc(chi.URLParam(r, "proc")); err != nil {
 		return fmt.Errorf("set proc: %w", err)
 	}
