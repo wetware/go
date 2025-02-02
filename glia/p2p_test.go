@@ -115,6 +115,7 @@ func TestP2P(t *testing.T) {
 	env := &system.Env{
 		Host: h,
 	}
+	buf := &bytes.Buffer{}
 
 	// Initialize wetware mocks.  Note the initialization in
 	// reverse-call-order.  This is because we are testing a
@@ -126,8 +127,8 @@ func TestP2P(t *testing.T) {
 		Return(nil).                         // error
 		Times(1)
 	method := p.EXPECT().
-		Method(gomock.Any()). // context.Context
-		Return(nil).          // error
+		Method(gomock.Any()).          // context.Context
+		Return(mockMethod{Body: buf}). // error
 		After(reserve).
 		Times(1)
 	p.EXPECT().
@@ -185,10 +186,7 @@ func TestP2P(t *testing.T) {
 
 	res, err := glia.ReadRootResult(m)
 	require.NoError(t, err)
-	require.NotZero(t, res)
-
-	// TODO:  eventually, we should investigate the contents of
-	// the result
+	require.Equal(t, glia.Result_Status_ok, res.Status(), res.Status().String())
 }
 
 func TestReadRequest(t *testing.T) {
