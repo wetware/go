@@ -2,7 +2,6 @@ package glia
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -18,7 +18,6 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/mr-tron/base58"
 	"github.com/wetware/go/system"
 )
 
@@ -63,60 +62,11 @@ func (h *HTTP) Init() {
 
 func (h *HTTP) DefaultRouter() chi.Router {
 	r := chi.NewRouter()
-	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		w.WriteHeader(http.StatusNoContent)
-	})
-	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+	r.Get("/status", h.status)
+	r.Get("/version", h.version)
 
-		protoVersion := system.Proto.String()
-		if n, err := io.Copy(w, strings.NewReader(protoVersion)); err == nil {
-			h.Log().Debug("failed to write response",
-				"endpoint", "/version",
-				"wrote", n,
-				"reason", err)
-		}
-	})
-
-	path := path.Join("/", system.Proto.String(), ":host/:proc/:method")
-	r.Post(path, func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		defer io.Copy(io.Discard, r.Body)
-
-		// Bind request data
-		////
-		m, seg := capnp.NewSingleSegmentMessage(nil)
-		defer m.Release()
-
-		req, err := NewMessageRoutingRequest(r, seg)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if err := render.Bind(r, &req); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				http.Error(w, err.Error(), http.StatusNotFound)
-				return
-			}
-
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Render the request
-		////
-		if err := h.P2P.ServeP2P(w, &req.GliaRequest); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				http.Error(w, err.Error(), http.StatusNotFound)
-				return
-			}
-
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	})
+	path := path.Join("/", system.Proto.String(), "{peer}/{proc}/{method}")
+	r.Post(path, h.glia)
 
 	return r
 }
@@ -189,6 +139,61 @@ func (h *HTTP) Serve(ctx context.Context) error {
 	return <-cherr
 }
 
+func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *HTTP) version(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	protoVersion := system.Proto.String()
+	if n, err := io.Copy(w, strings.NewReader(protoVersion)); err == nil {
+		h.Log().Debug("failed to write response",
+			"endpoint", "/version",
+			"wrote", n,
+			"reason", err)
+	}
+}
+
+func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	defer io.Copy(io.Discard, r.Body)
+
+	// Bind request data
+	////
+	m, seg := capnp.NewSingleSegmentMessage(nil)
+	defer m.Release()
+
+	req, err := NewMessageRoutingRequest(r, seg)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := render.Bind(r, &req); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Render the request
+	////
+	if err := h.P2P.ServeP2P(w, &req.GliaRequest); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (h *HTTP) Listen(ctx context.Context) (net.Listener, error) {
 	h.Init()
 	return h.ListenConfig.Listen(ctx, "tcp", h.ListenAddr)
@@ -211,27 +216,39 @@ func (req *MessageRoutingRequest) Bind(r *http.Request) error {
 		return fmt.Errorf("set method: %w", err)
 	}
 
-	pushVals := r.URL.Query()["push"]
-	stackSize := int32(len(pushVals))
-	stack, err := req.GliaRequest.Header.NewStack(stackSize)
+	stackValues, err := parseStack(r.URL.Query().Get("stack"))
+	if err != nil {
+		return fmt.Errorf("failed to parse stack: %s", err)
+	}
+
+	stack, err := req.GliaRequest.Header.NewStack(int32(len(stackValues)))
 	if err != nil {
 		return fmt.Errorf("new stack: %w", err)
 	}
-	for i, word := range pushVals {
-		buf, err := base58.FastBase58Decoding(word)
-		if err != nil {
-			return fmt.Errorf("stack[%d]: %w", i, err)
-		}
 
-		u, n := binary.Uvarint(buf)
-		if n <= 0 {
-			return fmt.Errorf("stack[%d]: invalid uvarint", i)
-		}
-
-		stack.Set(i, u)
+	for i, stackValue := range stackValues {
+		stack.Set(i, stackValue)
 	}
 
 	req.GliaRequest.Ctx = r.Context()
 	req.GliaRequest.Body.Reset(r.Body)
 	return nil
+}
+
+func parseStack(stackValues string) ([]uint64, error) {
+	if stackValues == "" {
+		return []uint64{}, nil
+	}
+
+	splitValues := strings.Split(stackValues, ",")
+	stack := make([]uint64, len(splitValues))
+	for i, v := range splitValues {
+		stackValue, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return stack, err
+		}
+		stack[i] = stackValue
+	}
+
+	return stack, nil
 }
