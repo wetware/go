@@ -209,6 +209,7 @@ func NewMessageRoutingRequest(r *http.Request, seg *capnp.Segment) (MessageRouti
 }
 
 func (req *MessageRoutingRequest) Bind(r *http.Request) error {
+	// TODO: validate the peer id
 	if err := req.GliaRequest.Header.SetPeer([]byte(chi.URLParam(r, "peer"))); err != nil {
 		return fmt.Errorf("set peer: %w", err)
 	}

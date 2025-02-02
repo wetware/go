@@ -1,7 +1,14 @@
 package glia_test
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"testing"
+
+	glia "github.com/wetware/go/glia"
+	"github.com/wetware/go/system"
 )
 
 // import (
@@ -34,6 +41,38 @@ import (
 func TestHTTP(t *testing.T) {
 	t.Parallel()
 
+	h := new(glia.HTTP)
+	h.Init()
+	server := httptest.NewServer(h.DefaultRouter())
+
+	expectedPeer := "12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw"
+	expectedProc := "myProc"
+	expectedMethod := "myMethod"
+	// expectedStack := []uint64{1, 2, 3}
+	expectedStackStr := "1,2,3"
+
+	client := &http.Client{}
+	url := server.URL + path.Join("/", system.Proto.String(), expectedPeer, expectedProc, expectedMethod)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.Header.Add("Content-Type", "multipart/form-data")
+
+	restParams := req.URL.Query()
+	restParams.Add("stack", expectedStackStr)
+	req.URL.RawQuery = restParams.Encode()
+
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		errMsg, _ := io.ReadAll(res.Body)
+		t.Fatalf("HTTP request failed with status: %d: %s", res.StatusCode, string(errMsg))
+	}
 }
 
 // func TestHTTP_DefaultRouter(t *testing.T) {
