@@ -7,6 +7,7 @@ import (
 	"path"
 	"testing"
 
+	gomock "github.com/golang/mock/gomock"
 	glia "github.com/wetware/go/glia"
 	"github.com/wetware/go/system"
 )
@@ -45,11 +46,37 @@ func TestHTTP(t *testing.T) {
 	h.Init()
 	server := httptest.NewServer(h.DefaultRouter())
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	expectedPeer := "12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw"
 	expectedProc := "myProc"
 	expectedMethod := "myMethod"
 	// expectedStack := []uint64{1, 2, 3}
 	expectedStackStr := "1,2,3"
+
+	mockProc := NewMockProc(ctrl)
+	reserve := mockProc.EXPECT().
+		Reserve(gomock.Any(), gomock.Any()). // context.Context, io.Reader
+		Return(nil).                         // error
+		Times(1)
+	method := mockProc.EXPECT().
+		Method(gomock.Any()). // context.Context
+		Return(nil).          // error
+		After(reserve).
+		Times(1)
+	mockProc.EXPECT().
+		Release().
+		After(method).
+		Times(1)
+
+	mockRouter := NewMockRouter(ctrl)
+	mockRouter.EXPECT().
+		GetProc(expectedProc).
+		Return(mockProc, nil).
+		Times(1)
+
+	h.P2P.Router = mockRouter
 
 	client := &http.Client{}
 	url := server.URL + path.Join("/", system.Proto.String(), expectedPeer, expectedProc, expectedMethod)
@@ -58,7 +85,7 @@ func TestHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req.Header.Add("Content-Type", "multipart/form-data")
+	req.Header.Add("Content-Type", "text/plain")
 
 	restParams := req.URL.Query()
 	restParams.Add("stack", expectedStackStr)

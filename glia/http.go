@@ -16,8 +16,6 @@ import (
 	"time"
 
 	capnp "capnproto.org/go/capnp/v3"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/render"
 	"github.com/wetware/go/system"
 )
 
@@ -31,7 +29,7 @@ type HTTP struct {
 	once         sync.Once
 	ListenConfig *net.ListenConfig
 	ListenAddr   string
-	Router       chi.Router
+	Handler      http.Handler
 }
 
 func (*HTTP) String() string {
@@ -54,21 +52,21 @@ func (h *HTTP) Init() {
 			h.ListenAddr = DefaultListenAddr
 		}
 
-		if h.Router == nil {
-			h.Router = h.DefaultRouter()
+		if h.Handler == nil {
+			h.Handler = h.DefaultRouter()
 		}
 	})
 }
 
-func (h *HTTP) DefaultRouter() chi.Router {
-	r := chi.NewRouter()
-	r.Get("/status", h.status)
-	r.Get("/version", h.version)
+func (h *HTTP) DefaultRouter() http.Handler {
+	mux := &http.ServeMux{}
+	mux.HandleFunc("/status", h.status)
+	mux.HandleFunc("/version", h.version)
 
 	path := path.Join("/", system.Proto.String(), "{peer}/{proc}/{method}")
-	r.Post(path, h.glia)
+	mux.HandleFunc(path, h.glia)
 
-	return r
+	return mux
 }
 
 func (h *HTTP) Serve(ctx context.Context) error {
@@ -99,7 +97,7 @@ func (h *HTTP) Serve(ctx context.Context) error {
 	defer l.Close()
 
 	s := &http.Server{
-		Handler: h.Router,
+		Handler: h.Handler,
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
@@ -141,11 +139,22 @@ func (h *HTTP) Serve(ctx context.Context) error {
 
 func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+
+	if r.Method != http.MethodGet {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *HTTP) version(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+
+	if r.Method != http.MethodGet {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
 
 	protoVersion := system.Proto.String()
 	if n, err := io.Copy(w, strings.NewReader(protoVersion)); err == nil {
@@ -160,8 +169,12 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	defer io.Copy(io.Discard, r.Body)
 
+	if r.Method != http.MethodPost {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
 	// Bind request data
-	////
 	m, seg := capnp.NewSingleSegmentMessage(nil)
 	defer m.Release()
 
@@ -171,7 +184,7 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := render.Bind(r, &req); err != nil {
+	if err = req.unmarshal(r); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -208,16 +221,16 @@ func NewMessageRoutingRequest(r *http.Request, seg *capnp.Segment) (MessageRouti
 	return MessageRoutingRequest{GliaRequest: Request{Header: hdr}}, err
 }
 
-func (req *MessageRoutingRequest) Bind(r *http.Request) error {
+func (req *MessageRoutingRequest) unmarshal(r *http.Request) error {
 	// TODO: validate the peer id
-	if err := req.GliaRequest.Header.SetPeer([]byte(chi.URLParam(r, "peer"))); err != nil {
+	if err := req.GliaRequest.Header.SetPeer([]byte(r.PathValue("peer"))); err != nil {
 		return fmt.Errorf("set peer: %w", err)
 	}
 
-	if err := req.GliaRequest.Header.SetProc(chi.URLParam(r, "proc")); err != nil {
+	if err := req.GliaRequest.Header.SetProc(r.PathValue("proc")); err != nil {
 		return fmt.Errorf("set proc: %w", err)
 	}
-	if err := req.GliaRequest.Header.SetMethod(chi.URLParam(r, "method")); err != nil {
+	if err := req.GliaRequest.Header.SetMethod(r.PathValue("method")); err != nil {
 		return fmt.Errorf("set method: %w", err)
 	}
 
