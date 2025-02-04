@@ -1,7 +1,15 @@
 package glia_test
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"testing"
+
+	gomock "github.com/golang/mock/gomock"
+	glia "github.com/wetware/go/glia"
+	"github.com/wetware/go/system"
 )
 
 // import (
@@ -34,6 +42,64 @@ import (
 func TestHTTP(t *testing.T) {
 	t.Parallel()
 
+	h := new(glia.HTTP)
+	h.Init()
+	server := httptest.NewServer(h.DefaultRouter())
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedPeer := "12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw"
+	expectedProc := "myProc"
+	expectedMethod := "myMethod"
+	// expectedStack := []uint64{1, 2, 3}
+	expectedStackStr := "1,2,3"
+
+	mockProc := NewMockProc(ctrl)
+	reserve := mockProc.EXPECT().
+		Reserve(gomock.Any(), gomock.Any()). // context.Context, io.Reader
+		Return(nil).                         // error
+		Times(1)
+	method := mockProc.EXPECT().
+		Method(gomock.Any()). // context.Context
+		Return(nil).          // error
+		After(reserve).
+		Times(1)
+	mockProc.EXPECT().
+		Release().
+		After(method).
+		Times(1)
+
+	mockRouter := NewMockRouter(ctrl)
+	mockRouter.EXPECT().
+		GetProc(expectedProc).
+		Return(mockProc, nil).
+		Times(1)
+
+	h.P2P.Router = mockRouter
+
+	client := &http.Client{}
+	url := server.URL + path.Join("/", system.Proto.String(), expectedPeer, expectedProc, expectedMethod)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.Header.Add("Content-Type", "text/plain")
+
+	restParams := req.URL.Query()
+	restParams.Add("stack", expectedStackStr)
+	req.URL.RawQuery = restParams.Encode()
+
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		errMsg, _ := io.ReadAll(res.Body)
+		t.Fatalf("HTTP request failed with status: %d: %s", res.StatusCode, string(errMsg))
+	}
 }
 
 // func TestHTTP_DefaultRouter(t *testing.T) {
