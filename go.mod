@@ -7,8 +7,6 @@ toolchain go1.23.2
 require (
 	capnproto.org/go/capnp/v3 v3.0.1-alpha.2
 	github.com/blang/semver/v4 v4.0.0
-	github.com/go-chi/chi/v5 v5.2.0
-	github.com/go-chi/render v1.0.3
 	github.com/golang/mock v1.6.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/ipfs/boxo v0.24.3
@@ -26,7 +24,6 @@ require (
 )
 
 require (
-	github.com/ajg/form v1.5.1 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
