@@ -73,14 +73,9 @@ func setup(env *system.Env) cli.BeforeFunc {
 			app.Add(s)
 		}
 
-		// Start services in the background
+		// Run the supervisor
 		////
-		errs = app.ServeBackground(c.Context)
-		select {
-		case err = <-errs:
-		default:
-		}
-		return err
+		return app.Serve(c.Context)
 	}
 }
 
