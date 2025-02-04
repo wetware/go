@@ -12,7 +12,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
-	"github.com/thejerf/suture/v4"
 	"github.com/wetware/go/glia"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
@@ -195,10 +194,7 @@ func TestP2P(t *testing.T) {
 	require.NoError(t, hdr.SetMethod("test-method"))
 	// hdr.SetStack()
 
-	suture.NewSimple("test-proc")
-
 	body := "hello, Wetware!"
-
 	req := glia.Request{
 		Ctx:    ctx,
 		Header: hdr,
@@ -209,7 +205,14 @@ func TestP2P(t *testing.T) {
 	err = p2p.ServeP2P(w, &req)
 	require.NoError(t, err)
 
-	m, err = capnp.Unmarshal(w.Bytes())
+	// Read the uvarint length prefix from the buffer
+	n, err := binary.ReadUvarint(w)
+	require.NoError(t, err)
+
+	b, err := io.ReadAll(io.LimitReader(w, int64(n)))
+	require.NoError(t, err)
+
+	m, err = capnp.Unmarshal(b)
 	require.NoError(t, err)
 	defer m.Release()
 
