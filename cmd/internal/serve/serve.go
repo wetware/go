@@ -5,17 +5,19 @@ import (
 
 	"github.com/hashicorp/go-memdb"
 	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/boot"
 	"github.com/wetware/go/glia"
+	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
 var (
-	errs <-chan error
-	app  = suture.New("ww", suture.Spec{
+	app = suture.New("ww", suture.Spec{
 		EventHook: util.EventHook,
 	})
 )
@@ -47,23 +49,70 @@ func Command(env *system.Env) *cli.Command {
 		},
 		Before: setup(env),
 		Action: serve(env),
-		After:  awaitSupervisorShutdown,
 	}
 }
 
 func setup(env *system.Env) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		// Initialize STM and construct the router.
+		// Intantiate the root process
 		////
-		db, err := memdb.NewMemDB(&system.Schema)
+		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
+			WithCloseOnContextDone(true).
+			WithDebugInfoEnabled(c.Bool("wasm-debug")))
+		defer r.Close(c.Context)
+
+		wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
 		if err != nil {
 			return err
 		}
-		r := &Router{DB: db}
+		defer wasi.Close(c.Context)
+
+		b, err := env.Load(c.Context, c.Args().First())
+		if err != nil {
+			return err
+		}
+		cm, err := r.CompileModule(c.Context, b)
+		if err != nil {
+			return err
+		}
+		defer cm.Close(c.Context)
+
+		p, err := proc.Command{
+			PID:    proc.NewPID(),
+			Args:   c.Args().Slice(),
+			Stderr: c.App.ErrWriter,
+			FS:     env.NewUnixFS(c.Context),
+		}.Instantiate(c.Context, r, cm)
+		if err != nil {
+			return err
+		}
+		defer p.Close(c.Context)
+
+		// Initialize STM router and insert the root process
+		////
+		db, err := memdb.NewMemDB(&system.Schema) // provides STM
+		if err != nil {
+			return err
+		}
+		// Initialized an in-memory database that provides software-
+		// transactional-memory (STM) semantics for us.  This gives
+		// us flexibility to read/write multiple processes atomically.
+		//
+		// We add p to the "proc" table.
+		init := db.Txn(true)
+		if err := init.Insert("proc", p); err != nil {
+			init.Abort()
+			return err
+		}
+		init.Commit()
+		rt := &Router{DB: db} // message-routing interface; can route messages locally
+
+		// peer-to-eer messaging service; can route messages to peers,
+		// and accept messages from peers
+		p2p := glia.P2P{Env: env, Router: rt}
 
 		// Bind services to the supervisor.
 		////
-		p2p := glia.P2P{Env: env, Router: r} // core p2p service
 		for _, s := range []suture.Service{
 			p2p,
 			// &glia.Unix{P2P: p2p, Path c.String("unix")},
@@ -73,26 +122,24 @@ func setup(env *system.Env) cli.BeforeFunc {
 			app.Add(s)
 		}
 
+		env.Log().Info("server started",
+			"proc", p.String())
+
 		// Run the supervisor
 		////
 		return app.Serve(c.Context)
 	}
 }
 
-// awaitSupervisorShutdown waits until app closes and checks
-// for an error.  If an error is found, it is returned.
-func awaitSupervisorShutdown(c *cli.Context) error {
-	// supervisor was started?
-	if errs != nil {
-		// c.Context should be closed, so supervisor should be
-		// shutting down and <-errs shouldn't block.
-		//
-		// Expect context.Canceled on normal shutdown.
-		return <-errs
-	}
+// func bind(db *memdb.MemDB, p *proc.P) (err error) {
+// 	tx := db.Txn(true)
+// 	defer tx.Commit()
 
-	return nil
-}
+// 	if err = tx.Insert("proc", p); err != nil {
+// 		tx.Abort()
+// 	}
+// 	return
+// }
 
 // serve the main event loop
 func serve(env *system.Env) cli.ActionFunc {

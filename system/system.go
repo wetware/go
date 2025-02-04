@@ -4,14 +4,9 @@ package system
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/blang/semver/v4"
 	"github.com/hashicorp/go-memdb"
-	iface "github.com/ipfs/kubo/core/coreiface"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/wetware/go/proc"
 	protoutils "github.com/wetware/go/util/proto"
 )
@@ -47,23 +42,4 @@ type CloserFunc func(context.Context) error
 
 func (close CloserFunc) Close(ctx context.Context) error {
 	return close(ctx)
-}
-
-type Env struct {
-	IPFS iface.CoreAPI
-	Host host.Host
-}
-
-func (env Env) Log() *slog.Logger {
-	return slog.With("peer", env.Host.ID())
-}
-
-func (env Env) HandlePeerFound(info peer.AddrInfo) {
-	// TODO:  do we want to move this to boot/mdns.go?   Currently, this
-	// callback is used exclusively by the MDNS discovery system, but it
-	// can be used by other discovery systems in principle.
-
-	pstore := env.Host.Peerstore()
-	pstore.AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
-	env.Log().Info("peer discovered", "found", info.ID)
 }
