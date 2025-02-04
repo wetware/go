@@ -83,15 +83,15 @@ func (p *P) Close(ctx context.Context) error {
 	return p.Mod.Close(ctx)
 }
 
-func (p *P) Reserve(ctx context.Context, body io.Reader) error {
+func (p *P) Reserve(ctx context.Context, sender io.Writer, body io.Reader) error {
 	p.once.Do(func() {
 		p.sem = semaphore.NewWeighted(1)
 	})
 
 	err := p.sem.Acquire(ctx, 1)
 	if err == nil {
+		p.SendQueue.Writer = sender
 		p.Mailbox.Reader = body
-		// p.SendQueue.Writer = ...  // TODO
 	}
 
 	return err

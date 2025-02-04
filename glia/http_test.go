@@ -1,6 +1,7 @@
 package glia_test
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -65,9 +66,14 @@ func TestHTTP(t *testing.T) {
 		Return(nil).          // error
 		After(reserve).
 		Times(1)
-	mockProc.EXPECT().
+	release := mockProc.EXPECT().
 		Release().
 		After(method).
+		Times(1)
+	mockProc.EXPECT().
+		OutBuffer().
+		Return(bytes.NewReader(nil)).
+		After(release).
 		Times(1)
 
 	mockRouter := NewMockRouter(ctrl)

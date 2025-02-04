@@ -3,6 +3,7 @@ package glia_test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 	"strings"
 	"testing"
@@ -50,9 +51,14 @@ func TestGliaRPC(t *testing.T) {
 		Return(nil).          // error
 		After(reserve).
 		Times(1)
-	p.EXPECT().
+	release := p.EXPECT().
 		Release().
 		After(method).
+		Times(1)
+	p.EXPECT().
+		OutBuffer().
+		Return(bytes.NewReader(nil)).
+		After(release).
 		Times(1)
 
 	r := NewMockRouter(ctrl)
@@ -96,6 +102,24 @@ func TestGliaRPC(t *testing.T) {
 	w := &bytes.Buffer{}
 	err = p2p.ServeP2P(w, &req)
 	require.NoError(t, err)
+
+	// Read the uvarint length prefix from the response
+	size, err := binary.ReadUvarint(w)
+	require.NoError(t, err)
+	require.Equal(t, w.Len(), int(size),
+		"length prefix should match output buffer size")
+
+	b, err := io.ReadAll(io.LimitReader(w, int64(size)))
+	require.NoError(t, err)
+	m, err = capnp.Unmarshal(b)
+	require.NoError(t, err)
+	defer m.Release()
+
+	res, err := glia.ReadRootResult(m)
+	require.NoError(t, err)
+	require.NotZero(t, res)
+	require.Equal(t, glia.Result_Status_ok, res.Status(),
+		"expected status %s (got %s)", glia.Result_Status_ok, res.Status())
 }
 
 func TestP2P(t *testing.T) {
@@ -131,9 +155,14 @@ func TestP2P(t *testing.T) {
 		Return(mockMethod{Body: buf}). // error
 		After(reserve).
 		Times(1)
-	p.EXPECT().
+	release := p.EXPECT().
 		Release().
 		After(method).
+		Times(1)
+	p.EXPECT().
+		OutBuffer().
+		Return(bytes.NewReader(nil)).
+		After(release).
 		Times(1)
 
 	r := NewMockRouter(ctrl)
@@ -234,6 +263,11 @@ func TestRPC_ServeStream(t *testing.T) {
 			body = r
 			return nil
 		}).
+		Times(1)
+	p.EXPECT().
+		OutBuffer().
+		Return(bytes.NewReader(nil)).
+		// After(release).
 		Times(1)
 
 	call := p.EXPECT().

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -112,52 +113,65 @@ func (p2p P2P) ServeP2P(w io.Writer, req *Request) error {
 		return err
 	}
 
-	if r := p2p.Bind(req); r != nil {
-		if err := r.Render(req.Ctx, res); err != nil {
-			return err
-		}
+	// Render the method call
+	////
+	method, err := p2p.Bind(req)
+	if err != nil {
+		return err
+	}
+	if err := method.Render(req.Ctx, res); err != nil {
+		return err
 	}
 
+	// Return results
+	////
 	b, err := res.Message().Marshal()
 	if err != nil {
 		return err
 	}
 
-	_, err = io.Copy(w, bytes.NewReader(b))
+	// wrap b in a frame consisiting of a uvarint length prefix.
+	frame := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutUvarint(frame, uint64(len(b)))
+	frame = append(frame[:n], b...)
+
+	// write frame to w.
+	if _, err = io.Copy(w, bytes.NewReader(frame)); err == nil { // write results
+		_, err = io.Copy(w, method.P.OutBuffer()) // write body
+	}
+
 	return err
 }
 
-func (p2p P2P) Bind(req *Request) Renderer {
+func (p2p P2P) Bind(req *Request) (*MethodCall, error) {
 	pid, err := req.Header.Proc()
 	if err != nil {
-		return InvalidProc(err)
+		return nil, err
 	}
 
 	p, err := p2p.Router.GetProc(pid)
 	if err != nil {
-		return RoutingError(err)
+		return nil, err
 	}
 
 	name, err := req.Header.Method()
 	if err != nil {
-		return InvalidMethod(err)
+		return nil, err
 	}
 
-	mc := MethodCall{
+	mc := &MethodCall{
 		P:      p,
 		Method: name,
 		Body:   &req.Body,
 	}
 
 	stack, err := req.Header.Stack()
-	if err != nil {
-		return InvalidCallStack(err)
+	if err == nil {
+		for i := 0; i < stack.Len(); i++ {
+			mc.Stack = append(mc.Stack, stack.At(i))
+		}
 	}
-	for i := 0; i < stack.Len(); i++ {
-		mc.Stack = append(mc.Stack, stack.At(i))
-	}
-
-	return mc
+	return mc, err
 }
 
 type Request struct {

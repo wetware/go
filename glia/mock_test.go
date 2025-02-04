@@ -5,6 +5,7 @@
 package glia_test
 
 import (
+	bytes "bytes"
 	context "context"
 	io "io"
 	slog "log/slog"
@@ -64,6 +65,20 @@ func (m *MockProc) Method(name string) proc.Method {
 func (mr *MockProcMockRecorder) Method(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Method", reflect.TypeOf((*MockProc)(nil).Method), name)
+}
+
+// OutBuffer mocks base method.
+func (m *MockProc) OutBuffer() *bytes.Reader {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OutBuffer")
+	ret0, _ := ret[0].(*bytes.Reader)
+	return ret0
+}
+
+// OutBuffer indicates an expected call of OutBuffer.
+func (mr *MockProcMockRecorder) OutBuffer() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OutBuffer", reflect.TypeOf((*MockProc)(nil).OutBuffer))
 }
 
 // Release mocks base method.
