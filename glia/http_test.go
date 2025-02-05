@@ -30,7 +30,7 @@ func TestHTTP(t *testing.T) {
 
 	expectedPeer := "12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw"
 	expectedProc := "myProc"
-	expectedMethod := "myMethod"
+	expectedMethod := "echo"
 	// expectedStack := []uint64{1, 2, 3}
 	expectedStackStr := "1,2,3"
 
@@ -51,6 +51,7 @@ func TestHTTP(t *testing.T) {
 		// Args: ,
 		// Env: ,
 		Stderr: os.Stderr,
+		// FS: ,
 	}.Instantiate(context.TODO(), r, cm)
 	require.NoError(t, err)
 	defer p.Close(context.TODO())
@@ -60,7 +61,6 @@ func TestHTTP(t *testing.T) {
 		GetProc(expectedProc).
 		Return(p, nil).
 		Times(1)
-
 	h.P2P.Router = mockRouter
 
 	client := &http.Client{}

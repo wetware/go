@@ -1,5 +1,4 @@
 //go:generate mockgen -source=glia.go -destination=mock_test.go -package=glia_test
-//go:generate capnp compile -I$GOPATH/src/capnproto.org/go/capnp/std -ogo glia.capnp
 
 package glia
 
@@ -12,6 +11,14 @@ import (
 	"github.com/wetware/go/proc"
 )
 
+type Env interface {
+	Log() *slog.Logger
+}
+
+type Router interface {
+	GetProc(pid string) (Proc, error)
+}
+
 type Proc interface {
 	Reserve(context.Context, io.ReadWriteCloser) error
 	Release()
@@ -21,10 +28,10 @@ type Proc interface {
 	Method(name string) proc.Method
 }
 
-type Router interface {
-	GetProc(pid string) (Proc, error)
-}
-
-type Env interface {
-	Log() *slog.Logger
+type Stream interface {
+	ProcID() string
+	MethodName() string
+	io.ReadWriteCloser
+	CloseRead() error
+	CloseWrite() error
 }

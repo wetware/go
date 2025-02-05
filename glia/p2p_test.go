@@ -3,15 +3,12 @@ package glia_test
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
-	"strings"
 	"testing"
 
-	"capnproto.org/go/capnp/v3"
 	"github.com/golang/mock/gomock"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -43,7 +40,6 @@ func TestP2P(t *testing.T) {
 	env := &system.Env{
 		Host: h,
 	}
-	// buf := &bytes.Buffer{}
 
 	r := wazero.NewRuntimeWithConfig(context.TODO(), wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true))
@@ -74,46 +70,49 @@ func TestP2P(t *testing.T) {
 		Router: mockRouter{P: p},
 	}
 
-	m, seg := capnp.NewSingleSegmentMessage(nil)
-	defer m.Release()
+	s := NewMockStream(ctrl)
+	s.EXPECT().
+		ProcID().
+		Return(p.String()).
+		Times(1)
+	s.EXPECT().
+		MethodName().
+		Return("echo").
+		Times(1)
+	read1 := s.EXPECT().
+		Read(gomock.Any()).
+		DoAndReturn(func(b []byte) (int, error) {
+			const msg = "Hello, Wetware!"
+			if n := copy(b, msg); n <= len(msg) {
+				return n, nil
+			}
+			panic("overflow")
+		}).
+		MaxTimes(1)
+	s.EXPECT().
+		Read(gomock.Any()).
+		After(read1).
+		DoAndReturn(func([]byte) (int, error) {
+			return 0, io.EOF
+		}).
+		Times(1)
+	got := &bytes.Buffer{}
+	s.EXPECT().
+		Write(gomock.Any()).
+		After(read1).
+		DoAndReturn(func(b []byte) (int, error) {
+			return got.Write(b)
+		}).
+		Times(1)
+	s.EXPECT().
+		Close().
+		Return(nil).
+		After(read1).
+		Times(1)
 
-	hdr, err := glia.NewRootHeader(seg)
+	err = p2p.ServeStream(ctx, s)
 	require.NoError(t, err)
-
-	id, err := peer.Decode("12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw")
-	require.NoError(t, err)
-
-	require.NoError(t, hdr.SetPeer([]byte(id)))
-	require.NoError(t, hdr.SetProc("test-proc"))
-	require.NoError(t, hdr.SetMethod("test-method"))
-	// hdr.SetStack()
-
-	body := "hello, Wetware!"
-	req := glia.Request{
-		Ctx:    ctx,
-		Header: hdr,
-	}
-	req.Body.Reset(strings.NewReader(body))
-
-	w := &bytes.Buffer{}
-	err = p2p.ServeP2P(nopCloser{Writer: w}, &req)
-	require.NoError(t, err)
-
-	// Read the uvarint length prefix from the buffer
-	n, err := binary.ReadUvarint(w)
-	require.NoError(t, err,
-		"failed to read uvarint length header from response buffer")
-	b, err := io.ReadAll(io.LimitReader(w, int64(n)))
-	require.NoError(t, err)
-
-	m, err = capnp.Unmarshal(b)
-	require.NoError(t, err)
-	defer m.Release()
-
-	res, err := glia.ReadRootResult(m)
-	require.NoError(t, err)
-	require.NotZero(t, res)
-	// require.Equal(t, glia.Result_Status_ok, res.Status(), res.Status().String())
+	require.Equal(t, "Hello, Wetware!", got.String())
 }
 
 type mockRouter struct {
@@ -121,82 +120,86 @@ type mockRouter struct {
 }
 
 func (r mockRouter) GetProc(pid string) (glia.Proc, error) {
-	return r.P, nil
+	if r.P.String() == pid {
+		return r.P, nil
+	}
+
+	return nil, fmt.Errorf("mockRouter: %s != %s", r.P.String(), pid)
 }
 
-type nopCloser struct {
-	io.Writer
-}
-
-func (nopCloser) Close() error {
-	return nil
-}
-
-func TestReadRequest(t *testing.T) {
-	t.Parallel()
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	hdr := newTestHeader()
-
-	s := test_libp2p.NewMockStream(ctrl)
-	s.EXPECT().
-		Read(gomock.Any()).
-		DoAndReturn(func(p []byte) (n int, err error) {
-			return hdr.Read(p)
-		}).
-		MinTimes(1)
-
-	req, err := glia.ReadRequest(context.TODO(), s)
-	require.NoError(t, err)
-	require.NotNil(t, req)
-
-	pid, err := req.Header.Proc()
-	require.NoError(t, err)
-	require.Equal(t, "test-pid", pid)
-}
-
-// newTestHeader returns a buffer containing a pre-populated
-// header.  The caller is responsible for releasing m.
-func newTestHeader() *bytes.Buffer {
-	m, s := capnp.NewSingleSegmentMessage(nil)
-	// m is released by caller
-
-	cd, err := glia.NewRootHeader(s)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := cd.SetProc("test-pid"); err != nil {
-		panic(err)
-	}
-
-	if err := cd.SetMethod("test"); err != nil {
-		panic(err)
-	}
-
-	stack, err := cd.NewStack(4)
-	if err != nil {
-		panic(err)
-	}
-	for i := 0; i < 4; i++ {
-		stack.Set(i, uint64(i))
-	}
-
-	var buf bytes.Buffer
-	if err := glia.WriteMessage(&buf, m); err != nil {
-		panic(err)
-	}
-
-	return &buf
-}
-
-// type mockMethod struct {
-// 	Body io.Reader
+// type nopCloser struct {
+// 	io.Writer
 // }
 
-// func (mm mockMethod) CallWithStack(context.Context, []uint64) error {
-// 	_, err := io.Copy(io.Discard, mm.Body)
-// 	return err
+// func (nopCloser) Close() error {
+// 	return nil
 // }
+
+// func TestReadRequest(t *testing.T) {
+// 	t.Parallel()
+
+// 	ctrl := gomock.NewController(t)
+// 	defer ctrl.Finish()
+
+// 	hdr := newTestHeader()
+
+// 	s := test_libp2p.NewMockStream(ctrl)
+// 	s.EXPECT().
+// 		Read(gomock.Any()).
+// 		DoAndReturn(func(p []byte) (n int, err error) {
+// 			return hdr.Read(p)
+// 		}).
+// 		MinTimes(1)
+
+// 	req, err := glia.ReadRequest(context.TODO(), s)
+// 	require.NoError(t, err)
+// 	require.NotNil(t, req)
+
+// 	pid, err := req.Header.Proc()
+// 	require.NoError(t, err)
+// 	require.Equal(t, "test-pid", pid)
+// }
+
+// // newTestHeader returns a buffer containing a pre-populated
+// // header.  The caller is responsible for releasing m.
+// func newTestHeader() *bytes.Buffer {
+// 	m, s := capnp.NewSingleSegmentMessage(nil)
+// 	// m is released by caller
+
+// 	cd, err := glia.NewRootHeader(s)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+
+// 	if err := cd.SetProc("test-pid"); err != nil {
+// 		panic(err)
+// 	}
+
+// 	if err := cd.SetMethod("test"); err != nil {
+// 		panic(err)
+// 	}
+
+// 	stack, err := cd.NewStack(4)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	for i := 0; i < 4; i++ {
+// 		stack.Set(i, uint64(i))
+// 	}
+
+// 	var buf bytes.Buffer
+// 	if err := glia.WriteMessage(&buf, m); err != nil {
+// 		panic(err)
+// 	}
+
+// 	return &buf
+// }
+
+// // type mockMethod struct {
+// // 	Body io.Reader
+// // }
+
+// // func (mm mockMethod) CallWithStack(context.Context, []uint64) error {
+// // 	_, err := io.Copy(io.Discard, mm.Body)
+// // 	return err
+// // }
