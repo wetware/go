@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/wetware/go/system"
+	"go.uber.org/multierr"
 )
 
 const DefaultListenAddr = "ww.local:8020"
@@ -206,7 +207,9 @@ func (s HTTPStream) MethodName() string {
 }
 
 func (s HTTPStream) Close() error {
-	return s.CloseRead()
+	return multierr.Combine(
+		s.CloseRead(),
+		s.CloseWrite())
 }
 
 func (s HTTPStream) CloseRead() error {
