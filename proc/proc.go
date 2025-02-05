@@ -83,15 +83,15 @@ func (p *P) Close(ctx context.Context) error {
 	return p.Mod.Close(ctx)
 }
 
-func (p *P) Reserve(ctx context.Context, sender io.Writer, body io.Reader) error {
+func (p *P) Reserve(ctx context.Context, conn io.ReadWriteCloser) error {
 	p.once.Do(func() {
 		p.sem = semaphore.NewWeighted(1)
 	})
 
 	err := p.sem.Acquire(ctx, 1)
 	if err == nil {
-		p.SendQueue.Writer = sender
-		p.Mailbox.Reader = body
+		p.SendQueue.Writer = conn
+		p.Mailbox.Reader = conn
 	}
 
 	return err
@@ -106,82 +106,3 @@ func (p *P) Release() {
 func (p *P) Method(name string) Method {
 	return p.Mod.ExportedFunction(name)
 }
-
-// func (p *P) Deliver(ctx context.Context, body io.Reader) ([]uint64, error) {
-// 	// Acquire a lock on the process
-// 	////
-// 	err := p.sem.Acquire(ctx, 1)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer p.sem.Release(-1)
-
-// 	// Assign stream to mailbox and call method with stack.
-// 	////
-// 	p.Mailbox.Reader = body                   // we found the method; last chance to hook in
-// 	defer func() { p.Mailbox.Reader = nil }() // defensive; catch use-after-free
-
-// 	err = method.CallWithStack(ctx, stack)
-// 	if errors.Is(err, context.Canceled) {
-// 		err = context.Canceled
-// 	} else if errors.Is(err, context.DeadlineExceeded) {
-// 		err = context.DeadlineExceeded
-// 	}
-
-// 	return stack, err
-// }
-
-// func (p *P) ReadCallData(r io.Reader) (method api.Function, stack []uint64, err error) {
-// 	rd := bufio.NewReader(r)
-// 	if method, err = p.ReadAndLoadMethod(rd); err != nil {
-// 		return
-// 	} else if method == nil {
-// 		err = ErrMethodNotFound
-// 		return
-// 	}
-
-// 	stack, err = ReadStack(rd)
-// 	return
-// }
-
-// func (p *P) ReadAndLoadMethod(rd io.ByteReader) (api.Function, error) {
-// 	// Length prefix
-// 	n, err := binary.ReadUvarint(rd)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var b byte
-// 	var s strings.Builder
-// 	for i := uint64(0); i < n; i++ {
-// 		if b, err = rd.ReadByte(); err != nil {
-// 			break
-// 		} else if err = s.WriteByte(b); err != nil {
-// 			break
-// 		}
-// 	}
-
-// 	method := p.Mod.ExportedFunction(s.String())
-// 	return method, err
-// }
-
-// func ReadStack(rd io.ByteReader) ([]uint64, error) {
-// 	// Length prefix
-// 	n, err := binary.ReadUvarint(rd)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// Read n words from the stack
-// 	var word uint64
-// 	var stack []uint64
-// 	for i := uint64(0); i < n; i++ {
-// 		if word, err = binary.ReadUvarint(rd); err != nil {
-// 			break
-// 		}
-
-// 		stack = append(stack, word)
-// 	}
-
-// 	return stack, err
-// }

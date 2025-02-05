@@ -196,7 +196,8 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 
 	// Render the request
 	////
-	if err := h.P2P.ServeP2P(w, &req.GliaRequest); err != nil {
+	conn := nopCloser{ResponseWriter: w}
+	if err := h.P2P.ServeP2P(conn, &req.GliaRequest); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -205,6 +206,14 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+type nopCloser struct {
+	http.ResponseWriter
+}
+
+func (nopCloser) Close() error {
+	return nil
 }
 
 func (h *HTTP) Listen(ctx context.Context) (net.Listener, error) {

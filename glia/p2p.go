@@ -98,7 +98,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s network.Stream) error {
 	return p2p.ServeP2P(w, req)
 }
 
-func (p2p P2P) ServeP2P(w io.Writer, req *Request) error {
+func (p2p P2P) ServeP2P(conn io.WriteCloser, req *Request) error {
 	// We always return a result of some kind.  The first task
 	// is to set up a response arena for the request. All data
 	// written to this arena is ultimately sent to the remote
@@ -113,37 +113,38 @@ func (p2p P2P) ServeP2P(w io.Writer, req *Request) error {
 		return err
 	}
 
-	// Render the method call
-	////
-	method, err := p2p.Bind(req)
-	if err != nil {
-		return err
-	}
-	if err := method.Render(req.Ctx, res); err != nil {
-		return err
-	}
-
-	// Return results
-	////
-	b, err := res.Message().Marshal()
+	// Bind the request to the p2p router, resolving it
+	// into a method.
+	method, err := p2p.Bind(conn, req)
 	if err != nil {
 		return err
 	}
 
-	// wrap b in a frame consisiting of a uvarint length prefix.
-	frame := make([]byte, binary.MaxVarintLen64)
-	n := binary.PutUvarint(frame, uint64(len(b)))
-	frame = append(frame[:n], b...)
-
-	// write frame to w.
-	if _, err = io.Copy(w, bytes.NewReader(frame)); err == nil { // write results
-		_, err = io.Copy(w, method.P.OutBuffer()) // write body
+	// Render the method call.
+	if err := method.Render(res, req); err != nil {
+		return err
 	}
 
-	return err
+	// Marshal the result message and prefix with uvarint size header
+	b, err := m.Marshal()
+	if err != nil {
+		return fmt.Errorf("marshal result: %w", err)
+	}
+
+	// Write uvarint size header
+	var sizeBuf [binary.MaxVarintLen64]byte
+	n := binary.PutUvarint(sizeBuf[:], uint64(len(b)))
+	if _, err := conn.Write(sizeBuf[:n]); err != nil {
+		return err
+	} else if _, err = io.Copy(conn, bytes.NewReader(b)); err != nil {
+		return err
+	}
+	res.SetStatus(Result_Status_ok)
+
+	return nil
 }
 
-func (p2p P2P) Bind(req *Request) (*MethodCall, error) {
+func (p2p P2P) Bind(w io.WriteCloser, req *Request) (*MethodCall, error) {
 	pid, err := req.Header.Proc()
 	if err != nil {
 		return nil, err
@@ -162,7 +163,15 @@ func (p2p P2P) Bind(req *Request) (*MethodCall, error) {
 	mc := &MethodCall{
 		P:      p,
 		Method: name,
-		Body:   &req.Body,
+		Conn: struct {
+			io.Reader
+			io.WriteCloser
+		}{
+			Reader:      &req.Body,
+			WriteCloser: w,
+		},
+		// Body:   &req.Body,
+		// Writer: w,
 	}
 
 	stack, err := req.Header.Stack()

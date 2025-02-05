@@ -13,12 +13,12 @@ var ErrStatusNotSet = errors.New("status not set")
 // request.
 type Renderer interface {
 	// Render writes a response for r to w.
-	Render(context.Context, Result) error
+	Render(Result, *Request) error
 }
 
 // Render is an abstraction over r.Render(w, req) for readability.
-func Render(ctx context.Context, res Result, r Renderer) error {
-	if err := r.Render(ctx, res); err != nil {
+func Render(res Result, req *Request, r Renderer) error {
+	if err := r.Render(res, req); err != nil {
 		return err
 	}
 
@@ -33,7 +33,7 @@ func Render(ctx context.Context, res Result, r Renderer) error {
 
 type Ok []uint64 // stack
 
-func (stack Ok) Render(_ context.Context, res Result) error {
+func (stack Ok) Render(res Result, req *Request) error {
 	defer res.SetStatus(Result_Status_ok)
 
 	if size := int32(len(stack)); size > 0 {
@@ -83,7 +83,7 @@ func (f Failure) Render(res Result) error {
 }
 
 func RoutingError(err error) RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_routingError,
 			Err:    err,
@@ -92,7 +92,7 @@ func RoutingError(err error) RenderFunc {
 }
 
 func ProcNotFound() RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_procNotFound,
 		}.Render(res)
@@ -100,7 +100,7 @@ func ProcNotFound() RenderFunc {
 }
 
 func InvalidProc(err error) RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_invalidRequest,
 			Err:    err,
@@ -109,7 +109,7 @@ func InvalidProc(err error) RenderFunc {
 }
 
 func InvalidCallStack(err error) RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_invalidRequest,
 			Err:    err,
@@ -118,7 +118,7 @@ func InvalidCallStack(err error) RenderFunc {
 }
 
 func InvalidMethod(err error) RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_invalidMethod,
 			Err:    err,
@@ -127,7 +127,7 @@ func InvalidMethod(err error) RenderFunc {
 }
 
 func MethodNotFound() RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_methodNotFound,
 		}.Render(res)
@@ -135,7 +135,7 @@ func MethodNotFound() RenderFunc {
 }
 
 func GuestError(err error) RenderFunc {
-	return func(ctx context.Context, res Result) error {
+	return func(res Result, req *Request) error {
 		return Failure{
 			Status: Result_Status_guestError,
 			Err:    err,
@@ -147,13 +147,13 @@ type MethodCall struct {
 	P      Proc
 	Method string
 	Stack  []uint64
-	Body   io.Reader
+	Conn   io.ReadWriteCloser
 }
 
-func (mc MethodCall) Render(ctx context.Context, res Result) error {
+func (mc MethodCall) Render(res Result, req *Request) error {
 	// Acquire a lock on the process
 	////
-	err := mc.P.Reserve(ctx, mc.Body)
+	err := mc.P.Reserve(req.Ctx, mc.Conn)
 	if err != nil {
 		return err
 	}
@@ -161,10 +161,10 @@ func (mc MethodCall) Render(ctx context.Context, res Result) error {
 
 	method := mc.P.Method(mc.Method)
 	if method == nil {
-		return Render(ctx, res, MethodNotFound())
+		return Render(res, req, MethodNotFound())
 	}
 
-	err = method.CallWithStack(ctx, mc.Stack)
+	err = method.CallWithStack(req.Ctx, mc.Stack)
 	if errors.Is(err, context.Canceled) {
 		err = context.Canceled
 	} else if errors.Is(err, context.DeadlineExceeded) {
@@ -172,14 +172,14 @@ func (mc MethodCall) Render(ctx context.Context, res Result) error {
 	}
 
 	if err != nil {
-		return Render(ctx, res, GuestError(err))
+		return Render(res, req, GuestError(err))
 	}
 
-	return Render(ctx, res, Ok(mc.Stack))
+	return Render(res, req, Ok(mc.Stack))
 }
 
-type RenderFunc func(context.Context, Result) error
+type RenderFunc func(Result, *Request) error
 
-func (render RenderFunc) Render(ctx context.Context, res Result) error {
-	return render(ctx, res)
+func (render RenderFunc) Render(res Result, req *Request) error {
+	return render(res, req)
 }

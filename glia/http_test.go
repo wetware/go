@@ -1,15 +1,20 @@
 package glia_test
 
 import (
-	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	glia "github.com/wetware/go/glia"
+	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
 
@@ -56,30 +61,31 @@ func TestHTTP(t *testing.T) {
 	// expectedStack := []uint64{1, 2, 3}
 	expectedStackStr := "1,2,3"
 
-	mockProc := NewMockProc(ctrl)
-	reserve := mockProc.EXPECT().
-		Reserve(gomock.Any(), gomock.Any()). // context.Context, io.Reader
-		Return(nil).                         // error
-		Times(1)
-	method := mockProc.EXPECT().
-		Method(gomock.Any()). // context.Context
-		Return(nil).          // error
-		After(reserve).
-		Times(1)
-	release := mockProc.EXPECT().
-		Release().
-		After(method).
-		Times(1)
-	mockProc.EXPECT().
-		OutBuffer().
-		Return(bytes.NewReader(nil)).
-		After(release).
-		Times(1)
+	r := wazero.NewRuntimeWithConfig(context.TODO(), wazero.NewRuntimeConfig().
+		WithCloseOnContextDone(true))
+	defer r.Close(context.TODO())
+	wasi_snapshot_preview1.MustInstantiate(context.TODO(), r)
+
+	bytecode, err := os.ReadFile("../examples/echo/main.wasm")
+	require.NoError(t, err)
+
+	cm, err := r.CompileModule(context.TODO(), bytecode)
+	require.NoError(t, err)
+	defer cm.Close(context.TODO())
+
+	p, err := proc.Command{
+		PID: proc.NewPID(),
+		// Args: ,
+		// Env: ,
+		Stderr: os.Stderr,
+	}.Instantiate(context.TODO(), r, cm)
+	require.NoError(t, err)
+	defer p.Close(context.TODO())
 
 	mockRouter := NewMockRouter(ctrl)
 	mockRouter.EXPECT().
 		GetProc(expectedProc).
-		Return(mockProc, nil).
+		Return(p, nil).
 		Times(1)
 
 	h.P2P.Router = mockRouter

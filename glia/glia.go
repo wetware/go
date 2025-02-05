@@ -4,7 +4,6 @@
 package glia
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -14,10 +13,8 @@ import (
 )
 
 type Proc interface {
-	Reserve(ctx context.Context, body io.Reader) error
+	Reserve(context.Context, io.ReadWriteCloser) error
 	Release()
-
-	OutBuffer() *bytes.Reader
 
 	api.Closer
 	String() string
