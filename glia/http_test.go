@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
@@ -85,4 +86,45 @@ func TestHTTP(t *testing.T) {
 		errMsg, _ := io.ReadAll(res.Body)
 		t.Fatalf("HTTP request failed with status: %d: %s", res.StatusCode, string(errMsg))
 	}
+}
+
+func TestHTTPStream(t *testing.T) {
+	t.Parallel()
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/test/proc/method", strings.NewReader("test body"))
+
+	stream := glia.HTTPStream{
+		ResponseWriter: w,
+		Request:        r,
+	}
+
+	t.Run("ProcID", func(t *testing.T) {
+		r.SetPathValue("proc", "test-proc")
+		require.Equal(t, "test-proc", stream.ProcID())
+	})
+
+	t.Run("MethodName", func(t *testing.T) {
+		r.SetPathValue("method", "test-method")
+		require.Equal(t, "test-method", stream.MethodName())
+	})
+
+	t.Run("Read", func(t *testing.T) {
+		buf := make([]byte, 100)
+		n, err := stream.Read(buf)
+		require.NoError(t, err)
+		require.Equal(t, "test body", string(buf[:n]))
+	})
+
+	t.Run("Write", func(t *testing.T) {
+		body := "test response"
+		n, err := stream.Write([]byte(body))
+		require.NoError(t, err)
+		require.Equal(t, len(body), n)
+		require.Equal(t, body, w.Body.String())
+	})
+
+	t.Run("Close", func(t *testing.T) {
+		require.NoError(t, stream.Close())
+	})
 }

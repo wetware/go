@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -127,79 +128,18 @@ func (r mockRouter) GetProc(pid string) (glia.Proc, error) {
 	return nil, fmt.Errorf("mockRouter: %s != %s", r.P.String(), pid)
 }
 
-// type nopCloser struct {
-// 	io.Writer
-// }
+func TestP2PStream(t *testing.T) {
+	t.Parallel()
 
-// func (nopCloser) Close() error {
-// 	return nil
-// }
+	proto := "12D3KooWFYcCMuKujeeDDPqnH6yHeVrnXPaCjfbYVmQ9fHxfRDtA/Wt9hMLbqHmNuCsvqCW8AuKxUjwL/echo"
 
-// func TestReadRequest(t *testing.T) {
-// 	t.Parallel()
+	s := test_libp2p.NewMockStream(gomock.NewController(t))
+	stream := glia.P2PStream{Stream: s}
+	s.EXPECT().
+		Protocol().
+		Return(protocol.ID(proto)).
+		AnyTimes()
 
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
-
-// 	hdr := newTestHeader()
-
-// 	s := test_libp2p.NewMockStream(ctrl)
-// 	s.EXPECT().
-// 		Read(gomock.Any()).
-// 		DoAndReturn(func(p []byte) (n int, err error) {
-// 			return hdr.Read(p)
-// 		}).
-// 		MinTimes(1)
-
-// 	req, err := glia.ReadRequest(context.TODO(), s)
-// 	require.NoError(t, err)
-// 	require.NotNil(t, req)
-
-// 	pid, err := req.Header.Proc()
-// 	require.NoError(t, err)
-// 	require.Equal(t, "test-pid", pid)
-// }
-
-// // newTestHeader returns a buffer containing a pre-populated
-// // header.  The caller is responsible for releasing m.
-// func newTestHeader() *bytes.Buffer {
-// 	m, s := capnp.NewSingleSegmentMessage(nil)
-// 	// m is released by caller
-
-// 	cd, err := glia.NewRootHeader(s)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	if err := cd.SetProc("test-pid"); err != nil {
-// 		panic(err)
-// 	}
-
-// 	if err := cd.SetMethod("test"); err != nil {
-// 		panic(err)
-// 	}
-
-// 	stack, err := cd.NewStack(4)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	for i := 0; i < 4; i++ {
-// 		stack.Set(i, uint64(i))
-// 	}
-
-// 	var buf bytes.Buffer
-// 	if err := glia.WriteMessage(&buf, m); err != nil {
-// 		panic(err)
-// 	}
-
-// 	return &buf
-// }
-
-// // type mockMethod struct {
-// // 	Body io.Reader
-// // }
-
-// // func (mm mockMethod) CallWithStack(context.Context, []uint64) error {
-// // 	_, err := io.Copy(io.Discard, mm.Body)
-// // 	return err
-// // }
+	require.Equal(t, "Wt9hMLbqHmNuCsvqCW8AuKxUjwL", stream.ProcID())
+	require.Equal(t, "echo", stream.MethodName())
+}
