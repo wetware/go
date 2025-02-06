@@ -15,6 +15,81 @@ import (
 	proc "github.com/wetware/go/proc"
 )
 
+// MockEnv is a mock of Env interface.
+type MockEnv struct {
+	ctrl     *gomock.Controller
+	recorder *MockEnvMockRecorder
+}
+
+// MockEnvMockRecorder is the mock recorder for MockEnv.
+type MockEnvMockRecorder struct {
+	mock *MockEnv
+}
+
+// NewMockEnv creates a new mock instance.
+func NewMockEnv(ctrl *gomock.Controller) *MockEnv {
+	mock := &MockEnv{ctrl: ctrl}
+	mock.recorder = &MockEnvMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockEnv) EXPECT() *MockEnvMockRecorder {
+	return m.recorder
+}
+
+// Log mocks base method.
+func (m *MockEnv) Log() *slog.Logger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Log")
+	ret0, _ := ret[0].(*slog.Logger)
+	return ret0
+}
+
+// Log indicates an expected call of Log.
+func (mr *MockEnvMockRecorder) Log() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockEnv)(nil).Log))
+}
+
+// MockRouter is a mock of Router interface.
+type MockRouter struct {
+	ctrl     *gomock.Controller
+	recorder *MockRouterMockRecorder
+}
+
+// MockRouterMockRecorder is the mock recorder for MockRouter.
+type MockRouterMockRecorder struct {
+	mock *MockRouter
+}
+
+// NewMockRouter creates a new mock instance.
+func NewMockRouter(ctrl *gomock.Controller) *MockRouter {
+	mock := &MockRouter{ctrl: ctrl}
+	mock.recorder = &MockRouterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRouter) EXPECT() *MockRouterMockRecorder {
+	return m.recorder
+}
+
+// GetProc mocks base method.
+func (m *MockRouter) GetProc(pid string) (glia.Proc, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProc", pid)
+	ret0, _ := ret[0].(glia.Proc)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProc indicates an expected call of GetProc.
+func (mr *MockRouterMockRecorder) GetProc(pid interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProc", reflect.TypeOf((*MockRouter)(nil).GetProc), pid)
+}
+
 // MockProc is a mock of Proc interface.
 type MockProc struct {
 	ctrl     *gomock.Controller
@@ -79,17 +154,17 @@ func (mr *MockProcMockRecorder) Release() *gomock.Call {
 }
 
 // Reserve mocks base method.
-func (m *MockProc) Reserve(ctx context.Context, body io.Reader) error {
+func (m *MockProc) Reserve(arg0 context.Context, arg1 io.ReadWriteCloser) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reserve", ctx, body)
+	ret := m.ctrl.Call(m, "Reserve", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Reserve indicates an expected call of Reserve.
-func (mr *MockProcMockRecorder) Reserve(ctx, body interface{}) *gomock.Call {
+func (mr *MockProcMockRecorder) Reserve(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reserve", reflect.TypeOf((*MockProc)(nil).Reserve), ctx, body)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reserve", reflect.TypeOf((*MockProc)(nil).Reserve), arg0, arg1)
 }
 
 // String mocks base method.
@@ -106,77 +181,125 @@ func (mr *MockProcMockRecorder) String() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "String", reflect.TypeOf((*MockProc)(nil).String))
 }
 
-// MockRouter is a mock of Router interface.
-type MockRouter struct {
+// MockStream is a mock of Stream interface.
+type MockStream struct {
 	ctrl     *gomock.Controller
-	recorder *MockRouterMockRecorder
+	recorder *MockStreamMockRecorder
 }
 
-// MockRouterMockRecorder is the mock recorder for MockRouter.
-type MockRouterMockRecorder struct {
-	mock *MockRouter
+// MockStreamMockRecorder is the mock recorder for MockStream.
+type MockStreamMockRecorder struct {
+	mock *MockStream
 }
 
-// NewMockRouter creates a new mock instance.
-func NewMockRouter(ctrl *gomock.Controller) *MockRouter {
-	mock := &MockRouter{ctrl: ctrl}
-	mock.recorder = &MockRouterMockRecorder{mock}
+// NewMockStream creates a new mock instance.
+func NewMockStream(ctrl *gomock.Controller) *MockStream {
+	mock := &MockStream{ctrl: ctrl}
+	mock.recorder = &MockStreamMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRouter) EXPECT() *MockRouterMockRecorder {
+func (m *MockStream) EXPECT() *MockStreamMockRecorder {
 	return m.recorder
 }
 
-// GetProc mocks base method.
-func (m *MockRouter) GetProc(pid string) (glia.Proc, error) {
+// Close mocks base method.
+func (m *MockStream) Close() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProc", pid)
-	ret0, _ := ret[0].(glia.Proc)
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockStreamMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStream)(nil).Close))
+}
+
+// CloseRead mocks base method.
+func (m *MockStream) CloseRead() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloseRead")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CloseRead indicates an expected call of CloseRead.
+func (mr *MockStreamMockRecorder) CloseRead() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseRead", reflect.TypeOf((*MockStream)(nil).CloseRead))
+}
+
+// CloseWrite mocks base method.
+func (m *MockStream) CloseWrite() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloseWrite")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CloseWrite indicates an expected call of CloseWrite.
+func (mr *MockStreamMockRecorder) CloseWrite() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWrite", reflect.TypeOf((*MockStream)(nil).CloseWrite))
+}
+
+// MethodName mocks base method.
+func (m *MockStream) MethodName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MethodName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// MethodName indicates an expected call of MethodName.
+func (mr *MockStreamMockRecorder) MethodName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MethodName", reflect.TypeOf((*MockStream)(nil).MethodName))
+}
+
+// ProcID mocks base method.
+func (m *MockStream) ProcID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// ProcID indicates an expected call of ProcID.
+func (mr *MockStreamMockRecorder) ProcID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcID", reflect.TypeOf((*MockStream)(nil).ProcID))
+}
+
+// Read mocks base method.
+func (m *MockStream) Read(p []byte) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Read", p)
+	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetProc indicates an expected call of GetProc.
-func (mr *MockRouterMockRecorder) GetProc(pid interface{}) *gomock.Call {
+// Read indicates an expected call of Read.
+func (mr *MockStreamMockRecorder) Read(p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProc", reflect.TypeOf((*MockRouter)(nil).GetProc), pid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Read", reflect.TypeOf((*MockStream)(nil).Read), p)
 }
 
-// MockEnv is a mock of Env interface.
-type MockEnv struct {
-	ctrl     *gomock.Controller
-	recorder *MockEnvMockRecorder
-}
-
-// MockEnvMockRecorder is the mock recorder for MockEnv.
-type MockEnvMockRecorder struct {
-	mock *MockEnv
-}
-
-// NewMockEnv creates a new mock instance.
-func NewMockEnv(ctrl *gomock.Controller) *MockEnv {
-	mock := &MockEnv{ctrl: ctrl}
-	mock.recorder = &MockEnvMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockEnv) EXPECT() *MockEnvMockRecorder {
-	return m.recorder
-}
-
-// Log mocks base method.
-func (m *MockEnv) Log() *slog.Logger {
+// Write mocks base method.
+func (m *MockStream) Write(p []byte) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Log")
-	ret0, _ := ret[0].(*slog.Logger)
-	return ret0
+	ret := m.ctrl.Call(m, "Write", p)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// Log indicates an expected call of Log.
-func (mr *MockEnvMockRecorder) Log() *gomock.Call {
+// Write indicates an expected call of Write.
+func (mr *MockStreamMockRecorder) Write(p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockEnv)(nil).Log))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockStream)(nil).Write), p)
 }

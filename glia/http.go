@@ -9,14 +9,13 @@ import (
 	"net"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	capnp "capnproto.org/go/capnp/v3"
 	"github.com/wetware/go/system"
+	"go.uber.org/multierr"
 )
 
 const DefaultListenAddr = "ww.local:8020"
@@ -40,6 +39,11 @@ func (h *HTTP) Log() *slog.Logger {
 	return h.P2P.Env.Log().With(
 		"service", h.String(),
 		"addr", h.ListenAddr)
+}
+
+func (h *HTTP) Listen(ctx context.Context) (net.Listener, error) {
+	h.Init()
+	return h.ListenConfig.Listen(ctx, "tcp", h.ListenAddr)
 }
 
 func (h *HTTP) Init() {
@@ -174,99 +178,57 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Bind request data
-	m, seg := capnp.NewSingleSegmentMessage(nil)
-	defer m.Release()
-
-	req, err := NewMessageRoutingRequest(r, seg)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err = req.unmarshal(r); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Render the request
-	////
-	if err := h.P2P.ServeP2P(w, &req.GliaRequest); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
+	if err := h.P2P.ServeStream(r.Context(), HTTPStream{
+		ResponseWriter: w,
+		Request:        r,
+	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func (h *HTTP) Listen(ctx context.Context) (net.Listener, error) {
-	h.Init()
-	return h.ListenConfig.Listen(ctx, "tcp", h.ListenAddr)
+type HTTPStream struct {
+	http.ResponseWriter
+	*http.Request
 }
 
-type MessageRoutingRequest struct {
-	GliaRequest Request
+var _ Stream = (*HTTPStream)(nil)
+
+// func (s HTTPStream) Host() string {
+// 	return s.Request.PathValue("host")
+// }
+
+func (s HTTPStream) ProcID() string {
+	return s.Request.PathValue("proc")
 }
 
-func NewMessageRoutingRequest(r *http.Request, seg *capnp.Segment) (MessageRoutingRequest, error) {
-	hdr, err := NewRootHeader(seg)
-	return MessageRoutingRequest{GliaRequest: Request{Header: hdr}}, err
+func (s HTTPStream) MethodName() string {
+	return s.Request.PathValue("method")
 }
 
-func (req *MessageRoutingRequest) unmarshal(r *http.Request) error {
-	// TODO: validate the peer id
-	if err := req.GliaRequest.Header.SetPeer([]byte(r.PathValue("peer"))); err != nil {
-		return fmt.Errorf("set peer: %w", err)
+func (s HTTPStream) Close() error {
+	return multierr.Combine(
+		s.CloseRead(),
+		s.CloseWrite())
+}
+
+func (s HTTPStream) CloseRead() error {
+	return s.Request.Body.Close()
+}
+
+func (s HTTPStream) CloseWrite() error {
+	if c, ok := s.ResponseWriter.(io.Closer); ok {
+		return c.Close()
 	}
 
-	if err := req.GliaRequest.Header.SetProc(r.PathValue("proc")); err != nil {
-		return fmt.Errorf("set proc: %w", err)
-	}
-	if err := req.GliaRequest.Header.SetMethod(r.PathValue("method")); err != nil {
-		return fmt.Errorf("set method: %w", err)
-	}
-
-	stackValues, err := parseStack(r.URL.Query().Get("stack"))
-	if err != nil {
-		return fmt.Errorf("failed to parse stack: %s", err)
-	}
-
-	stack, err := req.GliaRequest.Header.NewStack(int32(len(stackValues)))
-	if err != nil {
-		return fmt.Errorf("new stack: %w", err)
-	}
-
-	for i, stackValue := range stackValues {
-		stack.Set(i, stackValue)
-	}
-
-	req.GliaRequest.Ctx = r.Context()
-	req.GliaRequest.Body.Reset(r.Body)
+	// TODO:  might need to hook in here to signal clean exit
 	return nil
 }
 
-func parseStack(stackValues string) ([]uint64, error) {
-	if stackValues == "" {
-		return []uint64{}, nil
-	}
+func (s HTTPStream) Read(p []byte) (int, error) {
+	return s.Request.Body.Read(p)
+}
 
-	splitValues := strings.Split(stackValues, ",")
-	stack := make([]uint64, len(splitValues))
-	for i, v := range splitValues {
-		stackValue, err := strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			return stack, err
-		}
-		stack[i] = stackValue
-	}
-
-	return stack, nil
+func (s HTTPStream) Write(p []byte) (int, error) {
+	return s.ResponseWriter.Write(p)
 }
