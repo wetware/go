@@ -5,10 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"path"
-	"strings"
 
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/wetware/go/system"
 )
@@ -27,11 +25,6 @@ func (p2p P2P) Log() *slog.Logger {
 
 func (p2p P2P) String() string {
 	return "p2p"
-}
-
-func (p2p P2P) Match(id protocol.ID) bool {
-	prefix := system.Proto.String()
-	return strings.HasPrefix(string(id), prefix)
 }
 
 func (p2p P2P) Serve(ctx context.Context) error {
