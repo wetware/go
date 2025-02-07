@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
@@ -38,6 +39,11 @@ func TestP2P(t *testing.T) {
 
 	// Initialize libp2p mocks.
 	h := test_libp2p.NewMockHost(ctrl)
+	id := mkPeerID(t)
+	h.EXPECT().
+		ID().
+		Return(id).
+		AnyTimes()
 	env := &system.Env{
 		Host: h,
 	}
@@ -73,13 +79,17 @@ func TestP2P(t *testing.T) {
 
 	s := NewMockStream(ctrl)
 	s.EXPECT().
+		Destination().
+		Return(id.String()).
+		Times(1)
+	s.EXPECT().
 		ProcID().
 		Return(p.String()).
-		Times(1)
+		AnyTimes()
 	s.EXPECT().
 		MethodName().
 		Return("echo").
-		Times(1)
+		AnyTimes()
 	read1 := s.EXPECT().
 		Read(gomock.Any()).
 		DoAndReturn(func(b []byte) (int, error) {
@@ -142,4 +152,12 @@ func TestP2PStream(t *testing.T) {
 
 	require.Equal(t, "Wt9hMLbqHmNuCsvqCW8AuKxUjwL", stream.ProcID())
 	require.Equal(t, "echo", stream.MethodName())
+}
+
+func mkPeerID(t *testing.T) peer.ID {
+	t.Helper()
+
+	id, err := peer.Decode("12D3KooWFYcCMuKujeeDDPqnH6yHeVrnXPaCjfbYVmQ9fHxfRDtA")
+	require.NoError(t, err)
+	return id
 }

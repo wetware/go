@@ -67,7 +67,7 @@ func (h *HTTP) DefaultRouter() http.Handler {
 	mux.HandleFunc("/status", h.status)
 	mux.HandleFunc("/version", h.version)
 
-	path := path.Join("/", system.Proto.String(), "{peer}/{proc}/{method}")
+	path := path.Join(system.Proto.Path(), "{host}/{proc}/{method}")
 	mux.HandleFunc(path, h.glia)
 
 	return mux
@@ -194,9 +194,10 @@ type HTTPStream struct {
 
 var _ Stream = (*HTTPStream)(nil)
 
-// func (s HTTPStream) Host() string {
-// 	return s.Request.PathValue("host")
-// }
+func (s HTTPStream) Destination() string {
+	hostID := s.Request.PathValue("host")
+	return hostID
+}
 
 func (s HTTPStream) ProcID() string {
 	return s.Request.PathValue("proc")

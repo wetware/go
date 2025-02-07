@@ -7,50 +7,12 @@ package glia_test
 import (
 	context "context"
 	io "io"
-	slog "log/slog"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	glia "github.com/wetware/go/glia"
 	proc "github.com/wetware/go/proc"
 )
-
-// MockEnv is a mock of Env interface.
-type MockEnv struct {
-	ctrl     *gomock.Controller
-	recorder *MockEnvMockRecorder
-}
-
-// MockEnvMockRecorder is the mock recorder for MockEnv.
-type MockEnvMockRecorder struct {
-	mock *MockEnv
-}
-
-// NewMockEnv creates a new mock instance.
-func NewMockEnv(ctrl *gomock.Controller) *MockEnv {
-	mock := &MockEnv{ctrl: ctrl}
-	mock.recorder = &MockEnvMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockEnv) EXPECT() *MockEnvMockRecorder {
-	return m.recorder
-}
-
-// Log mocks base method.
-func (m *MockEnv) Log() *slog.Logger {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Log")
-	ret0, _ := ret[0].(*slog.Logger)
-	return ret0
-}
-
-// Log indicates an expected call of Log.
-func (mr *MockEnvMockRecorder) Log() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockEnv)(nil).Log))
-}
 
 // MockRouter is a mock of Router interface.
 type MockRouter struct {
@@ -244,6 +206,20 @@ func (m *MockStream) CloseWrite() error {
 func (mr *MockStreamMockRecorder) CloseWrite() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWrite", reflect.TypeOf((*MockStream)(nil).CloseWrite))
+}
+
+// Destination mocks base method.
+func (m *MockStream) Destination() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Destination")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Destination indicates an expected call of Destination.
+func (mr *MockStreamMockRecorder) Destination() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destination", reflect.TypeOf((*MockStream)(nil).Destination))
 }
 
 // MethodName mocks base method.

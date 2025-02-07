@@ -13,6 +13,7 @@ require (
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/lmittmann/tint v1.0.4
+	github.com/lthibault/go-libp2p-inproc-transport v0.4.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/pkg/errors v0.9.1
@@ -97,6 +98,7 @@ require (
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.2 // indirect
 	github.com/libp2p/zeroconf/v2 v2.2.0 // indirect
+	github.com/lthibault/util v0.0.12 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
