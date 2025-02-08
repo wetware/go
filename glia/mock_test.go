@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	glia "github.com/wetware/go/glia"
 	proc "github.com/wetware/go/proc"
 )
@@ -248,6 +249,20 @@ func (m *MockStream) ProcID() string {
 func (mr *MockStreamMockRecorder) ProcID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcID", reflect.TypeOf((*MockStream)(nil).ProcID))
+}
+
+// Protocol mocks base method.
+func (m *MockStream) Protocol() protocol.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Protocol")
+	ret0, _ := ret[0].(protocol.ID)
+	return ret0
+}
+
+// Protocol indicates an expected call of Protocol.
+func (mr *MockStreamMockRecorder) Protocol() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Protocol", reflect.TypeOf((*MockStream)(nil).Protocol))
 }
 
 // Read mocks base method.

@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/wetware/go/system"
 )
@@ -33,8 +32,9 @@ func (p2p P2P) String() string {
 }
 
 func (p2p P2P) Serve(ctx context.Context) error {
+	env := p2p.Env
 	proto := system.Proto.Unwrap()
-	p2p.Env.Host.SetStreamHandlerMatch(proto,
+	env.Host.SetStreamHandlerMatch(proto,
 		func(id protocol.ID) bool {
 			root := system.Proto.Path()
 			return strings.HasPrefix(string(id), root)
@@ -56,11 +56,11 @@ func (p2p P2P) Serve(ctx context.Context) error {
 					"stream", s.ID())
 			}
 		})
-	defer p2p.Env.Host.RemoveStreamHandler(proto)
+	defer env.Host.RemoveStreamHandler(proto)
 	p2p.Log().DebugContext(ctx, "service started")
 
 	<-ctx.Done()
-	return nil
+	return ctx.Err()
 }
 
 func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
@@ -88,31 +88,33 @@ func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
 
 	// Forward the call
 	////
-	proto := path.Join(system.Proto.Path(),
-		s.Destination(),
-		s.ProcID(),
-		s.MethodName())
 	dst, err := peer.Decode(s.Destination())
 	if err != nil {
 		return err
 	}
-
-	remote, err := p2p.Env.Host.NewStream(ctx, dst, protocol.ID(proto))
+	remote, err := p2p.Env.Host.NewStream(ctx, dst, s.Protocol())
 	if err != nil {
 		return err
 	}
 	defer s.Close()
 
-	var g errgroup.Group
-	g.Go(func() error {
-		_, err := io.Copy(s, remote)
+	// Forward the request stream
+	if _, err := io.Copy(remote, s); err != nil {
 		return err
-	})
-	g.Go(func() error {
-		_, err := io.Copy(remote, s)
+	}
+	if err := remote.CloseWrite(); err != nil {
 		return err
-	})
-	return g.Wait()
+	}
+
+	// Read back the response stream
+	if _, err := io.Copy(s, remote); err != nil {
+		return err
+	}
+	if err := remote.CloseRead(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type P2PStream struct {
@@ -120,6 +122,10 @@ type P2PStream struct {
 }
 
 var _ Stream = (*P2PStream)(nil)
+
+func (s P2PStream) Close() error {
+	return s.Stream.Close()
+}
 
 func (s P2PStream) Destination() string {
 	proto := s.Protocol()

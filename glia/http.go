@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/wetware/go/system"
 	"go.uber.org/multierr"
 )
@@ -193,6 +194,11 @@ type HTTPStream struct {
 }
 
 var _ Stream = (*HTTPStream)(nil)
+
+func (s HTTPStream) Protocol() protocol.ID {
+	path := s.Request.URL.Path
+	return protocol.ID(path)
+}
 
 func (s HTTPStream) Destination() string {
 	hostID := s.Request.PathValue("host")
