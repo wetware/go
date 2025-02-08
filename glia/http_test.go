@@ -62,15 +62,13 @@ func TestHTTP(t *testing.T) {
 	require.NoError(t, err)
 	defer p.Close(context.TODO())
 
-	p2p := glia.P2P{
+	g := &glia.HTTP{
 		Env: &system.Env{
 			Host: h,
 			// IPFS: ,
 		},
 		Router: mockRouter{P: p},
 	}
-
-	g := &glia.HTTP{P2P: p2p}
 	g.Init()
 	server := httptest.NewServer(g.DefaultRouter())
 
