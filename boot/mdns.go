@@ -9,7 +9,6 @@ import (
 )
 
 type MDNS struct {
-	NS  string
 	Env *system.Env
 }
 

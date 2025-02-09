@@ -12,6 +12,10 @@ type VersionedID struct {
 	Version semver.Version
 }
 
+func (v VersionedID) Path() string {
+	return path.Clean(path.Join("/", v.String()))
+}
+
 func (v VersionedID) String() string {
 	proto := string(v.ID)
 	version := v.Version.String()

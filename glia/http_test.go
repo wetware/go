@@ -1,6 +1,7 @@
 package glia_test
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -10,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/libp2p/go-libp2p"
+	inproc "github.com/lthibault/go-libp2p-inproc-transport"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -22,18 +24,19 @@ import (
 func TestHTTP(t *testing.T) {
 	t.Parallel()
 
-	h := new(glia.HTTP)
-	h.Init()
-	server := httptest.NewServer(h.DefaultRouter())
+	const (
+		expectedProc   = "Wt9hMLbqHmNuCsvqCW8AuKxUjwL"
+		expectedMethod = "echo"
+		// expectedStack = []uint64{1, 2, 3}
+		// expectedStackStr = "1,2,3"
+	)
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	expectedPeer := "12D3KooWPTR9RGhkm5D5XsJCMh2WGofMfTWcN4F79ofaScWGfEDw"
-	expectedProc := "myProc"
-	expectedMethod := "echo"
-	// expectedStack := []uint64{1, 2, 3}
-	expectedStackStr := "1,2,3"
+	h, err := libp2p.New(libp2p.NoTransports,
+		libp2p.NoListenAddrs,
+		libp2p.Transport(inproc.New()),
+		libp2p.ListenAddrStrings("/inproc/~"))
+	require.NoError(t, err)
+	expectedPeer := h.ID().String()
 
 	r := wazero.NewRuntimeWithConfig(context.TODO(), wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true))
@@ -47,8 +50,10 @@ func TestHTTP(t *testing.T) {
 	require.NoError(t, err)
 	defer cm.Close(context.TODO())
 
+	pid, err := proc.ParsePID(expectedProc)
+	require.NoError(t, err)
 	p, err := proc.Command{
-		PID: proc.NewPID(),
+		PID: pid,
 		// Args: ,
 		// Env: ,
 		Stderr: os.Stderr,
@@ -57,35 +62,38 @@ func TestHTTP(t *testing.T) {
 	require.NoError(t, err)
 	defer p.Close(context.TODO())
 
-	mockRouter := NewMockRouter(ctrl)
-	mockRouter.EXPECT().
-		GetProc(expectedProc).
-		Return(p, nil).
-		Times(1)
-	h.P2P.Router = mockRouter
+	g := &glia.HTTP{
+		Env: &system.Env{
+			Host: h,
+			// IPFS: ,
+		},
+		Router: mockRouter{P: p},
+	}
+	g.Init()
+	server := httptest.NewServer(g.DefaultRouter())
 
 	client := &http.Client{}
 	url := server.URL + path.Join("/", system.Proto.String(), expectedPeer, expectedProc, expectedMethod)
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	body := bytes.NewBufferString("Hello, Wetware!")
+	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	req.Header.Add("Content-Type", "text/plain")
 
-	restParams := req.URL.Query()
-	restParams.Add("stack", expectedStackStr)
-	req.URL.RawQuery = restParams.Encode()
+	// restParams := req.URL.Query()
+	// restParams.Add("stack", expectedStackStr)
+	// req.URL.RawQuery = restParams.Encode()
 
 	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		errMsg, _ := io.ReadAll(res.Body)
-		t.Fatalf("HTTP request failed with status: %d: %s", res.StatusCode, string(errMsg))
-	}
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	got, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	require.Equal(t, "Hello, Wetware!", string(got))
 }
 
 func TestHTTPStream(t *testing.T) {

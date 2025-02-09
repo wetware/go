@@ -11,12 +11,13 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/internal/client"
 	"github.com/wetware/go/cmd/internal/serve"
 	"github.com/wetware/go/system"
 )
@@ -56,7 +57,6 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			serve.Command(&env),
-			client.Command(&env),
 			// export.Command(&env),
 			// run.Command(&env),
 		},
@@ -81,7 +81,14 @@ func setup(c *cli.Context) (err error) {
 	} else if env.Host, err = libp2p.New(); err != nil {
 		return
 	}
-	env.Host = routedhost.Wrap(env.Host, env.IPFS.Routing())
+	if env.DHT, err = dual.New(c.Context, env.Host); err != nil {
+
+	}
+	env.Host = routedhost.Wrap(env.Host, env.DHT)
+	env.Host.Peerstore().AddAddrs(
+		env.Host.ID(),
+		env.Host.Addrs(),
+		peerstore.PermanentAddrTTL)
 
 	return
 }

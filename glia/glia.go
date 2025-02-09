@@ -5,15 +5,11 @@ package glia
 import (
 	"context"
 	"io"
-	"log/slog"
 
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/wetware/go/proc"
 )
-
-type Env interface {
-	Log() *slog.Logger
-}
 
 type Router interface {
 	GetProc(pid string) (Proc, error)
@@ -29,8 +25,11 @@ type Proc interface {
 }
 
 type Stream interface {
+	Protocol() protocol.ID
+	Destination() string
 	ProcID() string
 	MethodName() string
+
 	io.ReadWriteCloser
 	CloseRead() error
 	CloseWrite() error

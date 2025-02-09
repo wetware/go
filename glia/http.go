@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/wetware/go/system"
 	"go.uber.org/multierr"
 )
@@ -23,7 +24,8 @@ const DefaultListenAddr = "ww.local:8020"
 var ErrNotFound = errors.New("not found")
 
 type HTTP struct {
-	P2P P2P
+	Env    *system.Env
+	Router Router
 
 	once         sync.Once
 	ListenConfig *net.ListenConfig
@@ -36,7 +38,8 @@ func (*HTTP) String() string {
 }
 
 func (h *HTTP) Log() *slog.Logger {
-	return h.P2P.Env.Log().With(
+	p2p := P2P{Env: h.Env /* withold h.Router for this operation */}
+	return p2p.Env.Log().With(
 		"service", h.String(),
 		"addr", h.ListenAddr)
 }
@@ -67,7 +70,7 @@ func (h *HTTP) DefaultRouter() http.Handler {
 	mux.HandleFunc("/status", h.status)
 	mux.HandleFunc("/version", h.version)
 
-	path := path.Join("/", system.Proto.String(), "{peer}/{proc}/{method}")
+	path := path.Join(system.Proto.Path(), "{host}/{proc}/{method}")
 	mux.HandleFunc(path, h.glia)
 
 	return mux
@@ -178,7 +181,8 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.P2P.ServeStream(r.Context(), HTTPStream{
+	p2p := P2P{Env: h.Env, Router: h.Router}
+	if err := p2p.ServeStream(r.Context(), HTTPStream{
 		ResponseWriter: w,
 		Request:        r,
 	}); err != nil {
@@ -194,9 +198,15 @@ type HTTPStream struct {
 
 var _ Stream = (*HTTPStream)(nil)
 
-// func (s HTTPStream) Host() string {
-// 	return s.Request.PathValue("host")
-// }
+func (s HTTPStream) Protocol() protocol.ID {
+	path := s.Request.URL.Path
+	return protocol.ID(path)
+}
+
+func (s HTTPStream) Destination() string {
+	hostID := s.Request.PathValue("host")
+	return hostID
+}
 
 func (s HTTPStream) ProcID() string {
 	return s.Request.PathValue("proc")

@@ -107,17 +107,13 @@ func setup(env *system.Env) cli.BeforeFunc {
 		init.Commit()
 		rt := &Router{DB: db} // message-routing interface; can route messages locally
 
-		// peer-to-eer messaging service; can route messages to peers,
-		// and accept messages from peers
-		p2p := glia.P2P{Env: env, Router: rt}
-
 		// Bind services to the supervisor.
 		////
 		for _, s := range []suture.Service{
-			p2p,
-			// &glia.Unix{P2P: p2p, Path c.String("unix")},
-			&glia.HTTP{P2P: p2p, ListenAddr: c.String("http")},
-			&boot.MDNS{Env: env /*NS: c.String("ns")*/},
+			&boot.MDNS{Env: env},
+			&glia.P2P{Env: env, Router: rt},
+			// &glia.Unix{Env: env, Router: rt, Path c.String("unix")},
+			&glia.HTTP{Env: env, Router: rt, ListenAddr: c.String("http")},
 		} {
 			app.Add(s)
 		}
