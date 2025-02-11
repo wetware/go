@@ -1,7 +1,12 @@
 name: Deploy Master to VPS
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
   ssh_command:
