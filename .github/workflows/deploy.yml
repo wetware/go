@@ -1,0 +1,21 @@
+name: Deploy Master to VPS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ssh_command:
+    runs-on: ubuntu-latest  # We'll use ubuntu-latest just to setup the SSH Key
+
+    container:
+      image: alpine:latest # Use Alpine for the main command execution
+
+    steps:
+      - name: SSH Key Setup
+        uses: webactions/setup-ssh-key@v1
+        with:
+          privateKey: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: SSH, Pull, and Build
+        run: |
+          ssh -o StrictHostKeyChecking=no -i /home/runner/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
