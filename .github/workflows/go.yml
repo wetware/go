@@ -31,15 +31,17 @@ jobs:
 
     needs: build
     if: github.ref == 'refs/heads/master'
+    env:
+      SSH_DIR: /home/runner/.ssh
 
     steps:
       - name: SSH Key Setup
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          mkdir -p $SSH_DIR
+          ssh-keyscan ${{ secrets.SSH_HOST }} >> $SSH_DIR/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $SSH_DIR/id_rsa
+          chmod 600 $SSH_DIR/id_rsa
 
       - name: SSH, Pull, and Build
         run: |
-          ssh -o StrictHostKeyChecking=no -i /home/runner/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
+          ssh -o StrictHostKeyChecking=no -i  $SSH_DIR/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
