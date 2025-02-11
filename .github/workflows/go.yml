@@ -41,7 +41,7 @@ jobs:
           mkdir -p $SSH_DIR
           ssh-keyscan ${{ secrets.SSH_HOST }} >> $SSH_DIR/known_hosts
           ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-add - <<< "${{ secrets.SSH_PRIVATE_KEY }}"
+          ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
       - name: SSH, Pull, and Build
         run: |
