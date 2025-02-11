@@ -2,17 +2,15 @@ name: Deploy Master to VPS
 
 on:
   push:
-    branches:
-      - master
+    branches: ["master"]
   pull_request:
-    branches:
-      - master
+    branches: ["master"]
 
 jobs:
   ssh_command:
     runs-on: ubuntu-latest # We'll use ubuntu-latest just to setup the SSH Key
 
-    needs: go
+    needs: build
 
     container:
       image: alpine:latest # Use Alpine for the main command execution
