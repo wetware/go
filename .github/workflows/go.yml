@@ -5,24 +5,39 @@ name: Go
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
 
-    - name: Build
-      run: go build -v ./...
+      - name: Build
+        run: go build -v ./...
 
-    - name: Test
-      run: go test -v -race ./...
+      - name: Test
+        run: go test -v -race ./...
+
+  deploy:
+    runs-on: ubuntu-latest # We'll use ubuntu-latest just to setup the SSH Key
+
+    needs: build
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: SSH Key Setup
+        uses: webactions/setup-ssh-key@v1
+        with:
+          privateKey: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: SSH, Pull, and Build
+        run: |
+          ssh -o StrictHostKeyChecking=no -i /home/runner/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
