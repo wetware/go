@@ -27,16 +27,18 @@ jobs:
         run: go test -v -race ./...
 
   deploy:
-    runs-on: ubuntu-latest # We'll use ubuntu-latest just to setup the SSH Key
+    runs-on: ubuntu-latest
 
     needs: build
     if: github.ref == 'refs/heads/master'
 
     steps:
       - name: SSH Key Setup
-        uses: webactions/setup-ssh-key@v1
-        with:
-          privateKey: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
       - name: SSH, Pull, and Build
         run: |
