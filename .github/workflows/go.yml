@@ -33,15 +33,16 @@ jobs:
     if: github.ref == 'refs/heads/master'
     env:
       SSH_DIR: /home/runner/.ssh
+      SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
     steps:
       - name: SSH Key Setup
         run: |
           mkdir -p $SSH_DIR
           ssh-keyscan ${{ secrets.SSH_HOST }} >> $SSH_DIR/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > $SSH_DIR/id_rsa
-          chmod 600 $SSH_DIR/id_rsa
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          ssh-add - <<< "${{ secrets.SSH_PRIVATE_KEY }}"
 
       - name: SSH, Pull, and Build
         run: |
-          ssh -o StrictHostKeyChecking=no -i  $SSH_DIR/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && && git checkout master && git pull && make"
