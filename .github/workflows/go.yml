@@ -39,7 +39,7 @@ jobs:
       - name: SSH Key Setup
         run: |
           mkdir -p $SSH_DIR
-          ssh-keyscan ${{ secrets.SSH_HOST }} >> $SSH_DIR/known_hosts
+          ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
           ssh-agent -a $SSH_AUTH_SOCK > /dev/null
           ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
