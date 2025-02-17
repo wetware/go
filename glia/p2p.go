@@ -9,12 +9,15 @@ import (
 	"math/rand"
 	"path"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wetware/go/boot"
 	"github.com/wetware/go/system"
@@ -66,7 +69,7 @@ func (p2p P2P) Serve(ctx context.Context) error {
 	p2p.Log().DebugContext(ctx, "service started")
 
 	if err := p2p.Bootstrap(ctx); err != nil {
-		return fmt.Errorf("boot: %w", err)
+		return err
 	}
 
 	// If we made it this far, we're bootstrapped.  Wait for shutdown
@@ -76,6 +79,9 @@ func (p2p P2P) Serve(ctx context.Context) error {
 }
 
 func (p2p P2P) Bootstrap(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
 	if p2p.Boot == nil {
 		addrs, err := p2p.IPFSPeers(ctx)
 		if err != nil {
@@ -89,21 +95,28 @@ func (p2p P2P) Bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	// It's possible that a handful of these AddrInfos will point to
-	// unavailable peers, so we should avoid spamming the error logs.
-	// Our strategy is to immediately retry with the next peer, and
-	// only report the last encountered error, if any.
+	var ok atomic.Bool
+	var g errgroup.Group
 	for info := range peers {
-		if err = p2p.Env.Host.Connect(ctx, info); err == nil {
-			break // Connection succeeded.
-			// TODO:  connect to all peers, and return an error iff
-			// *all* connection attempts failed.
-		}
+		g.Go(func(info peer.AddrInfo) func() error {
+			return func() error {
+				err := p2p.Env.Host.Connect(ctx, info)
+				if err == nil {
+					ok.Store(true)
+				}
+				return err
+			}
+		}(info))
 	}
-	if err != nil {
+
+	// Wait for all threads to finish.  Fail if none succeeded.
+	////
+	if err := g.Wait(); !ok.Load() {
 		return err
 	}
-	return nil
+
+	// At least one connection succeeded.  Onward!
+	return p2p.Env.DHT.Bootstrap(ctx)
 }
 
 func (p2p P2P) IPFSPeers(ctx context.Context) (boot.StaticAddrs, error) {
