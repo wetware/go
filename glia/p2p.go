@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"path"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/wetware/go/boot"
 	"github.com/wetware/go/system"
@@ -75,7 +77,11 @@ func (p2p P2P) Serve(ctx context.Context) error {
 
 func (p2p P2P) Bootstrap(ctx context.Context) error {
 	if p2p.Boot == nil {
-		p2p.Boot = boot.StaticAddrs{}
+		addrs, err := p2p.IPFSPeers(ctx)
+		if err != nil {
+			return fmt.Errorf("get ipfs peers: %w", err)
+		}
+		p2p.Boot = addrs
 	}
 
 	peers, err := p2p.Boot.FindPeers(ctx, p2p.Env.NS, discovery.Limit(8))
@@ -98,6 +104,39 @@ func (p2p P2P) Bootstrap(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (p2p P2P) IPFSPeers(ctx context.Context) (boot.StaticAddrs, error) {
+	// Get peers from IPFS swarm
+	peers, err := p2p.Env.IPFS.Swarm().Peers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get IPFS peers: %w", err)
+	}
+
+	// Build map of peer IDs to their multiaddrs
+	peerMap := make(map[peer.ID][]ma.Multiaddr)
+	for _, p := range peers {
+		id := p.ID()
+		peerMap[id] = append(peerMap[id], p.Address())
+	}
+
+	// Convert map entries to AddrInfos
+	addrs := make(boot.StaticAddrs, 0, len(peerMap))
+	for id, maddrs := range peerMap {
+		info := &peer.AddrInfo{
+			ID:    id,
+			Addrs: maddrs,
+		}
+		addrs = append(addrs, *info)
+	}
+
+	// Defensive measure:  randomize the order in which peers are
+	// dialed in order to distribute the load.
+	rand.Shuffle(len(addrs), func(i, j int) {
+		addrs[i], addrs[j] = addrs[j], addrs[i]
+	})
+
+	return addrs, nil
 }
 
 func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
