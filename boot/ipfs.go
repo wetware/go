@@ -36,51 +36,45 @@ func (ipfs IPFS) FindPeers(ctx context.Context, ns string, opt ...discovery.Opti
 		// Iterate through the IPLD node as a map
 		// TODO:  add logging or some kind of improved error handling.
 		for _, link := range n.Links() {
+			// Get the linked node containing peer info
+			peerNode, err := ipfs.Client.Dag().Get(ctx, link.Cid)
+			if err != nil {
+				continue
+			}
+
+			id, err := peer.Decode(link.Name)
+			if err != nil {
+				continue
+			}
+			info := peer.AddrInfo{ID: id}
+
+			// Resolve the addresses from the peer node
+			for i := 0; ; i++ {
+				// Try to resolve each index as a string address
+				v, rest, err := peerNode.Resolve([]string{fmt.Sprint(i)})
+				if err != nil || len(rest) > 0 {
+					break // end of list or error
+				}
+
+				addrStr, ok := v.(string)
+				if !ok {
+					continue
+				}
+
+				// Parse the multiaddr string
+				addr, err := multiaddr.NewMultiaddr(addrStr)
+				if err != nil {
+					continue
+				}
+
+				info.Addrs = append(info.Addrs, addr)
+			}
+
+			// Send the peer info through the channel
 			select {
+			case out <- info:
 			case <-ctx.Done():
 				return
-			default:
-				// Get the linked node containing peer info
-				peerNode, err := ipfs.Client.Dag().Get(ctx, link.Cid)
-				if err != nil {
-					continue
-				}
-
-				id, err := peer.Decode(link.Name)
-				if err != nil {
-					continue
-				}
-				info := peer.AddrInfo{ID: id}
-
-				// Resolve the addresses from the peer node
-				for i := 0; ; i++ {
-					// Try to resolve each index as a string address
-					addrIface, rest, err := peerNode.Resolve([]string{fmt.Sprint(i)})
-					if err != nil || len(rest) > 0 {
-						break // End of list or error
-					}
-
-					// Convert interface{} to string
-					addrStr, ok := addrIface.(string)
-					if !ok {
-						continue
-					}
-
-					// Parse the multiaddr string
-					addr, err := multiaddr.NewMultiaddr(addrStr)
-					if err != nil {
-						continue
-					}
-
-					info.Addrs = append(info.Addrs, addr)
-				}
-
-				// Send the peer info through the channel
-				select {
-				case out <- info:
-				case <-ctx.Done():
-					return
-				}
 			}
 		}
 	}()
