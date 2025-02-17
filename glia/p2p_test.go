@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/require"
@@ -18,6 +17,7 @@ import (
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 	test_libp2p "github.com/wetware/go/test/libp2p"
+	gomock "go.uber.org/mock/gomock"
 )
 
 var _ glia.Proc = (*proc.P)(nil)

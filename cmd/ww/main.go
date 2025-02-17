@@ -37,6 +37,12 @@ func main() {
 		After:          teardown,
 		DefaultCommand: "serve",
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "ns",
+				EnvVars: []string{"WW_NS"},
+				Value:   "ww",
+				Usage:   "cluster namespace",
+			},
 			&cli.BoolFlag{
 				Name:    "json",
 				EnvVars: []string{"WW_JSON"},
@@ -89,6 +95,10 @@ func setup(c *cli.Context) (err error) {
 		env.Host.ID(),
 		env.Host.Addrs(),
 		peerstore.PermanentAddrTTL)
+
+	// Set cluster namespace
+	////
+	env.NS = c.String("ns")
 
 	return
 }

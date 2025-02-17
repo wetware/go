@@ -17,6 +17,7 @@ import (
 )
 
 type Env struct {
+	NS   string // fully qualified namespace
 	IPFS iface.CoreAPI
 	Host host.Host
 	DHT  interface {
