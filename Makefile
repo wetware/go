@@ -1,6 +1,6 @@
 .PHONY: clean
 
-all: install publish
+all: generate install publish
 
 clean:
 	@if [ -f "ww" ]; then rm ww; fi
@@ -9,7 +9,7 @@ clean:
 generate:
 	go generate ./...
 
-publish: generate
+publish:
 	ipfs add -r .
 
 install:
