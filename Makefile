@@ -14,3 +14,5 @@ publish:
 
 install:
 	go install github.com/wetware/go/cmd/ww
+
+deploy: install && publish
