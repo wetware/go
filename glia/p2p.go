@@ -3,18 +3,15 @@ package glia
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"path"
 	"strings"
 
-	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
-	"github.com/wetware/go/boot"
 	"github.com/wetware/go/system"
 )
 
@@ -23,7 +20,6 @@ var ErrU16Overflow = errors.New("varint overflows u16")
 type P2P struct {
 	Env    *system.Env
 	Router Router
-	Boot   discovery.Discoverer
 }
 
 func (p2p P2P) Log() *slog.Logger {
@@ -63,41 +59,10 @@ func (p2p P2P) Serve(ctx context.Context) error {
 	defer env.Host.RemoveStreamHandler(proto)
 	p2p.Log().DebugContext(ctx, "service started")
 
-	if err := p2p.Bootstrap(ctx); err != nil {
-		return fmt.Errorf("boot: %w", err)
-	}
-
 	// If we made it this far, we're bootstrapped.  Wait for shutdown
 	// signal.
 	<-ctx.Done()
 	return ctx.Err()
-}
-
-func (p2p P2P) Bootstrap(ctx context.Context) error {
-	if p2p.Boot == nil {
-		p2p.Boot = boot.StaticAddrs{}
-	}
-
-	peers, err := p2p.Boot.FindPeers(ctx, p2p.Env.NS, discovery.Limit(8))
-	if err != nil {
-		return err
-	}
-
-	// It's possible that a handful of these AddrInfos will point to
-	// unavailable peers, so we should avoid spamming the error logs.
-	// Our strategy is to immediately retry with the next peer, and
-	// only report the last encountered error, if any.
-	for info := range peers {
-		if err = p2p.Env.Host.Connect(ctx, info); err == nil {
-			break // Connection succeeded.
-			// TODO:  connect to all peers, and return an error iff
-			// *all* connection attempts failed.
-		}
-	}
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
