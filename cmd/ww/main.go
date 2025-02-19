@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
@@ -91,16 +90,8 @@ func setup(c *cli.Context) (err error) {
 	}
 
 	env.DHT, err = dual.New(c.Context, env.Host,
-		dual.WanDHTOption(
-			// IPFS public bootstrap nodes
-			dht.BootstrapPeers(dht.GetDefaultBootstrapPeerAddrInfos()...)),
-		dual.LanDHTOption(
-			dht.BootstrapPeersFunc(func() (ps []peer.AddrInfo) {
-				for _, id := range env.Host.Peerstore().Peers() {
-					ps = append(ps, env.Host.Peerstore().PeerInfo(id))
-				}
-				return
-			})))
+		dual.WanDHTOption(dht.BootstrapPeersFunc(env.PublicBootstrapPeers)),
+		dual.LanDHTOption(dht.BootstrapPeersFunc(env.PrivateBootstrapPeers)))
 	if err != nil {
 		return
 	}

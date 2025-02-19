@@ -4,15 +4,19 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 )
 
@@ -92,4 +96,65 @@ func (env Env) NewUnixFS(ctx context.Context) UnixFS {
 		Ctx:  ctx,
 		Unix: env.IPFS.Unixfs(),
 	}
+}
+
+func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
+	return dht.GetDefaultBootstrapPeerAddrInfos()
+}
+
+// PrivateBootstrapPeers filters out peers that don't have private IP addresses.
+// It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs
+// and are currently connected to the local host.
+func (env Env) PrivateBootstrapPeers() (ps []peer.AddrInfo) {
+	for _, pid := range env.Host.Peerstore().Peers() {
+		var ms []ma.Multiaddr
+
+		for _, addr := range env.Host.Peerstore().Addrs(pid) {
+			ip, err := extractIPFromMultiaddr(addr)
+			if err == nil && ip != nil && isPrivateIP(ip) {
+				ms = append(ms, addr)
+			}
+		}
+
+		if len(ms) > 0 && env.Host.Network().Connectedness(pid) == network.Connected {
+			ps = append(ps, peer.AddrInfo{
+				ID:    pid,
+				Addrs: ms,
+			})
+		}
+	}
+
+	return
+}
+
+// https://pkg.go.dev/github.com/libp2p/go-libp2p@v0.40.0/p2p/net/swarm#DefaultDialRanker
+// https://www.rfc-editor.org/rfc/rfc1918.html
+var privateRanges = []net.IPNet{
+	{IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},     // 10.0.0.0/8
+	{IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},  // 172.16.0.0/12
+	{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)}, // 192.168.0.0/16
+}
+
+// isPrivateIP checks if an IP is within RFC1918 private ranges.
+func isPrivateIP(ip net.IP) bool {
+	return inRange(ip, privateRanges)
+}
+
+// inRange checks if an IP is within any of the provided IP ranges.
+func inRange(ip net.IP, ipRanges []net.IPNet) bool {
+	for _, ipRange := range ipRanges {
+		if ipRange.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractIPFromMultiaddr tries to extract an IPv4 address from a multiaddr.
+func extractIPFromMultiaddr(addr ma.Multiaddr) (net.IP, error) {
+	ipStr, err := addr.ValueForProtocol(ma.P_IP4)
+	if err != nil {
+		return nil, err
+	}
+	return net.ParseIP(ipStr), nil
 }
