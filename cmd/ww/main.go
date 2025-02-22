@@ -97,14 +97,18 @@ func setup(c *cli.Context) (err error) {
 			rand.Shuffle(len(public), func(i, j int) {
 				public[i], public[j] = public[j], public[i]
 			})
-			return public
+
+			args := addrs(c)
+			return append(args, public...)
 		})),
 		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
 			private := env.PrivateBootstrapPeers()
 			rand.Shuffle(len(private), func(i, j int) {
 				private[i], private[j] = private[j], private[i]
 			})
-			return private
+
+			args := addrs(c)
+			return append(args, private...)
 		})))
 	if err != nil {
 		return
@@ -120,6 +124,41 @@ func setup(c *cli.Context) (err error) {
 	env.NS = c.String("ns")
 
 	return
+}
+
+// addrs returns bootstrap addresses parsed from args
+func addrs(c *cli.Context) []peer.AddrInfo {
+	ps := map[peer.ID][]ma.Multiaddr{}
+	for _, a := range c.StringSlice("addr") {
+		m, err := ma.NewMultiaddr(a)
+		if err != nil {
+			// ...
+		}
+
+		s, err := m.ValueForProtocol(ma.P_P2P)
+		if err != nil {
+			// ...
+		}
+		id, err := peer.Decode(s)
+		if err != nil {
+			// ...
+		}
+
+		addr := m.Decapsulate(ma.StringCast("p2p/" + s))
+		ps[id] = append(ps[id], addr)
+	}
+
+	var dial []peer.AddrInfo
+	for id, addrs := range ps {
+		if len(addrs) > 0 {
+			dial = append(dial, peer.AddrInfo{
+				ID:    id,
+				Addrs: addrs,
+			})
+		}
+	}
+
+	return dial
 }
 
 func teardown(c *cli.Context) error {

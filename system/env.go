@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	iface "github.com/ipfs/kubo/core/coreiface"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -47,18 +48,23 @@ func (env Env) HandlePeerFound(info peer.AddrInfo) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	if err := env.Host.Connect(ctx, peer.AddrInfo{
-		ID:    info.ID,
-		Addrs: info.Addrs,
-	}); err != nil {
-		env.Log().Debug("failed to connect to peer",
-			"reason", err,
-			"peer", info.ID,
-			"addrs", info.Addrs)
-	} else if err := env.DHT.Bootstrap(ctx); err != nil {
-		env.Log().Error("failed to bootstrap dht",
+	if err := env.DHT.Bootstrap(ctx); err != nil {
+		slog.Warn("bootstrap failed",
 			"reason", err)
 	}
+
+	// if err := env.Host.Connect(ctx, peer.AddrInfo{
+	// 	ID:    info.ID,
+	// 	Addrs: info.Addrs,
+	// }); err != nil {
+	// 	env.Log().Debug("failed to connect to peer",
+	// 		"reason", err,
+	// 		"peer", info.ID,
+	// 		"addrs", info.Addrs)
+	// } else if err := env.DHT.Bootstrap(ctx); err != nil {
+	// 	env.Log().Error("failed to bootstrap dht",
+	// 		"reason", err)
+	// }
 }
 
 func (env Env) Load(ctx context.Context, p string) ([]byte, error) {
@@ -117,20 +123,48 @@ func (env Env) FilterPeers(selector func(ma.Multiaddr) bool) (ps []peer.AddrInfo
 }
 
 func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
-	return env.FilterPeers(func(m ma.Multiaddr) bool {
+	// var b = backoff.Backoff{
+	// 	Jitter: true,
+	// 	Min:    time.Millisecond * 10,
+	// 	Max:    time.Millisecond * 1000,
+	// }
+
+	public := env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err != nil && ip != nil && !isPrivateIP(ip) // public ip or relay
 	})
+
+	public = append(public, dht.GetDefaultBootstrapPeerAddrInfos()...)
+
+	if len(public) > 0 {
+		slog.Debug("bootstrapped public dht",
+			"public_addrs", public)
+	}
+
+	return public
 }
 
 // PrivateBootstrapPeers filters out peers that don't have private IP addresses.
 // It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs
 // and are currently connected to the local host.
 func (env Env) PrivateBootstrapPeers() []peer.AddrInfo {
-	return env.FilterPeers(func(m ma.Multiaddr) bool {
+	// var b = backoff.Backoff{
+	// 	Jitter: true,
+	// 	Min:    time.Millisecond * 10,
+	// 	Max:    time.Millisecond * 1000,
+	// }
+
+	private := env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err == nil && ip != nil && isPrivateIP(ip) // private ip
 	})
+
+	if len(private) > 0 {
+		slog.Debug("bootstrapped private dht",
+			"private_addrs", private)
+	}
+
+	return private
 }
 
 // https://pkg.go.dev/github.com/libp2p/go-libp2p@v0.40.0/p2p/net/swarm#DefaultDialRanker
