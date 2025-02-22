@@ -52,19 +52,6 @@ func (env Env) HandlePeerFound(info peer.AddrInfo) {
 		slog.Warn("bootstrap failed",
 			"reason", err)
 	}
-
-	// if err := env.Host.Connect(ctx, peer.AddrInfo{
-	// 	ID:    info.ID,
-	// 	Addrs: info.Addrs,
-	// }); err != nil {
-	// 	env.Log().Debug("failed to connect to peer",
-	// 		"reason", err,
-	// 		"peer", info.ID,
-	// 		"addrs", info.Addrs)
-	// } else if err := env.DHT.Bootstrap(ctx); err != nil {
-	// 	env.Log().Error("failed to bootstrap dht",
-	// 		"reason", err)
-	// }
 }
 
 func (env Env) Load(ctx context.Context, p string) ([]byte, error) {
