@@ -46,6 +46,12 @@ func main() {
 				Value:   "ww",
 				Usage:   "cluster namespace",
 			},
+			&cli.StringSliceFlag{
+				Name:    "addr",
+				EnvVars: []string{"WW_ADDRS"},
+				Aliases: []string{"a"},
+				Usage:   "peer addr to dial",
+			},
 			&cli.BoolFlag{
 				Name:    "json",
 				EnvVars: []string{"WW_JSON"},
