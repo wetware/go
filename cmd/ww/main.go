@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
@@ -90,8 +92,20 @@ func setup(c *cli.Context) (err error) {
 	}
 
 	env.DHT, err = dual.New(c.Context, env.Host,
-		dual.WanDHTOption(dht.BootstrapPeersFunc(env.PublicBootstrapPeers)),
-		dual.LanDHTOption(dht.BootstrapPeersFunc(env.PrivateBootstrapPeers)))
+		dual.WanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
+			public := env.PublicBootstrapPeers()
+			rand.Shuffle(len(public), func(i, j int) {
+				public[i], public[j] = public[j], public[i]
+			})
+			return public
+		})),
+		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
+			private := env.PrivateBootstrapPeers()
+			rand.Shuffle(len(private), func(i, j int) {
+				private[i], private[j] = private[j], private[i]
+			})
+			return private
+		})))
 	if err != nil {
 		return
 	}
