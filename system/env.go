@@ -11,9 +11,7 @@ import (
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	iface "github.com/ipfs/kubo/core/coreiface"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	ma "github.com/multiformats/go-multiaddr"
@@ -98,25 +96,16 @@ func (env Env) NewUnixFS(ctx context.Context) UnixFS {
 	}
 }
 
-func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
-	return dht.GetDefaultBootstrapPeerAddrInfos()
-}
-
-// PrivateBootstrapPeers filters out peers that don't have private IP addresses.
-// It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs
-// and are currently connected to the local host.
-func (env Env) PrivateBootstrapPeers() (ps []peer.AddrInfo) {
+func (env Env) FilterPeers(selector func(ma.Multiaddr) bool) (ps []peer.AddrInfo) {
 	for _, pid := range env.Host.Peerstore().Peers() {
 		var ms []ma.Multiaddr
-
 		for _, addr := range env.Host.Peerstore().Addrs(pid) {
-			ip, err := extractIPFromMultiaddr(addr)
-			if err == nil && ip != nil && isPrivateIP(ip) {
+			if selector(addr) {
 				ms = append(ms, addr)
 			}
 		}
 
-		if len(ms) > 0 && env.Host.Network().Connectedness(pid) == network.Connected {
+		if len(ms) > 0 {
 			ps = append(ps, peer.AddrInfo{
 				ID:    pid,
 				Addrs: ms,
@@ -125,6 +114,23 @@ func (env Env) PrivateBootstrapPeers() (ps []peer.AddrInfo) {
 	}
 
 	return
+}
+
+func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
+	return env.FilterPeers(func(m ma.Multiaddr) bool {
+		ip, err := extractIPFromMultiaddr(m)
+		return err != nil && ip != nil && !isPrivateIP(ip) // public ip or relay
+	})
+}
+
+// PrivateBootstrapPeers filters out peers that don't have private IP addresses.
+// It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs
+// and are currently connected to the local host.
+func (env Env) PrivateBootstrapPeers() []peer.AddrInfo {
+	return env.FilterPeers(func(m ma.Multiaddr) bool {
+		ip, err := extractIPFromMultiaddr(m)
+		return err == nil && ip != nil && isPrivateIP(ip) // private ip
+	})
 }
 
 // https://pkg.go.dev/github.com/libp2p/go-libp2p@v0.40.0/p2p/net/swarm#DefaultDialRanker
