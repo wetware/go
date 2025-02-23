@@ -186,7 +186,8 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		ResponseWriter: w,
 		Request:        r,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.Log().ErrorContext(r.Context(), "stream handler failed",
+			"reason", err)
 		return
 	}
 }

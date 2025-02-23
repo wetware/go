@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,7 +12,9 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
@@ -42,6 +45,12 @@ func main() {
 				EnvVars: []string{"WW_NS"},
 				Value:   "ww",
 				Usage:   "cluster namespace",
+			},
+			&cli.StringSliceFlag{
+				Name:    "addr",
+				EnvVars: []string{"WW_ADDRS"},
+				Aliases: []string{"a"},
+				Usage:   "peer addr to dial",
 			},
 			&cli.BoolFlag{
 				Name:    "json",
@@ -87,8 +96,28 @@ func setup(c *cli.Context) (err error) {
 	} else if env.Host, err = libp2p.New(); err != nil {
 		return
 	}
-	if env.DHT, err = dual.New(c.Context, env.Host); err != nil {
 
+	env.DHT, err = dual.New(c.Context, env.Host,
+		dual.WanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
+			public := env.PublicBootstrapPeers()
+			rand.Shuffle(len(public), func(i, j int) {
+				public[i], public[j] = public[j], public[i]
+			})
+
+			args := addrs(c)
+			return append(args, public...)
+		})),
+		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
+			private := env.PrivateBootstrapPeers()
+			rand.Shuffle(len(private), func(i, j int) {
+				private[i], private[j] = private[j], private[i]
+			})
+
+			args := addrs(c)
+			return append(args, private...)
+		})))
+	if err != nil {
+		return
 	}
 	env.Host = routedhost.Wrap(env.Host, env.DHT)
 	env.Host.Peerstore().AddAddrs(
@@ -101,6 +130,41 @@ func setup(c *cli.Context) (err error) {
 	env.NS = c.String("ns")
 
 	return
+}
+
+// addrs returns bootstrap addresses parsed from args
+func addrs(c *cli.Context) []peer.AddrInfo {
+	ps := map[peer.ID][]ma.Multiaddr{}
+	for _, a := range c.StringSlice("addr") {
+		m, err := ma.NewMultiaddr(a)
+		if err != nil {
+			// ...
+		}
+
+		s, err := m.ValueForProtocol(ma.P_P2P)
+		if err != nil {
+			// ...
+		}
+		id, err := peer.Decode(s)
+		if err != nil {
+			// ...
+		}
+
+		addr := m.Decapsulate(ma.StringCast("p2p/" + s))
+		ps[id] = append(ps[id], addr)
+	}
+
+	var dial []peer.AddrInfo
+	for id, addrs := range ps {
+		if len(addrs) > 0 {
+			dial = append(dial, peer.AddrInfo{
+				ID:    id,
+				Addrs: addrs,
+			})
+		}
+	}
+
+	return dial
 }
 
 func teardown(c *cli.Context) error {
