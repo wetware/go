@@ -45,4 +45,4 @@ jobs:
 
       - name: SSH, Pull, and Build
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} ". ~/.profile.go && cd ~/ww-go && git checkout master && git pull && make"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:$HOME/.go/bin && ~/.profile.go && cd ~/ww-go && git checkout master && git pull && make"
