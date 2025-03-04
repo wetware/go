@@ -127,16 +127,6 @@ func setup(env *system.Env) cli.BeforeFunc {
 	}
 }
 
-// func bind(db *memdb.MemDB, p *proc.P) (err error) {
-// 	tx := db.Txn(true)
-// 	defer tx.Commit()
-
-// 	if err = tx.Insert("proc", p); err != nil {
-// 		tx.Abort()
-// 	}
-// 	return
-// }
-
 // serve the main event loop
 func serve(env *system.Env) cli.ActionFunc {
 	return func(c *cli.Context) error {
