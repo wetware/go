@@ -97,6 +97,25 @@ func setup(c *cli.Context) (err error) {
 		return
 	}
 
+	// Initialize a Dual DHT, which maintains two separate Kademlia routing tables:
+	// one for the Wide Area Network (WAN) and another for the Local Area Network
+	// (LAN). This separation allows for efficient routing in both local and global
+	// contexts.
+	//
+	// The WAN DHT is bootstrapped with public bootstrap peers - well-known nodes
+	// that help new peers join the network by providing initial routing table
+	// entries. These peers are typically operated by IPFS infrastructure providers
+	// and are accessible from anywhere on the internet.
+	//
+	// The LAN DHT is bootstrapped with private bootstrap peers - nodes that are
+	// only accessible within the local network. This enables peer discovery and
+	// content routing to work efficiently in isolated/local network environments,
+	// without having to rely on public infrastructure.
+	//
+	// Both DHTs shuffle their bootstrap peers to prevent hotspots and ensure even
+	// load distribution across the bootstrap nodes. User-provided bootstrap addresses
+	// (-addr flag) are added to both DHTs to support custom network topologies.
+	////
 	env.DHT, err = dual.New(c.Context, env.Host,
 		dual.WanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
 			public := env.PublicBootstrapPeers()
@@ -119,6 +138,14 @@ func setup(c *cli.Context) (err error) {
 	if err != nil {
 		return
 	}
+
+	// Wrap the host in a routed host, which intercepts all network operations
+	// and uses the DHT for peer routing. This enables automatic peer discovery
+	// and routing through the DHT when direct connections aren't available.
+	// When the host attempts to dial a peer, the routed host will first check
+	// if it has a direct connection. If not, it will query the DHT to find
+	// the peer's addresses before attempting the connection.
+	////
 	env.Host = routedhost.Wrap(env.Host, env.DHT)
 	env.Host.Peerstore().AddAddrs(
 		env.Host.ID(),
@@ -138,16 +165,26 @@ func addrs(c *cli.Context) []peer.AddrInfo {
 	for _, a := range c.StringSlice("addr") {
 		m, err := ma.NewMultiaddr(a)
 		if err != nil {
-			// ...
+			slog.Debug("failed to parse multiaddr",
+				"addr", a,
+				"reason", err)
+			continue
 		}
 
 		s, err := m.ValueForProtocol(ma.P_P2P)
 		if err != nil {
-			// ...
+			slog.Debug("failed to parse value for protocol",
+				"proto", "p2p",
+				"addr", a,
+				"reason", err)
+			continue
 		}
 		id, err := peer.Decode(s)
 		if err != nil {
-			// ...
+			slog.Debug("failed to decode peer ID",
+				"addr", a,
+				"reason", err)
+			continue
 		}
 
 		addr := m.Decapsulate(ma.StringCast("p2p/" + s))
