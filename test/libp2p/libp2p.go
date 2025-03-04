@@ -271,6 +271,20 @@ func (mr *MockConnMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockConn)(nil).Close))
 }
 
+// CloseWithError mocks base method.
+func (m *MockConn) CloseWithError(errCode network.ConnErrorCode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloseWithError", errCode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CloseWithError indicates an expected call of CloseWithError.
+func (mr *MockConnMockRecorder) CloseWithError(errCode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWithError", reflect.TypeOf((*MockConn)(nil).CloseWithError), errCode)
+}
+
 // ConnState mocks base method.
 func (m *MockConn) ConnState() network.ConnectionState {
 	m.ctrl.T.Helper()
@@ -575,6 +589,20 @@ func (m *MockStream) Reset() error {
 func (mr *MockStreamMockRecorder) Reset() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reset", reflect.TypeOf((*MockStream)(nil).Reset))
+}
+
+// ResetWithError mocks base method.
+func (m *MockStream) ResetWithError(errCode network.StreamErrorCode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetWithError", errCode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetWithError indicates an expected call of ResetWithError.
+func (mr *MockStreamMockRecorder) ResetWithError(errCode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetWithError", reflect.TypeOf((*MockStream)(nil).ResetWithError), errCode)
 }
 
 // Scope mocks base method.
