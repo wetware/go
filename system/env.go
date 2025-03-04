@@ -9,12 +9,12 @@ import (
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	"github.com/ipfs/go-cid"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	core_routing "github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 )
@@ -23,22 +23,16 @@ type Env struct {
 	NS   string // fully qualified namespace
 	IPFS iface.CoreAPI
 	Host host.Host
-	DHT  interface {
-		Bootstrap(context.Context) error
-		Provide(context.Context, cid.Cid, bool) error
-		FindPeer(context.Context, peer.ID) (peer.AddrInfo, error)
-	}
+	DHT  core_routing.Routing
 }
 
 func (env Env) Log() *slog.Logger {
 	return slog.With("peer", env.Host.ID())
 }
 
+// HandlePeerFound is called when a peer is discovered, such as when
+// using MDNS or DHT discovery.
 func (env Env) HandlePeerFound(info peer.AddrInfo) {
-	// TODO:  do we want to move this to boot/mdns.go?   Currently, this
-	// callback is used exclusively by the MDNS discovery system, but it
-	// can be used by other discovery systems in principle.
-
 	pstore := env.Host.Peerstore()
 	pstore.AddAddrs(info.ID, info.Addrs, peerstore.AddressTTL)
 	env.Log().Info("peer discovered", "found", info.ID)
@@ -109,13 +103,9 @@ func (env Env) FilterPeers(selector func(ma.Multiaddr) bool) (ps []peer.AddrInfo
 	return
 }
 
+// PublicBootstrapPeers filters out peers that don't have public IP addresses.
+// It returns a slice of peer.AddrInfo for peers that have public IP addresses.
 func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
-	// var b = backoff.Backoff{
-	// 	Jitter: true,
-	// 	Min:    time.Millisecond * 10,
-	// 	Max:    time.Millisecond * 1000,
-	// }
-
 	public := env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err != nil && ip != nil && !isPrivateIP(ip) // public ip or relay
@@ -132,15 +122,8 @@ func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
 }
 
 // PrivateBootstrapPeers filters out peers that don't have private IP addresses.
-// It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs
-// and are currently connected to the local host.
+// It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs.
 func (env Env) PrivateBootstrapPeers() []peer.AddrInfo {
-	// var b = backoff.Backoff{
-	// 	Jitter: true,
-	// 	Min:    time.Millisecond * 10,
-	// 	Max:    time.Millisecond * 1000,
-	// }
-
 	private := env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err == nil && ip != nil && isPrivateIP(ip) // private ip
