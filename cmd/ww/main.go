@@ -14,12 +14,14 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/multierr"
 
 	"github.com/wetware/go/cmd/internal/serve"
 	"github.com/wetware/go/system"
@@ -51,6 +53,12 @@ func main() {
 				EnvVars: []string{"WW_ADDRS"},
 				Aliases: []string{"a"},
 				Usage:   "peer addr to dial",
+			},
+			&cli.StringSliceFlag{
+				Name:    "listen",
+				EnvVars: []string{"WW_LISTEN"},
+				Aliases: []string{"l"},
+				Usage:   "multiaddr to listen on",
 			},
 			&cli.BoolFlag{
 				Name:    "json",
@@ -93,7 +101,7 @@ func setup(c *cli.Context) (err error) {
 	////
 	if env.IPFS, err = newIPFSClient(c); err != nil {
 		return
-	} else if env.Host, err = libp2p.New(); err != nil {
+	} else if env.Host, err = newLibp2pHost(c); err != nil {
 		return
 	}
 
@@ -157,6 +165,31 @@ func setup(c *cli.Context) (err error) {
 	env.NS = c.String("ns")
 
 	return
+}
+
+func newLibp2pHost(c *cli.Context) (host.Host, error) {
+	listenAddrs, err := listenAddrs(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return libp2p.New(
+		libp2p.ListenAddrs(listenAddrs...),
+	)
+}
+
+func listenAddrs(c *cli.Context) ([]ma.Multiaddr, error) {
+	var addrs []ma.Multiaddr
+	var errs []error
+	for _, a := range c.StringSlice("listen") {
+		if m, err := ma.NewMultiaddr(a); err != nil {
+			errs = append(errs, err)
+		} else {
+			addrs = append(addrs, m)
+		}
+	}
+
+	return addrs, multierr.Combine(errs...)
 }
 
 // addrs returns bootstrap addresses parsed from args
