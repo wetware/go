@@ -196,6 +196,8 @@ func newLibp2pHost(c *cli.Context) (host.Host, error) {
 
 	return libp2p.New(
 		libp2p.ListenAddrs(listenAddrs...),
+		// Set reasonable timeouts for connection attempts
+		libp2p.WithDialTimeout(time.Second*15),
 	)
 }
 
