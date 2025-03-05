@@ -19,6 +19,7 @@ require (
 	github.com/tetratelabs/wazero v1.8.1
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/urfave/cli/v2 v2.27.5
+	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/sync v0.11.0
