@@ -49,9 +49,9 @@ func main() {
 				Usage:   "cluster namespace",
 			},
 			&cli.StringSliceFlag{
-				Name:    "addr",
-				EnvVars: []string{"WW_ADDRS"},
-				Aliases: []string{"a"},
+				Name:    "dial",
+				EnvVars: []string{"WW_DIAL"},
+				Aliases: []string{"d"},
 				Usage:   "peer addr to dial",
 			},
 			&cli.StringSliceFlag{
@@ -195,7 +195,7 @@ func listenAddrs(c *cli.Context) ([]ma.Multiaddr, error) {
 // addrs returns bootstrap addresses parsed from args
 func addrs(c *cli.Context) []peer.AddrInfo {
 	ps := map[peer.ID][]ma.Multiaddr{}
-	for _, a := range c.StringSlice("addr") {
+	for _, a := range c.StringSlice("dial") {
 		m, err := ma.NewMultiaddr(a)
 		if err != nil {
 			slog.Debug("failed to parse multiaddr",
