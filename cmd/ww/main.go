@@ -220,7 +220,7 @@ func addrs(c *cli.Context) []peer.AddrInfo {
 			continue
 		}
 
-		addr := m.Decapsulate(ma.StringCast("p2p/" + s))
+		addr := m.Decapsulate(ma.StringCast("/p2p/" + s))
 		ps[id] = append(ps[id], addr)
 	}
 
