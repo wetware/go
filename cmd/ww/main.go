@@ -21,6 +21,7 @@ import (
 	"github.com/lmittmann/tint"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
+	syncutils "github.com/wetware/go/util/sync"
 	"go.uber.org/multierr"
 
 	"github.com/wetware/go/cmd/internal/serve"
@@ -164,7 +165,27 @@ func setup(c *cli.Context) (err error) {
 	////
 	env.NS = c.String("ns")
 
-	return
+	return bootstrap(c)
+}
+
+func bootstrap(c *cli.Context) error {
+	// Concurrently attempt to connect to all provided bootstrap addresses.
+	// Each connection attempt is run in its own goroutine. If any connection
+	// fails, the error is stored in the atomic error value. The wait group
+	// ensures we wait for all connection attempts to complete before proceeding.
+	////
+	var join syncutils.Any // join strategy:  any successful connection => ok
+	for _, info := range addrs(c) {
+		join.Go(func() error {
+			return env.Host.Connect(c.Context, info)
+		})
+	}
+
+	if err := join.Wait(); err != nil {
+		return err
+	}
+
+	return env.DHT.Bootstrap(c.Context)
 }
 
 func newLibp2pHost(c *cli.Context) (host.Host, error) {
