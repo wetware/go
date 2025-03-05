@@ -126,13 +126,14 @@ func setup(c *cli.Context) (err error) {
 	////
 	env.DHT, err = dual.New(c.Context, env.Host,
 		dual.WanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
-			public := env.PublicBootstrapPeers()
+			public := append(
+				env.PublicBootstrapPeers(),
+				dht.GetDefaultBootstrapPeerAddrInfos()...)
 			rand.Shuffle(len(public), func(i, j int) {
 				public[i], public[j] = public[j], public[i]
 			})
 
-			args := addrs(c)
-			return append(args, public...)
+			return append(addrs(c), public...)
 		})),
 		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
 			private := env.PrivateBootstrapPeers()
@@ -140,8 +141,7 @@ func setup(c *cli.Context) (err error) {
 				private[i], private[j] = private[j], private[i]
 			})
 
-			args := addrs(c)
-			return append(args, private...)
+			return append(addrs(c), private...)
 		})))
 	if err != nil {
 		return

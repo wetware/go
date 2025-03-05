@@ -9,7 +9,6 @@ import (
 
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -92,35 +91,19 @@ func (env Env) FilterPeers(selector func(ma.Multiaddr) bool) (ps []peer.AddrInfo
 // PublicBootstrapPeers filters out peers that don't have public IP addresses.
 // It returns a slice of peer.AddrInfo for peers that have public IP addresses.
 func (env Env) PublicBootstrapPeers() []peer.AddrInfo {
-	public := env.FilterPeers(func(m ma.Multiaddr) bool {
+	return env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err != nil && ip != nil && !isPrivateIP(ip) // public ip or relay
 	})
-
-	public = append(public, dht.GetDefaultBootstrapPeerAddrInfos()...)
-
-	if len(public) > 0 {
-		slog.Debug("bootstrapped public dht",
-			"public_addrs", public)
-	}
-
-	return public
 }
 
 // PrivateBootstrapPeers filters out peers that don't have private IP addresses.
 // It returns a slice of peer.AddrInfo for peers that have RFC1918 private IPs.
 func (env Env) PrivateBootstrapPeers() []peer.AddrInfo {
-	private := env.FilterPeers(func(m ma.Multiaddr) bool {
+	return env.FilterPeers(func(m ma.Multiaddr) bool {
 		ip, err := extractIPFromMultiaddr(m)
 		return err == nil && ip != nil && isPrivateIP(ip) // private ip
 	})
-
-	if len(private) > 0 {
-		slog.Debug("bootstrapped private dht",
-			"private_addrs", private)
-	}
-
-	return private
 }
 
 // https://pkg.go.dev/github.com/libp2p/go-libp2p@v0.40.0/p2p/net/swarm#DefaultDialRanker
