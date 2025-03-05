@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -18,8 +19,28 @@ func echo() {
 }
 
 func _echo(dst io.Writer, src io.Reader) error {
-	_, err := io.Copy(dst, src)
-	return err
+	if dst == nil {
+		return fmt.Errorf("destination writer is nil")
+	}
+	if src == nil {
+		return fmt.Errorf("source reader is nil")
+	}
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return werr
+			}
+		}
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func main() {
