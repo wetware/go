@@ -2,12 +2,11 @@ package system
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"log/slog"
 	"net"
 	"time"
 
-	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -16,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	core_routing "github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
+	"github.com/wetware/go/util"
 )
 
 type Env struct {
@@ -51,7 +50,7 @@ func (env Env) HandlePeerFound(info peer.AddrInfo) {
 func (env Env) Load(ctx context.Context, p string) ([]byte, error) {
 	path, err := path.NewPath(p)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid IPFS path %q: %w", p, err)
 	}
 
 	node, err := env.IPFS.Unixfs().Get(ctx, path)
@@ -60,20 +59,7 @@ func (env Env) Load(ctx context.Context, p string) ([]byte, error) {
 	}
 	defer node.Close()
 
-	// TODO: improve
-	switch n := node.(type) {
-	case files.File:
-		return io.ReadAll(n)
-	case files.Directory:
-		entries := n.Entries()
-		for entries.Next() {
-			if entries.Name() == "main.wasm" {
-				return io.ReadAll(entries.Node().(io.Reader))
-			}
-		}
-	}
-
-	return nil, errors.New("not found")
+	return util.LoadByteCode(ctx, node)
 }
 
 func (env Env) NewUnixFS(ctx context.Context) UnixFS {
