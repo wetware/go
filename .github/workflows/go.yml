@@ -43,6 +43,6 @@ jobs:
           ssh-agent -a $SSH_AUTH_SOCK > /dev/null
           ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
-      - name: SSH, Pull, and Build
+      - name: SSH, Pull, and Install
         run: |
-          ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make"
+          ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
