@@ -3,13 +3,14 @@ package serve
 import (
 	"github.com/hashicorp/go-memdb"
 	"github.com/wetware/go/glia"
+	"github.com/wetware/go/system"
 )
 
 type Router struct {
 	DB *memdb.MemDB
 }
 
-func (r Router) GetProc(pid string) (glia.Proc, error) {
+func (r Router) GetProc(pid string) (system.Proc, error) {
 	tx := r.DB.Txn(false)
 	defer tx.Abort()
 
@@ -20,5 +21,5 @@ func (r Router) GetProc(pid string) (glia.Proc, error) {
 		return nil, glia.ErrNotFound
 	}
 
-	return v.(glia.Proc), nil
+	return v.(system.Proc), nil
 }

@@ -22,15 +22,10 @@ var (
 	})
 )
 
-func Command(env *system.Env) *cli.Command {
+func Command(env system.Env) *cli.Command {
 	return &cli.Command{
 		Name: "serve",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "ipfs",
-				EnvVars: []string{"WW_IPFS"},
-				Usage:   "`addr` of IPFS node (defaults: local discovery)",
-			},
 			&cli.StringSliceFlag{
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},
@@ -52,7 +47,7 @@ func Command(env *system.Env) *cli.Command {
 	}
 }
 
-func setup(env *system.Env) cli.BeforeFunc {
+func setup(env system.Env) cli.BeforeFunc {
 	return func(c *cli.Context) error {
 		// Intantiate the root process
 		////
@@ -128,7 +123,7 @@ func setup(env *system.Env) cli.BeforeFunc {
 }
 
 // serve the main event loop
-func serve(env *system.Env) cli.ActionFunc {
+func serve(env system.Env) cli.ActionFunc {
 	return func(c *cli.Context) error {
 		ctx := c.Context
 

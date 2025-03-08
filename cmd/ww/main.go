@@ -80,7 +80,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			serve.Command(&env),
+			serve.Command(env),
 			// export.Command(&env),
 			// run.Command(&env),
 		},
@@ -160,10 +160,6 @@ func setup(c *cli.Context) (err error) {
 		env.Host.ID(),
 		env.Host.Addrs(),
 		peerstore.PermanentAddrTTL)
-
-	// Set cluster namespace
-	////
-	env.NS = c.String("ns")
 
 	return bootstrap(c)
 }

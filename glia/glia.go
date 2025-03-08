@@ -5,14 +5,19 @@ package glia
 import (
 	"context"
 	"io"
+	"log/slog"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	core_routing "github.com/libp2p/go-libp2p/core/routing"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/wetware/go/proc"
 )
 
-type Router interface {
-	GetProc(pid string) (Proc, error)
+type Env interface {
+	Log() *slog.Logger
+	LocalHost() host.Host
+	Routing() core_routing.Routing
 }
 
 type Proc interface {

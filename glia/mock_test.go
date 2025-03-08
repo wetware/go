@@ -12,13 +12,82 @@ package glia_test
 import (
 	context "context"
 	io "io"
+	slog "log/slog"
 	reflect "reflect"
 
+	host "github.com/libp2p/go-libp2p/core/host"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
+	routing "github.com/libp2p/go-libp2p/core/routing"
 	glia "github.com/wetware/go/glia"
 	proc "github.com/wetware/go/proc"
 	gomock "go.uber.org/mock/gomock"
 )
+
+// MockEnv is a mock of Env interface.
+type MockEnv struct {
+	ctrl     *gomock.Controller
+	recorder *MockEnvMockRecorder
+	isgomock struct{}
+}
+
+// MockEnvMockRecorder is the mock recorder for MockEnv.
+type MockEnvMockRecorder struct {
+	mock *MockEnv
+}
+
+// NewMockEnv creates a new mock instance.
+func NewMockEnv(ctrl *gomock.Controller) *MockEnv {
+	mock := &MockEnv{ctrl: ctrl}
+	mock.recorder = &MockEnvMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockEnv) EXPECT() *MockEnvMockRecorder {
+	return m.recorder
+}
+
+// LocalHost mocks base method.
+func (m *MockEnv) LocalHost() host.Host {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LocalHost")
+	ret0, _ := ret[0].(host.Host)
+	return ret0
+}
+
+// LocalHost indicates an expected call of LocalHost.
+func (mr *MockEnvMockRecorder) LocalHost() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LocalHost", reflect.TypeOf((*MockEnv)(nil).LocalHost))
+}
+
+// Log mocks base method.
+func (m *MockEnv) Log() *slog.Logger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Log")
+	ret0, _ := ret[0].(*slog.Logger)
+	return ret0
+}
+
+// Log indicates an expected call of Log.
+func (mr *MockEnvMockRecorder) Log() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockEnv)(nil).Log))
+}
+
+// Routing mocks base method.
+func (m *MockEnv) Routing() routing.Routing {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Routing")
+	ret0, _ := ret[0].(routing.Routing)
+	return ret0
+}
+
+// Routing indicates an expected call of Routing.
+func (mr *MockEnvMockRecorder) Routing() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Routing", reflect.TypeOf((*MockEnv)(nil).Routing))
+}
 
 // MockRouter is a mock of Router interface.
 type MockRouter struct {

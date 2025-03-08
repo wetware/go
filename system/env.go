@@ -18,7 +18,6 @@ import (
 )
 
 type Env struct {
-	NS   string // fully qualified namespace
 	IPFS iface.CoreAPI
 	Host host.Host
 	DHT  core_routing.Routing
@@ -26,6 +25,14 @@ type Env struct {
 
 func (env Env) Log() *slog.Logger {
 	return slog.With("peer", env.Host.ID())
+}
+
+func (env Env) LocalHost() host.Host {
+	return env.Host
+}
+
+func (env Env) Routing() core_routing.Routing {
+	return env.DHT
 }
 
 // HandlePeerFound is called when a peer is discovered, such as when

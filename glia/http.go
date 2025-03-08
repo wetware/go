@@ -24,8 +24,8 @@ const DefaultListenAddr = "ww.local:8020"
 var ErrNotFound = errors.New("not found")
 
 type HTTP struct {
-	Env    *system.Env
-	Router Router
+	Env    Env
+	Router system.Router
 
 	once         sync.Once
 	ListenConfig *net.ListenConfig
@@ -181,7 +181,7 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p2p := P2P{Env: h.Env, Router: h.Router}
+	p2p := P2P{Env: h.Env, Host: h.Env.LocalHost(), Router: h.Router}
 	if err := p2p.ServeStream(r.Context(), HTTPStream{
 		ResponseWriter: w,
 		Request:        r,

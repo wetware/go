@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -18,8 +19,9 @@ import (
 var ErrU16Overflow = errors.New("varint overflows u16")
 
 type P2P struct {
-	Env    *system.Env
-	Router Router
+	Env    Env
+	Host   host.Host
+	Router system.Router
 }
 
 func (p2p P2P) Log() *slog.Logger {
@@ -32,9 +34,8 @@ func (p2p P2P) String() string {
 }
 
 func (p2p P2P) Serve(ctx context.Context) error {
-	env := p2p.Env
 	proto := system.Proto.Unwrap()
-	env.Host.SetStreamHandlerMatch(proto,
+	p2p.Host.SetStreamHandlerMatch(proto,
 		func(id protocol.ID) bool {
 			root := system.Proto.Path()
 			return strings.HasPrefix(string(id), root)
@@ -56,7 +57,7 @@ func (p2p P2P) Serve(ctx context.Context) error {
 					"stream", s.ID())
 			}
 		})
-	defer env.Host.RemoveStreamHandler(proto)
+	defer p2p.Host.RemoveStreamHandler(proto)
 	p2p.Log().DebugContext(ctx, "service started")
 
 	// If we made it this far, we're bootstrapped.  Wait for shutdown
@@ -74,7 +75,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
 
 	// Local call?
 	////
-	if p2p.Env.Host.ID().String() == s.Destination() {
+	if p2p.Host.ID().String() == s.Destination() {
 		p, err := p2p.Router.GetProc(s.ProcID())
 		if err != nil {
 			return err
@@ -94,7 +95,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
 	if err != nil {
 		return err
 	}
-	remote, err := p2p.Env.Host.NewStream(ctx, dst, s.Protocol())
+	remote, err := p2p.Host.NewStream(ctx, dst, s.Protocol())
 	if err != nil {
 		return err
 	}

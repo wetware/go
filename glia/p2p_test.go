@@ -130,7 +130,7 @@ type mockRouter struct {
 	P *proc.P
 }
 
-func (r mockRouter) GetProc(pid string) (glia.Proc, error) {
+func (r mockRouter) GetProc(pid string) (system.Proc, error) {
 	if r.P.String() == pid {
 		return r.P, nil
 	}

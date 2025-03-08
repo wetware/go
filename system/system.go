@@ -4,9 +4,11 @@ package system
 
 import (
 	"context"
+	"io"
 
 	"github.com/blang/semver/v4"
 	"github.com/hashicorp/go-memdb"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/wetware/go/proc"
 	protoutils "github.com/wetware/go/util/proto"
 )
@@ -42,4 +44,17 @@ type CloserFunc func(context.Context) error
 
 func (close CloserFunc) Close(ctx context.Context) error {
 	return close(ctx)
+}
+
+type Proc interface {
+	Reserve(context.Context, io.ReadWriteCloser) error
+	Release()
+
+	api.Closer
+	String() string
+	Method(name string) proc.Method
+}
+
+type Router interface {
+	GetProc(pid string) (Proc, error)
 }

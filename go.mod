@@ -3,7 +3,7 @@ module github.com/wetware/go
 go 1.24
 
 require (
-	capnproto.org/go/capnp/v3 v3.0.1-alpha.2
+	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
 	github.com/blang/semver/v4 v4.0.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/ipfs/boxo v0.28.0
