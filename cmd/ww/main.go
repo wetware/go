@@ -80,7 +80,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			serve.Command(env),
+			serve.Command(&env),
 			// export.Command(&env),
 			// run.Command(&env),
 		},

@@ -22,7 +22,7 @@ var (
 	})
 )
 
-func Command(env system.Env) *cli.Command {
+func Command(env *system.Env) *cli.Command {
 	return &cli.Command{
 		Name: "serve",
 		Flags: []cli.Flag{
@@ -42,8 +42,8 @@ func Command(env system.Env) *cli.Command {
 				Value:   "localhost:2080",
 			},
 		},
-		Before: setup(env),
-		Action: serve(env),
+		Before: setup(*env),
+		Action: serve(*env),
 	}
 }
 

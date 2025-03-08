@@ -70,11 +70,12 @@ func TestP2P(t *testing.T) {
 	require.NoError(t, err)
 	defer p.Close(ctx)
 
-	// Instantiate glia P2P runtime and populate it with
-	// the mock router.
-	p2p := glia.P2P{
+	// Initialize mock router and P2P instance
+	router := &mockRouter{P: p}
+	p2p := &glia.P2P{
 		Env:    env,
-		Router: mockRouter{P: p},
+		Host:   h,
+		Router: router,
 	}
 
 	s := NewMockStream(ctrl)
