@@ -1,10 +1,9 @@
 package serve
 
 import (
-	"log/slog"
+	"fmt"
 
 	"github.com/hashicorp/go-memdb"
-	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/thejerf/suture/v4"
@@ -33,7 +32,6 @@ func Command(env *system.Env) *cli.Command {
 			&cli.BoolFlag{
 				Name:    "wasm-debug",
 				EnvVars: []string{"WW_WASM_DEBUG"},
-				Usage:   "enable wasm debug symbols",
 			},
 			&cli.StringFlag{
 				Name:    "http",
@@ -42,14 +40,26 @@ func Command(env *system.Env) *cli.Command {
 				Value:   "localhost:2080",
 			},
 		},
-		Before: setup(*env),
-		Action: serve(*env),
+		Before: setup(env),
+		Action: serve(env),
+		Usage:  "serve a wetware process",
 	}
 }
 
-func setup(env system.Env) cli.BeforeFunc {
+func setup(*system.Env) cli.BeforeFunc {
 	return func(c *cli.Context) error {
-		// Intantiate the root process
+		return nil
+	}
+}
+
+// serve the main event loop
+func serve(env *system.Env) cli.ActionFunc {
+	return func(c *cli.Context) error {
+		if c.NArg() < 1 {
+			return fmt.Errorf("missing required argument: path to wetware process")
+		}
+
+		// Instantiate the root process
 		////
 		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
 			WithCloseOnContextDone(true).
@@ -66,6 +76,7 @@ func setup(env system.Env) cli.BeforeFunc {
 		if err != nil {
 			return err
 		}
+
 		cm, err := r.CompileModule(c.Context, b)
 		if err != nil {
 			return err
@@ -89,6 +100,7 @@ func setup(env system.Env) cli.BeforeFunc {
 		if err != nil {
 			return err
 		}
+
 		// Initialized an in-memory database that provides software-
 		// transactional-memory (STM) semantics for us.  This gives
 		// us flexibility to read/write multiple processes atomically.
@@ -119,82 +131,5 @@ func setup(env system.Env) cli.BeforeFunc {
 		// Run the supervisor
 		////
 		return app.Serve(c.Context)
-	}
-}
-
-// serve the main event loop
-func serve(env system.Env) cli.ActionFunc {
-	return func(c *cli.Context) error {
-		ctx := c.Context
-
-		sub, err := env.Host.EventBus().Subscribe([]any{
-			new(event.EvtLocalAddressesUpdated),
-			new(event.EvtLocalProtocolsUpdated),
-			new(event.EvtLocalReachabilityChanged),
-			new(event.EvtNATDeviceTypeChanged),
-			new(event.EvtPeerConnectednessChanged),
-			new(event.EvtPeerIdentificationCompleted),
-			new(event.EvtPeerIdentificationFailed),
-			new(event.EvtPeerProtocolsUpdated)})
-		if err != nil {
-			return err
-		}
-		defer sub.Close()
-
-		log := slog.With("peer", env.Host.ID())
-		log.InfoContext(ctx, "wetware started")
-		defer log.WarnContext(ctx, "wetware stopped")
-
-		var v any
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case v = <-sub.Out():
-				// v was modified
-			}
-
-			// handle the event
-			switch ev := v.(type) {
-
-			case *event.EvtLocalAddressesUpdated:
-				log.InfoContext(ctx, "local addresses updated")
-				// ignore the event fields; they're noisy
-
-			case *event.EvtLocalProtocolsUpdated:
-				log.InfoContext(ctx, "local protocols updated")
-
-			case *event.EvtLocalReachabilityChanged:
-				log.InfoContext(ctx, "local reachability changed",
-					"status", ev.Reachability)
-
-			case *event.EvtNATDeviceTypeChanged:
-				log.InfoContext(ctx, "nat device type changed",
-					"device", ev.NatDeviceType,
-					"transport", ev.TransportProtocol)
-
-			case *event.EvtPeerConnectednessChanged:
-				log.InfoContext(ctx, "peer connection changed",
-					"peer", ev.Peer,
-					"status", ev.Connectedness)
-
-			case *event.EvtPeerIdentificationCompleted:
-				log.DebugContext(ctx, "peer identification completed",
-					"peer", ev.Peer,
-					"proto-version", ev.ProtocolVersion,
-					"agent-version", ev.AgentVersion,
-					"conn", ev.Conn.ID())
-
-			case *event.EvtPeerIdentificationFailed:
-				log.WarnContext(ctx, "peer identification failed",
-					"peer", ev.Peer,
-					"reason", ev.Reason)
-
-			case *event.EvtPeerProtocolsUpdated:
-				log.InfoContext(ctx, "peer protocols updated",
-					"peer", ev.Peer)
-
-			}
-		}
 	}
 }

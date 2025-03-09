@@ -38,7 +38,7 @@ func (*HTTP) String() string {
 }
 
 func (h *HTTP) Log() *slog.Logger {
-	p2p := P2P{Env: h.Env /* withold h.Router for this operation */}
+	p2p := P2P{Env: h.Env}
 	return p2p.Env.Log().With(
 		"service", h.String(),
 		"addr", h.ListenAddr)

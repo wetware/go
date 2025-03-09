@@ -9,7 +9,7 @@ import (
 )
 
 type MDNS struct {
-	Env system.Env
+	Env *system.Env
 }
 
 func (m MDNS) String() string {
