@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"log/slog"
-	"math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,11 +16,13 @@ import (
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/lmittmann/tint"
+	"github.com/mr-tron/base58"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 	syncutils "github.com/wetware/go/util/sync"
@@ -78,6 +82,12 @@ func main() {
 				Usage:   "multi`addr` of IPFS node, or \"local\"",
 				Value:   "local",
 			},
+			&cli.StringFlag{
+				Name:    "privkey",
+				Aliases: []string{"pk"},
+				EnvVars: []string{"WW_PRIVKEY"},
+				Usage:   "path to private key file for libp2p identity",
+			},
 		},
 		Commands: []*cli.Command{
 			serve.Command(&env),
@@ -130,7 +140,7 @@ func setup(c *cli.Context) (err error) {
 			public := append(
 				env.PublicBootstrapPeers(),
 				dht.GetDefaultBootstrapPeerAddrInfos()...)
-			rand.Shuffle(len(public), func(i, j int) {
+			mathrand.Shuffle(len(public), func(i, j int) {
 				public[i], public[j] = public[j], public[i]
 			})
 
@@ -138,7 +148,7 @@ func setup(c *cli.Context) (err error) {
 		})),
 		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
 			private := env.PrivateBootstrapPeers()
-			rand.Shuffle(len(private), func(i, j int) {
+			mathrand.Shuffle(len(private), func(i, j int) {
 				private[i], private[j] = private[j], private[i]
 			})
 
@@ -190,11 +200,12 @@ func newLibp2pHost(c *cli.Context) (host.Host, error) {
 		return nil, err
 	}
 
-	return libp2p.New(
+	opts := []libp2p.Option{
 		libp2p.ListenAddrs(listenAddrs...),
-		// Set reasonable timeouts for connection attempts
-		libp2p.WithDialTimeout(time.Second*15),
-	)
+		libp2p.WithDialTimeout(time.Second * 15),
+		identity(c)}
+
+	return libp2p.New(opts...)
 }
 
 func listenAddrs(c *cli.Context) ([]ma.Multiaddr, error) {
@@ -217,7 +228,7 @@ func addrs(c *cli.Context) []peer.AddrInfo {
 	for _, a := range c.StringSlice("dial") {
 		m, err := ma.NewMultiaddr(a)
 		if err != nil {
-			slog.Debug("failed to parse multiaddr",
+			slog.DebugContext(c.Context, "failed to parse multiaddr",
 				"addr", a,
 				"reason", err)
 			continue
@@ -225,7 +236,7 @@ func addrs(c *cli.Context) []peer.AddrInfo {
 
 		s, err := m.ValueForProtocol(ma.P_P2P)
 		if err != nil {
-			slog.Debug("failed to parse value for protocol",
+			slog.DebugContext(c.Context, "failed to parse value for protocol",
 				"proto", "p2p",
 				"addr", a,
 				"reason", err)
@@ -233,7 +244,7 @@ func addrs(c *cli.Context) []peer.AddrInfo {
 		}
 		id, err := peer.Decode(s)
 		if err != nil {
-			slog.Debug("failed to decode peer ID",
+			slog.DebugContext(c.Context, "failed to decode peer ID",
 				"addr", a,
 				"reason", err)
 			continue
@@ -304,4 +315,46 @@ func newIPFSClient(c *cli.Context) (iface.CoreAPI, error) {
 	}
 
 	return rpc.NewApiWithClient(a, http.DefaultClient)
+}
+
+func identity(c *cli.Context) libp2p.Option {
+	if pkStr := c.String("privkey"); pkStr != "" {
+		// First try to decode as base58
+		pkBytes, err := base58.Decode(pkStr)
+		if err == nil {
+			if pk, err := crypto.UnmarshalPrivateKey(pkBytes); err == nil {
+				return libp2p.Identity(pk)
+			} else {
+				return raiseOption(fmt.Errorf("failed to unmarshal base58-encoded private key: %w", err))
+			}
+		}
+
+		// If base58 decode fails, try as file path
+		pkBytes, err = os.ReadFile(pkStr)
+		if err != nil {
+			return raiseOption(fmt.Errorf("failed to read private key file: %w", err))
+		}
+
+		pk, err := crypto.UnmarshalPrivateKey(pkBytes)
+		if err != nil {
+			return raiseOption(fmt.Errorf("failed to unmarshal private key from file: %w", err))
+		}
+
+		return libp2p.Identity(pk)
+	}
+
+	// Generate new Ed25519 key if none provided
+	priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return raiseOption(fmt.Errorf("failed to generate Ed25519 key: %w", err))
+	}
+
+	slog.InfoContext(c.Context, "generated new identity using Ed25519")
+	return libp2p.Identity(priv)
+}
+
+func raiseOption(err error) libp2p.Option {
+	return func(cfg *libp2p.Config) error {
+		return err
+	}
 }
