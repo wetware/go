@@ -18,7 +18,6 @@ import (
 	host "github.com/libp2p/go-libp2p/core/host"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	routing "github.com/libp2p/go-libp2p/core/routing"
-	glia "github.com/wetware/go/glia"
 	proc "github.com/wetware/go/proc"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -87,45 +86,6 @@ func (m *MockEnv) Routing() routing.Routing {
 func (mr *MockEnvMockRecorder) Routing() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Routing", reflect.TypeOf((*MockEnv)(nil).Routing))
-}
-
-// MockRouter is a mock of Router interface.
-type MockRouter struct {
-	ctrl     *gomock.Controller
-	recorder *MockRouterMockRecorder
-	isgomock struct{}
-}
-
-// MockRouterMockRecorder is the mock recorder for MockRouter.
-type MockRouterMockRecorder struct {
-	mock *MockRouter
-}
-
-// NewMockRouter creates a new mock instance.
-func NewMockRouter(ctrl *gomock.Controller) *MockRouter {
-	mock := &MockRouter{ctrl: ctrl}
-	mock.recorder = &MockRouterMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRouter) EXPECT() *MockRouterMockRecorder {
-	return m.recorder
-}
-
-// GetProc mocks base method.
-func (m *MockRouter) GetProc(pid string) (glia.Proc, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProc", pid)
-	ret0, _ := ret[0].(glia.Proc)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetProc indicates an expected call of GetProc.
-func (mr *MockRouterMockRecorder) GetProc(pid any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProc", reflect.TypeOf((*MockRouter)(nil).GetProc), pid)
 }
 
 // MockProc is a mock of Proc interface.
