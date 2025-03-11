@@ -81,9 +81,11 @@ jobs:
           sleep 5
           
           # Check service status
-          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "systemctl is-active wetware.service")
+          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo systemctl is-active wetware.service")
           if [ "$STATUS" != "active" ]; then
             echo "Service failed to start properly. Status: $STATUS"
+            echo "Last 50 lines of service logs:"
+            ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo journalctl -u wetware.service -n 50 --no-pager"
             exit 1
           fi
 
@@ -95,8 +97,10 @@ jobs:
           
           # Verify rollback was successful
           sleep 5
-          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "systemctl is-active wetware.service")
+          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo systemctl is-active wetware.service")
           if [ "$STATUS" != "active" ]; then
             echo "CRITICAL: Rollback failed. Manual intervention required."
+            echo "Last 50 lines of service logs:"
+            ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo journalctl -u wetware.service -n 50 --no-pager"
             exit 1
           fi
