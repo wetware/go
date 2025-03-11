@@ -74,7 +74,6 @@ func TestP2P(t *testing.T) {
 	router := &mockRouter{P: p}
 	p2p := &glia.P2P{
 		Env:    env,
-		Host:   h,
 		Router: router,
 	}
 

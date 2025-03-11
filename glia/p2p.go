@@ -8,7 +8,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -20,22 +19,21 @@ var ErrU16Overflow = errors.New("varint overflows u16")
 
 type P2P struct {
 	Env    Env
-	Host   host.Host
 	Router system.Router
 }
 
-func (p2p P2P) Log() *slog.Logger {
+func (p2p *P2P) Log() *slog.Logger {
 	return p2p.Env.Log().With(
 		"service", p2p.String())
 }
 
-func (p2p P2P) String() string {
+func (p2p *P2P) String() string {
 	return "p2p"
 }
 
-func (p2p P2P) Serve(ctx context.Context) error {
+func (p2p *P2P) Serve(ctx context.Context) error {
 	proto := system.Proto.Unwrap()
-	p2p.Host.SetStreamHandlerMatch(proto,
+	p2p.Env.LocalHost().SetStreamHandlerMatch(proto,
 		func(id protocol.ID) bool {
 			root := system.Proto.Path()
 			return strings.HasPrefix(string(id), root)
@@ -57,7 +55,7 @@ func (p2p P2P) Serve(ctx context.Context) error {
 					"stream", s.ID())
 			}
 		})
-	defer p2p.Host.RemoveStreamHandler(proto)
+	defer p2p.Env.LocalHost().RemoveStreamHandler(proto)
 	p2p.Log().DebugContext(ctx, "service started")
 
 	// If we made it this far, we're bootstrapped.  Wait for shutdown
@@ -66,7 +64,7 @@ func (p2p P2P) Serve(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
+func (p2p *P2P) ServeStream(ctx context.Context, s Stream) error {
 	defer s.Close()
 	// Glia RPC is a synchronous RPC protocol models one round-trip
 	// (request-response) between a server and a client.  The round-
@@ -75,7 +73,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
 
 	// Local call?
 	////
-	if p2p.Host.ID().String() == s.Destination() {
+	if p2p.Env.LocalHost().ID().String() == s.Destination() {
 		p, err := p2p.Router.GetProc(s.ProcID())
 		if err != nil {
 			return err
@@ -95,7 +93,7 @@ func (p2p P2P) ServeStream(ctx context.Context, s Stream) error {
 	if err != nil {
 		return err
 	}
-	remote, err := p2p.Host.NewStream(ctx, dst, s.Protocol())
+	remote, err := p2p.Env.LocalHost().NewStream(ctx, dst, s.Protocol())
 	if err != nil {
 		return err
 	}

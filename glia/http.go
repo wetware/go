@@ -181,7 +181,7 @@ func (h *HTTP) glia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p2p := P2P{Env: h.Env, Host: h.Env.LocalHost(), Router: h.Router}
+	p2p := P2P{Env: h.Env, Router: h.Router}
 	if err := p2p.ServeStream(r.Context(), HTTPStream{
 		ResponseWriter: w,
 		Request:        r,
