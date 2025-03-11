@@ -20,7 +20,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-var _ glia.Proc = (*proc.P)(nil)
+var _ system.Proc = (*proc.P)(nil)
 
 func TestP2P(t *testing.T) {
 	t.Parallel()
@@ -29,7 +29,7 @@ func TestP2P(t *testing.T) {
 	// three major interfaces:
 	//  1. host.Host
 	//  2. glia.Router
-	//  3. glia.Proc
+	//  3. system.Proc
 	////
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -230,23 +230,23 @@ func TestP2P_ServeStream_RemoteError(t *testing.T) {
 		Return(localID).
 		AnyTimes()
 
-	// Expect NewStream call to fail
-	remoteID := "12D3KooWQfGkPUkoGQr8Zc4UmiMqK9wmFtqkEqFtYWqJrHWXL9hp"
-	h.EXPECT().
-		NewStream(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, fmt.Errorf("connection refused")).
-		Times(1)
-
 	// Set up stream mock
 	s := NewMockStream(ctrl)
 	s.EXPECT().
-		Destination().
-		Return(remoteID).
-		Times(1)
-	s.EXPECT().
 		Protocol().
 		Return(protocol.ID("/test")).
+		AnyTimes()
+	s.EXPECT().
+		Destination().
+		Return("12D3KooWQfGkPUkoGQr8Zc4UmiMqK9wmFtqkEqFtYWqJrHWXL9hp").
+		Times(2)
+
+	// Expect NewStream call to fail
+	h.EXPECT().
+		NewStream(gomock.Any(), gomock.Any(), protocol.ID("/test")).
+		Return(nil, fmt.Errorf("connection refused")).
 		Times(1)
+
 	s.EXPECT().
 		Close().
 		Return(nil).
