@@ -28,6 +28,7 @@ import (
 	syncutils "github.com/wetware/go/util/sync"
 	"go.uber.org/multierr"
 
+	"github.com/wetware/go/cmd/internal/idgen"
 	"github.com/wetware/go/cmd/internal/serve"
 	"github.com/wetware/go/system"
 )
@@ -91,6 +92,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			serve.Command(&env),
+			idgen.Command(),
 			// export.Command(&env),
 			// run.Command(&env),
 		},
