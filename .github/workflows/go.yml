@@ -28,6 +28,8 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      previous_commit: ${{ steps.store_commit.outputs.commit }}
 
     needs: build
     if: github.ref == 'refs/heads/master'
@@ -43,6 +45,58 @@ jobs:
           ssh-agent -a $SSH_AUTH_SOCK > /dev/null
           ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
+      - name: Store Current Commit
+        id: store_commit
+        run: |
+          PREV_COMMIT=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git rev-parse HEAD")
+          echo "commit=$PREV_COMMIT" >> "$GITHUB_OUTPUT"
+
       - name: SSH, Pull, and Install
         run: |
-          ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
+
+  restart-service:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/master'
+    env:
+      SSH_DIR: /home/runner/.ssh
+      SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+
+    steps:
+      - name: SSH Key Setup
+        run: |
+          mkdir -p $SSH_DIR
+          ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
+
+      - name: Restart Service and Verify Health
+        id: restart
+        run: |
+          # Restart the service
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo systemctl restart wetware.service"
+          
+          # Wait a bit for the service to start up
+          sleep 5
+          
+          # Check service status
+          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "systemctl is-active wetware.service")
+          if [ "$STATUS" != "active" ]; then
+            echo "Service failed to start properly. Status: $STATUS"
+            exit 1
+          fi
+
+      - name: Rollback on Failure
+        if: failure() && steps.restart.outcome == 'failure'
+        run: |
+          echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && make install && sudo systemctl restart wetware.service"
+          
+          # Verify rollback was successful
+          sleep 5
+          STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "systemctl is-active wetware.service")
+          if [ "$STATUS" != "active" ]; then
+            echo "CRITICAL: Rollback failed. Manual intervention required."
+            exit 1
+          fi
