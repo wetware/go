@@ -17,7 +17,8 @@ import (
 
 var (
 	app = suture.New("ww", suture.Spec{
-		EventHook: util.EventHook,
+		EventHook:         util.EventHook,
+		PassThroughPanics: true,
 	})
 )
 
