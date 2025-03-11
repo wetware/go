@@ -74,33 +74,76 @@ jobs:
       - name: Restart Service and Verify Health
         id: restart
         run: |
-          # Restart the service
-          ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "/usr/bin/sudo /usr/bin/systemctl restart wetware.service"
+          # Create a temporary script with our commands
+          cat << 'EOF' > /tmp/restart_service.sh
+          #!/bin/bash
+          set -e
           
-          # Wait a bit for the service to start up
-          sleep 5
+          # Set timeout
+          TIMEOUT=30
+          STARTTIME=$(date +%s)
           
-          # Check service status
-          STATUS=$(ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "/usr/bin/sudo /usr/bin/systemctl is-active wetware.service")
-          if [ "$STATUS" != "active" ]; then
-            echo "Service failed to start properly. Status: $STATUS"
-            echo "Last 50 lines of service logs:"
-            ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "/usr/bin/sudo /usr/bin/journalctl -u wetware.service -n 50 --no-pager"
-            exit 1
-          fi
+          /usr/bin/sudo /usr/bin/systemctl restart ww-go.service
+          
+          # Wait for service to be active or timeout
+          while true; do
+            NOW=$(date +%s)
+            if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
+              echo "Timeout waiting for service to become active"
+              echo "Last 50 lines of service logs:"
+              /usr/bin/sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager
+              exit 1
+            fi
+            
+            STATUS=$(/usr/bin/sudo /usr/bin/systemctl is-active ww-go.service)
+            if [ "$STATUS" = "active" ]; then
+              break
+            fi
+            sleep 2
+          done
+          EOF
+          
+          # Copy and execute the script
+          scp -P ${{ secrets.SSH_PORT || 22 }} /tmp/restart_service.sh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/restart_service.sh
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "chmod +x ~/restart_service.sh && ~/restart_service.sh && rm ~/restart_service.sh"
+          rm /tmp/restart_service.sh
 
       - name: Rollback on Failure
         if: failure() && steps.restart.outcome == 'failure'
         run: |
-          echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
-          ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && make install && /usr/bin/sudo /usr/bin/systemctl restart wetware.service"
+          # Create a temporary script with our rollback commands
+          cat << 'EOF' > /tmp/rollback_service.sh
+          #!/bin/bash
+          set -e
           
-          # Verify rollback was successful
-          sleep 5
-          STATUS=$(ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "/usr/bin/sudo /usr/bin/systemctl is-active wetware.service")
-          if [ "$STATUS" != "active" ]; then
-            echo "CRITICAL: Rollback failed. Manual intervention required."
-            echo "Last 50 lines of service logs:"
-            ssh -tt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "/usr/bin/sudo /usr/bin/journalctl -u wetware.service -n 50 --no-pager"
-            exit 1
-          fi
+          # Set timeout
+          TIMEOUT=30
+          STARTTIME=$(date +%s)
+          
+          cd ~/ww-go
+          git checkout ${{ needs.deploy.outputs.previous_commit }}
+          make install
+          /usr/bin/sudo /usr/bin/systemctl restart ww-go.service
+          
+          # Wait for service to be active or timeout
+          while true; do
+            NOW=$(date +%s)
+            if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
+              echo "Timeout waiting for service to become active during rollback"
+              echo "Last 50 lines of service logs:"
+              /usr/bin/sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager
+              exit 1
+            fi
+            
+            STATUS=$(/usr/bin/sudo /usr/bin/systemctl is-active ww-go.service)
+            if [ "$STATUS" = "active" ]; then
+              break
+            fi
+            sleep 2
+          done
+          EOF
+          
+          # Copy and execute the script
+          scp -P ${{ secrets.SSH_PORT || 22 }} /tmp/rollback_service.sh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/rollback_service.sh
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "chmod +x ~/rollback_service.sh && PATH=$PATH:~/.go/bin ~/rollback_service.sh && rm ~/rollback_service.sh"
+          rm /tmp/rollback_service.sh
