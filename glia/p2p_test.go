@@ -127,15 +127,19 @@ func TestP2P(t *testing.T) {
 }
 
 type mockRouter struct {
-	P *proc.P
+	P system.Proc
 }
 
 func (r mockRouter) GetProc(pid string) (system.Proc, error) {
-	if r.P.String() == pid {
+	if r.P != nil && r.P.String() == pid {
 		return r.P, nil
 	}
 
-	return nil, fmt.Errorf("mockRouter: %s != %s", r.P.String(), pid)
+	return nil, fmt.Errorf("proc not found: %s", pid)
+}
+
+type B struct {
+	P system.Proc
 }
 
 func TestP2PStream(t *testing.T) {
@@ -154,10 +158,189 @@ func TestP2PStream(t *testing.T) {
 	require.Equal(t, "echo", stream.MethodName())
 }
 
+func TestP2P_Log(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	h := test_libp2p.NewMockHost(ctrl)
+	id := mkPeerID(t)
+	h.EXPECT().
+		ID().
+		Return(id).
+		AnyTimes()
+
+	env := &system.Env{Host: h}
+	p2p := &glia.P2P{Env: env}
+	require.NotNil(t, p2p.Log())
+}
+
+func TestP2P_ServeStream_GetProcError(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Set up host mock
+	h := test_libp2p.NewMockHost(ctrl)
+	id := mkPeerID(t)
+	h.EXPECT().
+		ID().
+		Return(id).
+		AnyTimes()
+
+	// Set up stream mock
+	s := NewMockStream(ctrl)
+	s.EXPECT().
+		Destination().
+		Return(id.String()).
+		Times(1)
+	s.EXPECT().
+		ProcID().
+		Return("nonexistent").
+		Times(1)
+	s.EXPECT().
+		Close().
+		Return(nil).
+		Times(1)
+
+	// Initialize P2P with a router that has no processes
+	p2p := &glia.P2P{
+		Env:    &system.Env{Host: h},
+		Router: &mockRouter{P: nil},
+	}
+
+	err := p2p.ServeStream(context.Background(), s)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "proc not found")
+}
+
+func TestP2P_ServeStream_RemoteError(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Set up host mock
+	h := test_libp2p.NewMockHost(ctrl)
+	localID := mkPeerID(t)
+	h.EXPECT().
+		ID().
+		Return(localID).
+		AnyTimes()
+
+	// Expect NewStream call to fail
+	remoteID := "12D3KooWQfGkPUkoGQr8Zc4UmiMqK9wmFtqkEqFtYWqJrHWXL9hp"
+	h.EXPECT().
+		NewStream(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("connection refused")).
+		Times(1)
+
+	// Set up stream mock
+	s := NewMockStream(ctrl)
+	s.EXPECT().
+		Destination().
+		Return(remoteID).
+		Times(1)
+	s.EXPECT().
+		Protocol().
+		Return(protocol.ID("/test")).
+		Times(1)
+	s.EXPECT().
+		Close().
+		Return(nil).
+		Times(1)
+
+	// Initialize P2P
+	p2p := &glia.P2P{
+		Env: &system.Env{Host: h},
+	}
+
+	err := p2p.ServeStream(context.Background(), s)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "connection refused")
+}
+
+func TestP2P_ServeStream_ReserveError(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Set up host mock
+	h := test_libp2p.NewMockHost(ctrl)
+	id := mkPeerID(t)
+	h.EXPECT().
+		ID().
+		Return(id).
+		AnyTimes()
+
+	// Set up stream mock
+	s := NewMockStream(ctrl)
+	s.EXPECT().
+		Destination().
+		Return(id.String()).
+		Times(1)
+	s.EXPECT().
+		ProcID().
+		Return("test-proc").
+		Times(1)
+	s.EXPECT().
+		Close().
+		Return(nil).
+		Times(1)
+
+	// Create a mock proc that fails reservation
+	proc := &mockProc{
+		id:         "test-proc",
+		reserveErr: fmt.Errorf("resource busy"),
+	}
+	router := &mockRouter{P: proc}
+
+	p2p := &glia.P2P{
+		Env:    &system.Env{Host: h},
+		Router: router,
+	}
+
+	err := p2p.ServeStream(context.Background(), s)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "resource busy")
+}
+
 func mkPeerID(t *testing.T) peer.ID {
 	t.Helper()
 
 	id, err := peer.Decode("12D3KooWFYcCMuKujeeDDPqnH6yHeVrnXPaCjfbYVmQ9fHxfRDtA")
 	require.NoError(t, err)
 	return id
+}
+
+type mockProc struct {
+	id         string
+	reserveErr error
+}
+
+func (p *mockProc) String() string {
+	return p.id
+}
+
+func (p *mockProc) Reserve(ctx context.Context, s io.ReadWriteCloser) error {
+	return p.reserveErr
+}
+
+func (p *mockProc) Release() {}
+
+type mockMethod struct{}
+
+func (m *mockMethod) CallWithStack(ctx context.Context, stack []uint64) error {
+	return nil
+}
+
+func (p *mockProc) Method(string) proc.Method {
+	return &mockMethod{}
+}
+
+func (p *mockProc) Close(context.Context) error {
+	return nil
 }
