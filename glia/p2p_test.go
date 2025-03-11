@@ -138,10 +138,6 @@ func (r mockRouter) GetProc(pid string) (system.Proc, error) {
 	return nil, fmt.Errorf("proc not found: %s", pid)
 }
 
-type B struct {
-	P system.Proc
-}
-
 func TestP2PStream(t *testing.T) {
 	t.Parallel()
 
