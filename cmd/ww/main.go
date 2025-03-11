@@ -26,49 +26,6 @@ func main() {
 		Copyright:      "2020 The Wetware Project",
 		Before:         setup,
 		DefaultCommand: "serve",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "ns",
-				EnvVars: []string{"WW_NS"},
-				Value:   "ww",
-				Usage:   "cluster namespace",
-			},
-			&cli.StringSliceFlag{
-				Name:    "dial",
-				EnvVars: []string{"WW_DIAL"},
-				Aliases: []string{"d"},
-				Usage:   "peer addr to dial",
-			},
-			&cli.StringSliceFlag{
-				Name:    "listen",
-				EnvVars: []string{"WW_LISTEN"},
-				Aliases: []string{"l"},
-				Usage:   "multiaddr to listen on",
-			},
-			&cli.BoolFlag{
-				Name:    "json",
-				EnvVars: []string{"WW_JSON"},
-				Usage:   "output json logs",
-			},
-			&cli.StringFlag{
-				Name:    "loglvl",
-				EnvVars: []string{"WW_LOGLVL"},
-				Value:   "info",
-				Usage:   "logging level: debug, info, warn, error",
-			},
-			&cli.StringFlag{
-				Name:    "ipfs",
-				EnvVars: []string{"WW_IPFS"},
-				Usage:   "multi`addr` of IPFS node, or \"local\"",
-				Value:   "local",
-			},
-			&cli.StringFlag{
-				Name:    "privkey",
-				Aliases: []string{"pk"},
-				EnvVars: []string{"WW_PRIVKEY"},
-				Usage:   "path to private key file for libp2p identity",
-			},
-		},
 		Commands: []*cli.Command{
 			serve.Command(),
 			idgen.Command(),
