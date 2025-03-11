@@ -74,76 +74,52 @@ jobs:
       - name: Restart Service and Verify Health
         id: restart
         run: |
-          # Create a temporary script with our commands
-          cat << 'EOF' > /tmp/restart_service.sh
-          #!/bin/bash
-          set -e
+          # Restart the service
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
           
-          # Set timeout
+          # Wait for service to be active or timeout
           TIMEOUT=30
           STARTTIME=$(date +%s)
           
-          /usr/bin/sudo /usr/bin/systemctl restart ww-go.service
-          
-          # Wait for service to be active or timeout
           while true; do
             NOW=$(date +%s)
             if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
               echo "Timeout waiting for service to become active"
               echo "Last 50 lines of service logs:"
-              /usr/bin/sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager
+              ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
               exit 1
             fi
             
-            STATUS=$(/usr/bin/sudo /usr/bin/systemctl is-active ww-go.service)
+            STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
             if [ "$STATUS" = "active" ]; then
               break
             fi
             sleep 2
           done
-          EOF
-          
-          # Copy and execute the script
-          scp -P ${{ secrets.SSH_PORT || 22 }} /tmp/restart_service.sh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/restart_service.sh
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "chmod +x ~/restart_service.sh && ~/restart_service.sh && rm ~/restart_service.sh"
-          rm /tmp/restart_service.sh
 
       - name: Rollback on Failure
         if: failure() && steps.restart.outcome == 'failure'
         run: |
-          # Create a temporary script with our rollback commands
-          cat << 'EOF' > /tmp/rollback_service.sh
-          #!/bin/bash
-          set -e
+          echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && PATH=$PATH:~/.go/bin make install"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
           
-          # Set timeout
+          # Wait for service to be active or timeout
           TIMEOUT=30
           STARTTIME=$(date +%s)
           
-          cd ~/ww-go
-          git checkout ${{ needs.deploy.outputs.previous_commit }}
-          make install
-          /usr/bin/sudo /usr/bin/systemctl restart ww-go.service
-          
-          # Wait for service to be active or timeout
           while true; do
             NOW=$(date +%s)
             if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
               echo "Timeout waiting for service to become active during rollback"
               echo "Last 50 lines of service logs:"
-              /usr/bin/sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager
+              ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
               exit 1
             fi
             
-            STATUS=$(/usr/bin/sudo /usr/bin/systemctl is-active ww-go.service)
+            STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
             if [ "$STATUS" = "active" ]; then
               break
             fi
             sleep 2
           done
-          EOF
-          
-          # Copy and execute the script
-          scp -P ${{ secrets.SSH_PORT || 22 }} /tmp/rollback_service.sh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/rollback_service.sh
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "chmod +x ~/rollback_service.sh && PATH=$PATH:~/.go/bin ~/rollback_service.sh && rm ~/rollback_service.sh"
-          rm /tmp/rollback_service.sh
