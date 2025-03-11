@@ -16,13 +16,15 @@ import (
 )
 
 var (
-	app = suture.New("ww", suture.Spec{
+	wetware = suture.New("ww", suture.Spec{
 		EventHook:         util.EventHook,
 		PassThroughPanics: true,
 	})
+
+	env system.Env
 )
 
-func Command(env *system.Env) *cli.Command {
+func Command() *cli.Command {
 	return &cli.Command{
 		Name: "serve",
 		Flags: []cli.Flag{
@@ -41,96 +43,102 @@ func Command(env *system.Env) *cli.Command {
 				Value:   "localhost:2080",
 			},
 		},
-		Before: setup(env),
-		Action: serve(env),
+		Before: setup,
+		Action: serve,
+		After:  teardown,
 		Usage:  "serve a wetware process",
 	}
 }
 
-func setup(*system.Env) cli.BeforeFunc {
-	return func(c *cli.Context) error {
-		return nil
+// serve is the main event loop for the wetware process. It:
+// 1. Sets up a WebAssembly runtime environment
+// 2. Loads and instantiates the process module
+// 3. Initializes the routing infrastructure
+// 4. Starts system services
+// 5. Runs the supervisor until completion
+func serve(c *cli.Context) error {
+	// Validate that a process path was provided
+	if c.NArg() < 1 {
+		return fmt.Errorf("missing required argument: path to wetware process")
 	}
-}
 
-// serve the main event loop
-func serve(env *system.Env) cli.ActionFunc {
-	return func(c *cli.Context) error {
-		if c.NArg() < 1 {
-			return fmt.Errorf("missing required argument: path to wetware process")
-		}
+	// Initialize WebAssembly runtime with debug info if enabled
+	r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
+		WithCloseOnContextDone(true).
+		WithDebugInfoEnabled(c.Bool("wasm-debug")))
+	defer r.Close(c.Context)
 
-		// Instantiate the root process
-		////
-		r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
-			WithCloseOnContextDone(true).
-			WithDebugInfoEnabled(c.Bool("wasm-debug")))
-		defer r.Close(c.Context)
-
-		wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
-		if err != nil {
-			return err
-		}
-		defer wasi.Close(c.Context)
-
-		b, err := env.Load(c.Context, c.Args().First())
-		if err != nil {
-			return err
-		}
-
-		cm, err := r.CompileModule(c.Context, b)
-		if err != nil {
-			return err
-		}
-		defer cm.Close(c.Context)
-
-		p, err := proc.Command{
-			PID:    proc.NewPID(),
-			Args:   c.Args().Slice(),
-			Stderr: c.App.ErrWriter,
-			FS:     env.NewUnixFS(c.Context),
-		}.Instantiate(c.Context, r, cm)
-		if err != nil {
-			return err
-		}
-		defer p.Close(c.Context)
-
-		// Initialize STM router and insert the root process
-		////
-		db, err := memdb.NewMemDB(&system.Schema) // provides STM
-		if err != nil {
-			return err
-		}
-
-		// Initialized an in-memory database that provides software-
-		// transactional-memory (STM) semantics for us.  This gives
-		// us flexibility to read/write multiple processes atomically.
-		//
-		// We add p to the "proc" table.
-		init := db.Txn(true)
-		if err := init.Insert("proc", p); err != nil {
-			init.Abort()
-			return err
-		}
-		init.Commit()
-		rt := &Router{DB: db} // message-routing interface; can route messages locally
-
-		// Bind services to the supervisor.
-		////
-		for _, s := range []suture.Service{
-			&boot.MDNS{Env: env},
-			&glia.P2P{Env: env, Router: rt},
-			// &glia.Unix{Env: env, Router: rt, Path c.String("unix")},
-			&glia.HTTP{Env: env, Router: rt, ListenAddr: c.String("http")},
-		} {
-			app.Add(s)
-		}
-
-		env.Log().Info("server started",
-			"proc", p.String())
-
-		// Run the supervisor
-		////
-		return app.Serve(c.Context)
+	// Instantiate WASI preview1 for system interface compatibility
+	wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
+	if err != nil {
+		return err
 	}
+	defer wasi.Close(c.Context)
+
+	// Load the WebAssembly module bytes from the specified path
+	b, err := env.Load(c.Context, c.Args().First())
+	if err != nil {
+		return err
+	}
+
+	// Compile the WebAssembly module
+	cm, err := r.CompileModule(c.Context, b)
+	if err != nil {
+		return err
+	}
+	defer cm.Close(c.Context)
+
+	// Create a new process instance with:
+	// - A unique process ID
+	// - Command line arguments
+	// - Standard error output
+	// - A Unix-like filesystem
+	p, err := proc.Command{
+		PID:    proc.NewPID(),
+		Args:   c.Args().Slice(),
+		Stderr: c.App.ErrWriter,
+		FS:     env.NewUnixFS(c.Context),
+	}.Instantiate(c.Context, r, cm)
+	if err != nil {
+		return err
+	}
+	defer p.Close(c.Context)
+
+	// Initialize the software transactional memory database that will
+	// store and coordinate process state
+	db, err := memdb.NewMemDB(&system.Schema)
+	if err != nil {
+		return err
+	}
+
+	// Begin transaction to insert the root process
+	init := db.Txn(true)
+	if err := init.Insert("proc", p); err != nil {
+		init.Abort()
+		return err
+	}
+	init.Commit()
+
+	// Create router for inter-process message delivery
+	rt := &Router{DB: db}
+
+	// Initialize and bind system services to the supervisor:
+	// - MDNS for local network discovery
+	// - P2P for distributed communication
+	// - HTTP API server
+	for _, s := range []suture.Service{
+		&boot.MDNS{Env: &env},
+		&glia.P2P{Env: &env, Router: rt},
+		// &glia.Unix{Env: env, Router: rt, Path c.String("unix")},
+		&glia.HTTP{Env: &env, Router: rt, ListenAddr: c.String("http")},
+	} {
+		wetware.Add(s)
+	}
+
+	// Log successful server startup
+	env.Log().Info("server started",
+		"proc", p.String())
+
+	// Run the supervisor until context cancellation or fatal error
+	return wetware.Serve(c.Context)
 }
