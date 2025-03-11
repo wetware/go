@@ -91,7 +91,7 @@ jobs:
         if: failure() && steps.restart.outcome == 'failure'
         run: |
           echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && make install && sudo systemctl restart wetware.service"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && make install && sudo systemctl restart wetware.service"
           
           # Verify rollback was successful
           sleep 5
