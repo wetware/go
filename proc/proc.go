@@ -31,6 +31,13 @@ type Command struct {
 	FS        fs.FS
 }
 
+// Module represents the subset of wazero.Module methods we use
+type Module interface {
+	Name() string
+	Close(context.Context) error
+	ExportedFunction(string) api.Function
+}
+
 func (cmd Command) Instantiate(ctx context.Context, r wazero.Runtime, cm wazero.CompiledModule) (*P, error) {
 	var p P
 	var err error
@@ -69,7 +76,7 @@ func (cfg Command) WithEnv(mc wazero.ModuleConfig) wazero.ModuleConfig {
 type P struct {
 	Mailbox   struct{ io.Reader }
 	SendQueue struct{ io.Writer }
-	Mod       api.Module
+	Mod       Module
 
 	once sync.Once
 	sem  *semaphore.Weighted

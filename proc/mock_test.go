@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	api "github.com/tetratelabs/wazero/api"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -52,4 +53,70 @@ func (m *MockMethod) CallWithStack(arg0 context.Context, arg1 []uint64) error {
 func (mr *MockMethodMockRecorder) CallWithStack(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallWithStack", reflect.TypeOf((*MockMethod)(nil).CallWithStack), arg0, arg1)
+}
+
+// MockModule is a mock of Module interface.
+type MockModule struct {
+	ctrl     *gomock.Controller
+	recorder *MockModuleMockRecorder
+	isgomock struct{}
+}
+
+// MockModuleMockRecorder is the mock recorder for MockModule.
+type MockModuleMockRecorder struct {
+	mock *MockModule
+}
+
+// NewMockModule creates a new mock instance.
+func NewMockModule(ctrl *gomock.Controller) *MockModule {
+	mock := &MockModule{ctrl: ctrl}
+	mock.recorder = &MockModuleMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockModule) EXPECT() *MockModuleMockRecorder {
+	return m.recorder
+}
+
+// Close mocks base method.
+func (m *MockModule) Close(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockModuleMockRecorder) Close(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockModule)(nil).Close), arg0)
+}
+
+// ExportedFunction mocks base method.
+func (m *MockModule) ExportedFunction(arg0 string) api.Function {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExportedFunction", arg0)
+	ret0, _ := ret[0].(api.Function)
+	return ret0
+}
+
+// ExportedFunction indicates an expected call of ExportedFunction.
+func (mr *MockModuleMockRecorder) ExportedFunction(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExportedFunction", reflect.TypeOf((*MockModule)(nil).ExportedFunction), arg0)
+}
+
+// Name mocks base method.
+func (m *MockModule) Name() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Name")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Name indicates an expected call of Name.
+func (mr *MockModuleMockRecorder) Name() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockModule)(nil).Name))
 }
