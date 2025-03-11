@@ -24,6 +24,7 @@ import (
 	"github.com/urfave/cli/v2"
 	syncutils "github.com/wetware/go/util/sync"
 	"go.uber.org/multierr"
+	"golang.org/x/time/rate"
 )
 
 func teardown(c *cli.Context) error {
@@ -120,17 +121,30 @@ func setup(c *cli.Context) (err error) {
 //   - Begin the background DHT maintenance processes
 //   - Enable peer discovery and content routing
 func bootstrap(c *cli.Context) error {
-	var join syncutils.Any // join strategy: any successful connection => ok
-	for _, info := range addrs(c) {
+	var peers []peer.AddrInfo
+	peers = append(peers, addrs(c)...)                               // User-provided peers
+	peers = append(peers, env.PublicBootstrapPeers()...)             // Public peers
+	peers = append(peers, dht.GetDefaultBootstrapPeerAddrInfos()...) // Default IPFS peers
+
+	// Try to connect to bootstrap peers concurrently with rate limiting
+	limiter := rate.NewLimiter(rate.Limit(32), 8) // Allow up to 8 concurrent connection attempts
+	var join syncutils.Any                        // join strategy: any successful connection => ok
+	for _, info := range peers {
+		info := info // capture for closure
 		join.Go(func() error {
+			if err := limiter.Wait(c.Context); err != nil {
+				return err
+			}
+
 			return env.Host.Connect(c.Context, info)
 		})
 	}
 
 	if err := join.Wait(); err != nil {
-		return err
+		return fmt.Errorf("failed to connect to any bootstrap peers: %w", err)
 	}
 
+	// Now that we have connections, bootstrap the DHT
 	return env.DHT.Bootstrap(c.Context)
 }
 
