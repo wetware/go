@@ -58,17 +58,6 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_PRIVKEY"},
 				Usage:   "path to private key file for libp2p identity",
 			},
-			&cli.BoolFlag{
-				Name:    "json",
-				EnvVars: []string{"WW_JSON"},
-				Usage:   "output json logs",
-			},
-			&cli.StringFlag{
-				Name:    "loglvl",
-				EnvVars: []string{"WW_LOGLVL"},
-				Value:   "info",
-				Usage:   "logging level: debug, info, warn, error",
-			},
 			&cli.StringSliceFlag{
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},

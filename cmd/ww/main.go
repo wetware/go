@@ -26,6 +26,19 @@ func main() {
 		Copyright:      "2020 The Wetware Project",
 		Before:         setup,
 		DefaultCommand: "serve",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "json",
+				EnvVars: []string{"WW_JSON"},
+				Usage:   "output json logs",
+			},
+			&cli.StringFlag{
+				Name:    "loglvl",
+				EnvVars: []string{"WW_LOGLVL"},
+				Value:   "info",
+				Usage:   "logging level: debug, info, warn, error",
+			},
+		},
 		Commands: []*cli.Command{
 			serve.Command(),
 			idgen.Command(),
