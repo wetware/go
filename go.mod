@@ -4,6 +4,7 @@ go 1.24
 
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
+	github.com/Mathew-Estafanous/memlist v0.1.2
 	github.com/blang/semver/v4 v4.0.0
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/ipfs/boxo v0.28.0
@@ -52,6 +53,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
+	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250208200701-d0013a598941 // indirect
 	github.com/google/uuid v1.6.0 // indirect
