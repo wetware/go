@@ -25,7 +25,7 @@ type Method interface {
 }
 
 type Command struct {
-	PID       PID
+	PID       ID
 	Args, Env []string
 	Stderr    io.Writer
 	FS        fs.FS

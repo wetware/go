@@ -12,9 +12,9 @@ import (
 	"github.com/mr-tron/base58/base58"
 )
 
-type PID [20]byte // 160bit opaque identifier
+type ID [20]byte // 160bit opaque identifier
 
-func NewPID() (pid PID) {
+func NewPID() (pid ID) {
 	var err error
 	if pid, err = ReadPID(rand.Reader); err != nil {
 		panic(err)
@@ -23,7 +23,7 @@ func NewPID() (pid PID) {
 	return
 }
 
-func ReadPID(r io.Reader) (pid PID, err error) {
+func ReadPID(r io.Reader) (pid ID, err error) {
 	var n int // if no error and don't read 20 bytes, sound the alarm.
 	if n, err = r.Read(pid[:]); n != len(pid) && err == nil {
 		err = io.ErrUnexpectedEOF
@@ -32,7 +32,7 @@ func ReadPID(r io.Reader) (pid PID, err error) {
 	return
 }
 
-func ParsePID(s string) (pid PID, err error) {
+func ParsePID(s string) (pid ID, err error) {
 	var buf []byte
 	if buf, err = base58.FastBase58Decoding(s); err == nil {
 		copy(pid[:], buf)
@@ -40,7 +40,7 @@ func ParsePID(s string) (pid PID, err error) {
 	return
 }
 
-func (pid PID) String() string {
+func (pid ID) String() string {
 	return base58.FastBase58Encoding(pid[:])
 }
 
@@ -56,7 +56,7 @@ func (i PIDIndexer) FromArgs(args ...interface{}) ([]byte, error) {
 	}
 
 	switch arg0 := args[0].(type) {
-	case PID:
+	case ID:
 		return arg0[:], nil
 
 	case string:
@@ -75,7 +75,7 @@ func (i PIDIndexer) FromArgs(args ...interface{}) ([]byte, error) {
 // while extracting the index value, respectively.
 func (i PIDIndexer) FromObject(raw interface{}) (bool, []byte, error) {
 	switch object := raw.(type) {
-	case PID:
+	case ID:
 		return true, object[:], nil
 
 	case string:
