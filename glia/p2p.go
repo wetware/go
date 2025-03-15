@@ -144,5 +144,4 @@ func (s P2PStream) ProcID() string {
 func (s P2PStream) MethodName() string {
 	proto := s.Protocol()
 	return path.Base(string(proto))
-
 }
