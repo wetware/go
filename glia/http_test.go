@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,25 @@ import (
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
+
+// testEnv implements glia.Env for testing
+type testEnv struct {
+	logger *slog.Logger
+	// Add other required fields based on the Env interface
+}
+
+func (e *testEnv) Log() *slog.Logger {
+	return e.logger
+}
+
+// Add other required methods based on the Env interface
+
+func newTestEnv(t *testing.T) *testEnv {
+	t.Helper()
+	return &testEnv{
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+}
 
 func TestHTTP(t *testing.T) {
 	t.Parallel()
@@ -134,5 +154,103 @@ func TestHTTPStream(t *testing.T) {
 
 	t.Run("Close", func(t *testing.T) {
 		require.NoError(t, stream.Close())
+	})
+}
+
+func TestHTTPIntegration(t *testing.T) {
+	host, err := libp2p.New(libp2p.NoTransports, libp2p.NoListenAddrs)
+	require.NoError(t, err)
+
+	// Set up wazero runtime and load echo module
+	r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfig().
+		WithCloseOnContextDone(true))
+	defer r.Close(context.Background())
+	wasi_snapshot_preview1.MustInstantiate(context.Background(), r)
+
+	bytecode, err := os.ReadFile("../examples/echo/main.wasm")
+	require.NoError(t, err)
+
+	cm, err := r.CompileModule(context.Background(), bytecode)
+	require.NoError(t, err)
+	defer cm.Close(context.Background())
+
+	const expectedProc = "Wt9hMLbqHmNuCsvqCW8AuKxUjwL"
+	pid, err := proc.ParsePID(expectedProc)
+	require.NoError(t, err)
+
+	p, err := proc.Command{
+		PID:    pid,
+		Stderr: os.Stderr,
+	}.Instantiate(context.Background(), r, cm)
+	require.NoError(t, err)
+	defer p.Close(context.Background())
+
+	h := &glia.HTTP{
+		Env: &system.Env{
+			Host: host,
+		},
+		Router: mockRouter{P: p},
+	}
+	h.Init()
+
+	server := httptest.NewServer(h.Handler)
+	defer server.Close()
+
+	t.Run("status endpoint", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/status")
+		require.NoError(t, err, "Failed to get status")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+
+	t.Run("version endpoint", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/version")
+		require.NoError(t, err, "Failed to get version")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+		require.NotEmpty(t, body, "Expected non-empty version response")
+	})
+
+	t.Run("glia endpoint", func(t *testing.T) {
+		// Test POST request
+		resp, err := http.Post(server.URL+"/ipfs/v0/host123/proc456/method789", "", nil)
+		require.NoError(t, err, "Failed to post to glia endpoint")
+		defer resp.Body.Close()
+
+		require.NotEqual(t, http.StatusMethodNotAllowed, resp.StatusCode, "Expected endpoint to be found, got method not allowed")
+	})
+
+	t.Run("method not allowed", func(t *testing.T) {
+		// Test wrong methods on endpoints
+		endpoints := []string{"/status", "/version"}
+		for _, endpoint := range endpoints {
+			resp, err := http.Post(server.URL+endpoint, "", nil)
+			require.NoError(t, err, "Failed to post to %s", endpoint)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode,
+				"Expected status 405 for POST to %s", endpoint)
+		}
+	})
+
+	t.Run("echo endpoint", func(t *testing.T) {
+		const message = "Hello, Wetware!"
+		resp, err := http.Post(
+			server.URL+path.Join("/ipfs/v0", host.ID().String(), expectedProc, "echo"),
+			"text/plain",
+			strings.NewReader(message))
+		require.NoError(t, err, "Failed to post to echo endpoint")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+		require.Equal(t, message, string(body), "Echo response should match input")
 	})
 }
