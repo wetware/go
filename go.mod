@@ -13,6 +13,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.29.0
 	github.com/lmittmann/tint v1.0.4
 	github.com/lthibault/go-libp2p-inproc-transport v0.4.1
+	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.15.0
 	github.com/pkg/errors v0.9.1

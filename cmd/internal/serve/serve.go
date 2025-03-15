@@ -154,10 +154,12 @@ func serve(c *cli.Context) error {
 
 	// Initialize and bind system services to the supervisor:
 	// - MDNS for local network discovery
+	// - DHT for peer discovery over the network
 	// - P2P for distributed communication
 	// - HTTP API server
 	for _, s := range []suture.Service{
 		&boot.MDNS{Env: &env},
+		&boot.DHT{Env: &env},
 		&glia.P2P{Env: &env, Router: rt},
 		// &glia.Unix{Env: env, Router: rt, Path c.String("unix")},
 		&glia.HTTP{Env: &env, Router: rt, ListenAddr: c.String("http")},
