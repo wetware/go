@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	inproc "github.com/lthibault/go-libp2p-inproc-transport"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
@@ -39,6 +41,107 @@ func newTestEnv(t *testing.T) *testEnv {
 	return &testEnv{
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
+}
+
+type testFixture struct {
+	t      *testing.T
+	ctx    context.Context
+	rt     wazero.Runtime
+	module wazero.CompiledModule
+	host   host.Host
+	server *httptest.Server
+}
+
+func newTestFixture(t *testing.T) *testFixture {
+	t.Helper()
+
+	// Create host with inproc transport
+	h, err := libp2p.New(
+		libp2p.NoTransports,
+		libp2p.NoListenAddrs,
+		libp2p.Transport(inproc.New()),
+		libp2p.ListenAddrStrings("/inproc/~"))
+	require.NoError(t, err)
+
+	// Set up wazero runtime
+	ctx := context.Background()
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		WithCloseOnContextDone(true))
+	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
+
+	// Load echo module
+	bytecode, err := os.ReadFile("../examples/echo/main.wasm")
+	require.NoError(t, err)
+
+	module, err := rt.CompileModule(ctx, bytecode)
+	require.NoError(t, err)
+
+	return &testFixture{
+		t:      t,
+		ctx:    ctx,
+		rt:     rt,
+		module: module,
+		host:   h,
+	}
+}
+
+func (f *testFixture) Close() {
+	if f.server != nil {
+		f.server.Close()
+	}
+	if f.module != nil {
+		f.module.Close(f.ctx)
+	}
+	if f.rt != nil {
+		f.rt.Close(f.ctx)
+	}
+}
+
+func (f *testFixture) NewProcess() (*proc.P, string) {
+	f.t.Helper()
+	pid := proc.NewPID()
+	p, err := proc.Command{
+		PID:    pid,
+		Stderr: os.Stderr,
+	}.Instantiate(f.ctx, f.rt, f.module)
+	require.NoError(f.t, err)
+	return p, pid.String()
+}
+
+func (f *testFixture) NewHTTPServer(p *proc.P) *httptest.Server {
+	f.t.Helper()
+	h := &glia.HTTP{
+		Env: &system.Env{
+			Host: f.host,
+		},
+		Router: mockRouter{P: p},
+	}
+	h.Init()
+	f.server = httptest.NewServer(h.Handler)
+	return f.server
+}
+
+func (f *testFixture) NewPeerWithProcess() (host.Host, *proc.P, string) {
+	f.t.Helper()
+	peer, err := libp2p.New(
+		libp2p.NoTransports,
+		libp2p.NoListenAddrs,
+		libp2p.Transport(inproc.New()),
+		libp2p.ListenAddrStrings("/inproc/~"))
+	require.NoError(f.t, err)
+
+	p, pid := f.NewProcess()
+	return peer, p, pid
+}
+
+func (f *testFixture) ConnectToPeer(h host.Host) {
+	f.t.Helper()
+	info := peer.AddrInfo{
+		ID:    h.ID(),
+		Addrs: h.Addrs(),
+	}
+	err := f.host.Connect(f.ctx, info)
+	require.NoError(f.t, err)
 }
 
 func TestHTTP(t *testing.T) {
@@ -158,42 +261,15 @@ func TestHTTPStream(t *testing.T) {
 }
 
 func TestHTTPIntegration(t *testing.T) {
-	host, err := libp2p.New(libp2p.NoTransports, libp2p.NoListenAddrs)
-	require.NoError(t, err)
+	f := newTestFixture(t)
+	defer f.Close()
 
-	// Set up wazero runtime and load echo module
-	r := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfig().
-		WithCloseOnContextDone(true))
-	defer r.Close(context.Background())
-	wasi_snapshot_preview1.MustInstantiate(context.Background(), r)
+	// Create local process
+	p, pid := f.NewProcess()
+	defer p.Close(f.ctx)
 
-	bytecode, err := os.ReadFile("../examples/echo/main.wasm")
-	require.NoError(t, err)
-
-	cm, err := r.CompileModule(context.Background(), bytecode)
-	require.NoError(t, err)
-	defer cm.Close(context.Background())
-
-	const expectedProc = "Wt9hMLbqHmNuCsvqCW8AuKxUjwL"
-	pid, err := proc.ParsePID(expectedProc)
-	require.NoError(t, err)
-
-	p, err := proc.Command{
-		PID:    pid,
-		Stderr: os.Stderr,
-	}.Instantiate(context.Background(), r, cm)
-	require.NoError(t, err)
-	defer p.Close(context.Background())
-
-	h := &glia.HTTP{
-		Env: &system.Env{
-			Host: host,
-		},
-		Router: mockRouter{P: p},
-	}
-	h.Init()
-
-	server := httptest.NewServer(h.Handler)
+	// Set up HTTP server
+	server := f.NewHTTPServer(p)
 	defer server.Close()
 
 	t.Run("status endpoint", func(t *testing.T) {
@@ -217,16 +293,14 @@ func TestHTTPIntegration(t *testing.T) {
 	})
 
 	t.Run("glia endpoint", func(t *testing.T) {
-		// Test POST request
 		resp, err := http.Post(server.URL+"/ipfs/v0/host123/proc456/method789", "", nil)
 		require.NoError(t, err, "Failed to post to glia endpoint")
 		defer resp.Body.Close()
 
-		require.NotEqual(t, http.StatusMethodNotAllowed, resp.StatusCode, "Expected endpoint to be found, got method not allowed")
+		require.NotEqual(t, http.StatusMethodNotAllowed, resp.StatusCode)
 	})
 
 	t.Run("method not allowed", func(t *testing.T) {
-		// Test wrong methods on endpoints
 		endpoints := []string{"/status", "/version"}
 		for _, endpoint := range endpoints {
 			resp, err := http.Post(server.URL+endpoint, "", nil)
@@ -241,7 +315,7 @@ func TestHTTPIntegration(t *testing.T) {
 	t.Run("echo endpoint", func(t *testing.T) {
 		const message = "Hello, Wetware!"
 		resp, err := http.Post(
-			server.URL+path.Join("/ipfs/v0", host.ID().String(), expectedProc, "echo"),
+			server.URL+path.Join("/", system.Proto.String(), f.host.ID().String(), pid, "echo"),
 			"text/plain",
 			strings.NewReader(message))
 		require.NoError(t, err, "Failed to post to echo endpoint")
@@ -252,5 +326,50 @@ func TestHTTPIntegration(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err, "Failed to read response body")
 		require.Equal(t, message, string(body), "Echo response should match input")
+	})
+
+	t.Run("remote echo endpoint", func(t *testing.T) {
+		// Create peer B with its own process
+		peerB, pB, pidB := f.NewPeerWithProcess()
+		defer pB.Close(f.ctx)
+
+		// Set up P2P handlers on both hosts
+		p2pA := &glia.P2P{
+			Env: &system.Env{
+				Host: f.host,
+			},
+			Router: mockRouter{P: p},
+		}
+		go p2pA.Serve(f.ctx)
+
+		p2pB := &glia.P2P{
+			Env: &system.Env{
+				Host: peerB,
+			},
+			Router: mockRouter{P: pB},
+		}
+		go p2pB.Serve(f.ctx)
+
+		// Create HTTP handler for host A that will route to host B
+		serverA := f.NewHTTPServer(pB)
+		defer serverA.Close()
+
+		// Connect host A to host B
+		f.ConnectToPeer(peerB)
+
+		// Send request to host A that should be routed to process on host B
+		const message = "Hello from remote ww host!"
+		resp, err := http.Post(
+			serverA.URL+path.Join("/", system.Proto.String(), peerB.ID().String(), pidB, "echo"),
+			"text/plain",
+			strings.NewReader(message))
+		require.NoError(t, err, "failed to post to remote echo endpoint")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "failed to read response body")
+		require.Equal(t, message, string(body), "remote echo response should match input")
 	})
 }
