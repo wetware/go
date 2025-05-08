@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/wetware/go/system"
@@ -28,6 +29,7 @@ var ErrNotFound = errors.New("not found")
 type HTTP struct {
 	Env    Env
 	Router system.Router
+	Root   string
 
 	once         sync.Once
 	ListenConfig *net.ListenConfig
@@ -68,15 +70,16 @@ func (h *HTTP) Init() {
 }
 
 func (h *HTTP) DefaultRouter() http.Handler {
-	mux := &http.ServeMux{}
-	mux.HandleFunc("/status", h.status)
-	mux.HandleFunc("/info", h.info)
-	mux.HandleFunc("/version", h.version)
+	r := chi.NewRouter()
+	r.Get("/status", h.status)
+	r.Get("/info", h.info)
+	r.Get("/version", h.version)
+	r.Get("/root", h.root)
 
 	path := path.Join(system.Proto.Path(), "{host}/{proc}/{method}")
-	mux.HandleFunc(path, h.glia)
+	r.Post(path, h.glia)
 
-	return mux
+	return r
 }
 
 func (h *HTTP) Serve(ctx context.Context) error {
@@ -274,4 +277,17 @@ func (s HTTPStream) Read(p []byte) (int, error) {
 
 func (s HTTPStream) Write(p []byte) (int, error) {
 	return s.ResponseWriter.Write(p)
+}
+
+// root handles GET requests to the /root endpoint.
+// It returns a 200 OK response with the root proc.ID.
+func (h *HTTP) root(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	// Write the root proc.ID as a base58-encoded string
+	w.WriteHeader(http.StatusOK)
+	if _, err := io.WriteString(w, h.Root); err != nil {
+		h.Log().ErrorContext(r.Context(), "failed to write root response",
+			"reason", err)
+	}
 }

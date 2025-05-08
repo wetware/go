@@ -6,6 +6,7 @@ require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
 	github.com/Mathew-Estafanous/memlist v0.1.2
 	github.com/blang/semver/v4 v4.0.0
+	github.com/go-chi/chi/v5 v5.0.12
 	github.com/hashicorp/go-memdb v1.3.4
 	github.com/ipfs/boxo v0.28.0
 	github.com/ipfs/kubo v0.31.0

@@ -96,6 +96,7 @@ func (f *testFixture) NewHTTPServer(p *proc.P) *httptest.Server {
 			Host: f.host,
 		},
 		Router: mockRouter{P: p},
+		Root:   p.String(),
 	}
 	h.Init()
 	f.server = httptest.NewServer(h.Handler)
@@ -274,6 +275,41 @@ func TestHTTPIntegration(t *testing.T) {
 		require.NoError(t, err, "Failed to decode JSON response")
 		require.Equal(t, f.host.ID(), info.ID)
 		require.NotEmpty(t, info.Addrs, "Expected non-empty addresses")
+	})
+
+	t.Run("root endpoint", func(t *testing.T) {
+		// Test root endpoint
+		resp, err := http.Get(server.URL + "/root")
+		require.NoError(t, err, "Failed to get root")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+
+		// Verify the response is a valid proc.ID
+		pid, err := proc.ParsePID(string(body))
+		require.NoError(t, err, "Response should be a valid proc.ID")
+		require.Len(t, pid[:], 20, "proc.ID should be 20 bytes")
+
+		// Test deterministic behavior - should yield same PID
+		resp2, err := http.Get(server.URL + "/root")
+		require.NoError(t, err, "Failed to get root second time")
+		defer resp2.Body.Close()
+
+		body2, err := io.ReadAll(resp2.Body)
+		require.NoError(t, err, "Failed to read second response body")
+
+		pid2, err := proc.ParsePID(string(body2))
+		require.NoError(t, err, "Second response should be a valid proc.ID")
+		require.Equal(t, pid, pid2, "Root endpoint should yield same PID")
+
+		// Test with POST method (should fail)
+		resp, err = http.Post(server.URL+"/root", "", nil)
+		require.NoError(t, err, "Failed to post to root endpoint")
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 	})
 
 	t.Run("version endpoint", func(t *testing.T) {

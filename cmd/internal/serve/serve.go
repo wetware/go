@@ -180,6 +180,7 @@ func serve(c *cli.Context) error {
 		&glia.P2P{Env: &env, Router: rt},
 		&glia.HTTP{
 			Env:        &env,
+			Root:       p.String(),
 			Router:     rt,
 			ListenAddr: c.String("http"),
 		},
