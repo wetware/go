@@ -2,7 +2,6 @@ package system
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"time"
@@ -53,13 +52,8 @@ func (env Env) HandlePeerFound(info peer.AddrInfo) {
 	}
 }
 
-func (env Env) Load(ctx context.Context, p string) ([]byte, error) {
-	path, err := path.NewPath(p)
-	if err != nil {
-		return nil, fmt.Errorf("invalid IPFS path %q: %w", p, err)
-	}
-
-	node, err := env.IPFS.Unixfs().Get(ctx, path)
+func (env Env) Load(ctx context.Context, p path.Path) ([]byte, error) {
+	node, err := env.IPFS.Unixfs().Get(ctx, p)
 	if err != nil {
 		return nil, err
 	}
