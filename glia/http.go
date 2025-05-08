@@ -2,6 +2,7 @@ package glia
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/wetware/go/system"
 	"go.uber.org/multierr"
@@ -68,6 +70,7 @@ func (h *HTTP) Init() {
 func (h *HTTP) DefaultRouter() http.Handler {
 	mux := &http.ServeMux{}
 	mux.HandleFunc("/status", h.status)
+	mux.HandleFunc("/info", h.info)
 	mux.HandleFunc("/version", h.version)
 
 	path := path.Join(system.Proto.Path(), "{host}/{proc}/{method}")
@@ -144,6 +147,9 @@ func (h *HTTP) Serve(ctx context.Context) error {
 	return <-cherr
 }
 
+// status handles GET requests to the /status endpoint.
+// It returns a 204 No Content response to indicate the service is running.
+// This endpoint is useful for health checks and service availability monitoring.
 func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -153,6 +159,32 @@ func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// info handles GET requests to the /info endpoint.
+// It returns a 200 OK response with a JSON object containing the host's peer information,
+// including its ID and network addresses. The response is encoded as a peer.AddrInfo object.
+// This endpoint is useful for discovering the host's identity and network configuration.
+func (h *HTTP) info(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	if r.Method != http.MethodGet {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get host info
+	info := host.InfoFromHost(h.Env.LocalHost())
+
+	// Set content type to JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// Encode and write the response
+	if err := json.NewEncoder(w).Encode(info); err != nil {
+		h.Log().ErrorContext(r.Context(), "failed to write info response",
+			"reason", err)
+	}
 }
 
 func (h *HTTP) version(w http.ResponseWriter, r *http.Request) {
