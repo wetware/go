@@ -10,15 +10,12 @@
 package glia_test
 
 import (
-	context "context"
-	io "io"
 	slog "log/slog"
 	reflect "reflect"
 
 	host "github.com/libp2p/go-libp2p/core/host"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	routing "github.com/libp2p/go-libp2p/core/routing"
-	proc "github.com/wetware/go/proc"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -86,98 +83,6 @@ func (m *MockEnv) Routing() routing.Routing {
 func (mr *MockEnvMockRecorder) Routing() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Routing", reflect.TypeOf((*MockEnv)(nil).Routing))
-}
-
-// MockProc is a mock of Proc interface.
-type MockProc struct {
-	ctrl     *gomock.Controller
-	recorder *MockProcMockRecorder
-	isgomock struct{}
-}
-
-// MockProcMockRecorder is the mock recorder for MockProc.
-type MockProcMockRecorder struct {
-	mock *MockProc
-}
-
-// NewMockProc creates a new mock instance.
-func NewMockProc(ctrl *gomock.Controller) *MockProc {
-	mock := &MockProc{ctrl: ctrl}
-	mock.recorder = &MockProcMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockProc) EXPECT() *MockProcMockRecorder {
-	return m.recorder
-}
-
-// Close mocks base method.
-func (m *MockProc) Close(arg0 context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Close indicates an expected call of Close.
-func (mr *MockProcMockRecorder) Close(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockProc)(nil).Close), arg0)
-}
-
-// Method mocks base method.
-func (m *MockProc) Method(name string) proc.Method {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Method", name)
-	ret0, _ := ret[0].(proc.Method)
-	return ret0
-}
-
-// Method indicates an expected call of Method.
-func (mr *MockProcMockRecorder) Method(name any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Method", reflect.TypeOf((*MockProc)(nil).Method), name)
-}
-
-// Release mocks base method.
-func (m *MockProc) Release() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Release")
-}
-
-// Release indicates an expected call of Release.
-func (mr *MockProcMockRecorder) Release() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockProc)(nil).Release))
-}
-
-// Reserve mocks base method.
-func (m *MockProc) Reserve(arg0 context.Context, arg1 io.ReadWriteCloser) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reserve", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Reserve indicates an expected call of Reserve.
-func (mr *MockProcMockRecorder) Reserve(arg0, arg1 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reserve", reflect.TypeOf((*MockProc)(nil).Reserve), arg0, arg1)
-}
-
-// String mocks base method.
-func (m *MockProc) String() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "String")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// String indicates an expected call of String.
-func (mr *MockProcMockRecorder) String() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "String", reflect.TypeOf((*MockProc)(nil).String))
 }
 
 // MockStream is a mock of Stream interface.
