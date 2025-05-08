@@ -259,7 +259,15 @@ func TestHTTPIntegration(t *testing.T) {
 		require.NoError(t, err, "Failed to get status")
 		defer resp.Body.Close()
 
-		require.Equal(t, http.StatusNoContent, resp.StatusCode)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "text/plain", resp.Header.Get("Content-Type"))
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+
+		// Verify the response contains the API path with root PID
+		expectedPath := path.Join(system.Proto.String(), f.host.ID().String(), pid)
+		require.Equal(t, expectedPath, string(body), "Status should return API path with root PID")
 	})
 
 	t.Run("info endpoint", func(t *testing.T) {

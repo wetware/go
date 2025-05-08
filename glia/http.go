@@ -151,8 +151,7 @@ func (h *HTTP) Serve(ctx context.Context) error {
 }
 
 // status handles GET requests to the /status endpoint.
-// It returns a 204 No Content response to indicate the service is running.
-// This endpoint is useful for health checks and service availability monitoring.
+// It returns a 200 OK response with the API path including the root PID.
 func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -161,7 +160,18 @@ func (h *HTTP) status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Construct the API path with the root PID
+	apiPath := path.Join(system.Proto.String(), h.Env.LocalHost().ID().String(), h.Root)
+
+	// Set content type to text/plain
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+
+	// Write the API path
+	if _, err := io.WriteString(w, apiPath); err != nil {
+		h.Log().ErrorContext(r.Context(), "failed to write status response",
+			"reason", err)
+	}
 }
 
 // info handles GET requests to the /info endpoint.
