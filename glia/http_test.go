@@ -3,8 +3,8 @@ package glia_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -23,25 +23,6 @@ import (
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
 )
-
-// testEnv implements glia.Env for testing
-type testEnv struct {
-	logger *slog.Logger
-	// Add other required fields based on the Env interface
-}
-
-func (e *testEnv) Log() *slog.Logger {
-	return e.logger
-}
-
-// Add other required methods based on the Env interface
-
-func newTestEnv(t *testing.T) *testEnv {
-	t.Helper()
-	return &testEnv{
-		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-	}
-}
 
 type testFixture struct {
 	t      *testing.T
@@ -278,6 +259,21 @@ func TestHTTPIntegration(t *testing.T) {
 		defer resp.Body.Close()
 
 		require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	})
+
+	t.Run("info endpoint", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/info")
+		require.NoError(t, err, "Failed to get info")
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+		var info peer.AddrInfo
+		err = json.NewDecoder(resp.Body).Decode(&info)
+		require.NoError(t, err, "Failed to decode JSON response")
+		require.Equal(t, f.host.ID(), info.ID)
+		require.NotEmpty(t, info.Addrs, "Expected non-empty addresses")
 	})
 
 	t.Run("version endpoint", func(t *testing.T) {
