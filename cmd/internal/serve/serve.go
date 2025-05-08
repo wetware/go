@@ -1,14 +1,17 @@
 package serve
 
 import (
-	"fmt"
+	"context"
+	"io"
+	"os"
 
 	"github.com/hashicorp/go-memdb"
+	"github.com/ipfs/boxo/path"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/sys"
 	"github.com/thejerf/suture/v4"
 	"github.com/urfave/cli/v2"
-	"github.com/wetware/go/boot"
 	"github.com/wetware/go/glia"
 	"github.com/wetware/go/proc"
 	"github.com/wetware/go/system"
@@ -58,6 +61,12 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_PRIVKEY"},
 				Usage:   "path to private key file for libp2p identity",
 			},
+			&cli.PathFlag{
+				Name:    "root",
+				EnvVars: []string{"WW_ROOT"},
+				Usage:   "ipfs path or local path to config directory",
+				Value:   ".",
+			},
 			&cli.StringSliceFlag{
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},
@@ -87,36 +96,33 @@ func Command() *cli.Command {
 // 4. Starts system services
 // 5. Runs the supervisor until completion
 func serve(c *cli.Context) error {
-	// Validate that a process path was provided
-	if c.NArg() < 1 {
-		return fmt.Errorf("missing required argument: path to wetware process")
-	}
+	ctx, cancel := context.WithCancel(c.Context)
+	defer cancel()
 
 	// Initialize WebAssembly runtime with debug info if enabled
-	r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
+	r := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
 		WithCloseOnContextDone(true).
 		WithDebugInfoEnabled(c.Bool("wasm-debug")))
-	defer r.Close(c.Context)
+	defer r.Close(ctx)
 
 	// Instantiate WASI preview1 for system interface compatibility
-	wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
+	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, r)
 	if err != nil {
 		return err
 	}
-	defer wasi.Close(c.Context)
+	defer wasi.Close(ctx)
 
-	// Load the WebAssembly module bytes from the specified path
-	b, err := env.Load(c.Context, c.Args().First())
+	b, err := bytecode(c)
 	if err != nil {
 		return err
 	}
 
 	// Compile the WebAssembly module
-	cm, err := r.CompileModule(c.Context, b)
+	cm, err := r.CompileModule(ctx, b)
 	if err != nil {
 		return err
 	}
-	defer cm.Close(c.Context)
+	defer cm.Close(ctx)
 
 	// Create a new process instance with:
 	// - A unique process ID
@@ -126,13 +132,14 @@ func serve(c *cli.Context) error {
 	p, err := proc.Command{
 		PID:    proc.NewPID(),
 		Args:   c.Args().Slice(),
+		Env:    c.StringSlice("env"),
 		Stderr: c.App.ErrWriter,
-		FS:     env.NewUnixFS(c.Context),
-	}.Instantiate(c.Context, r, cm)
+		FS:     env.NewUnixFS(ctx),
+	}.Instantiate(ctx, r, cm)
 	if err != nil {
 		return err
 	}
-	defer p.Close(c.Context)
+	defer p.Close(ctx)
 
 	// Initialize the software transactional memory database that will
 	// store and coordinate process state
@@ -149,6 +156,18 @@ func serve(c *cli.Context) error {
 	}
 	init.Commit()
 
+	// Reserve resources for the bootloader execution
+	if err := p.Reserve(ctx, struct {
+		io.ReadCloser
+		io.Writer
+	}{
+		ReadCloser: io.NopCloser(c.App.Reader),
+		Writer:     c.App.Writer,
+	}); err != nil {
+		return err
+	}
+	defer p.Release()
+
 	// Create router for inter-process message delivery
 	rt := &Router{DB: db}
 
@@ -158,19 +177,48 @@ func serve(c *cli.Context) error {
 	// - P2P for distributed communication
 	// - HTTP API server
 	for _, s := range []suture.Service{
-		&boot.MDNS{Env: &env},
-		&boot.DHT{Env: &env},
 		&glia.P2P{Env: &env, Router: rt},
-		// &glia.Unix{Env: env, Router: rt, Path c.String("unix")},
-		&glia.HTTP{Env: &env, Router: rt, ListenAddr: c.String("http")},
+		&glia.HTTP{
+			Env:        &env,
+			Router:     rt,
+			ListenAddr: c.String("http"),
+		},
 	} {
 		wetware.Add(s)
 	}
+	cherr := wetware.ServeBackground(ctx)
 
 	// Log successful server startup
 	env.Log().Info("server started",
 		"proc", p.String())
 
-	// Run the supervisor until context cancellation or fatal error
-	return wetware.Serve(c.Context)
+	// execute the bootloader
+	if err := p.Method("_start").CallWithStack(ctx, nil); err != nil {
+		if e, ok := err.(*sys.ExitError); !ok || e.ExitCode() != 0 {
+			return err
+		}
+	}
+
+	return <-cherr
+}
+
+func rootPath(c *cli.Context) (path.Path, error) {
+	if c.NArg() == 0 {
+		return path.NewPath(c.String("root"))
+	}
+
+	return path.NewPath(c.Args().First())
+}
+
+func bytecode(c *cli.Context) ([]byte, error) {
+	root, err := rootPath(c)
+	if err != nil {
+		// Try loading from local file path first
+		if _, err := os.Stat(c.Args().First()); err == nil {
+			return os.ReadFile(c.Args().First())
+		}
+		return nil, err
+	}
+
+	return env.Load(c.Context, root)
 }
