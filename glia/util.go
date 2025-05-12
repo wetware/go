@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-
-	capnp "capnproto.org/go/capnp/v3"
 )
 
 func ReadFrame(r *bufio.Reader) ([]byte, error) {
@@ -18,15 +16,6 @@ func ReadFrame(r *bufio.Reader) ([]byte, error) {
 
 	_, err = io.ReadFull(r, buf)
 	return buf, err
-}
-
-func ReadMessage(r *bufio.Reader) (*capnp.Message, error) {
-	body, err := ReadFrame(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return capnp.Unmarshal(body)
 }
 
 func WriteFrame(w io.Writer, body []byte) error {
@@ -43,13 +32,4 @@ func WriteFrame(w io.Writer, body []byte) error {
 	////
 	_, err := io.Copy(w, bytes.NewReader(body))
 	return err
-}
-
-func WriteMessage(w io.Writer, m *capnp.Message) error {
-	b, err := m.Marshal()
-	if err != nil {
-		return err
-	}
-
-	return WriteFrame(w, b)
 }
