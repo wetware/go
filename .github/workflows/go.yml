@@ -9,9 +9,18 @@ on:
   pull_request:
     branches: ["master"]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PRIVATE_REGISTRY: ${{ secrets.PRIVATE_REGISTRY }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,100 +35,57 @@ jobs:
       - name: Test
         run: go test -v -race ./...
 
-  # deploy:
-  #   runs-on: ubuntu-latest
-  #   outputs:
-  #     previous_commit: ${{ steps.store_commit.outputs.commit }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-  #   needs: build
-  #   if: github.ref == 'refs/heads/master'
-  #   env:
-  #     SSH_DIR: /home/runner/.ssh
-  #     SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  #   steps:
-  #     - name: SSH Key Setup
-  #       run: |
-  #         mkdir -p $SSH_DIR
-  #         ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
-  #         ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-  #         ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
+      - name: Log in to Private Registry
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.PRIVATE_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-  #     - name: Store Current Commit
-  #       id: store_commit
-  #       run: |
-  #         PREV_COMMIT=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git rev-parse HEAD")
-  #         echo "commit=$PREV_COMMIT" >> "$GITHUB_OUTPUT"
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=ref,event=branch
+            type=ref,event=tag
 
-  #     - name: SSH, Pull, and Install
-  #       run: |
-  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./build/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # restart-service:
-  #   runs-on: ubuntu-latest
-  #   needs: deploy
-  #   if: github.ref == 'refs/heads/master'
-  #   env:
-  #     SSH_DIR: /home/runner/.ssh
-  #     SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-
-  #   steps:
-  #     - name: SSH Key Setup
-  #       run: |
-  #         mkdir -p $SSH_DIR
-  #         ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
-  #         ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-  #         ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
-
-  #     - name: Restart Service and Verify Health
-  #       id: restart
-  #       run: |
-  #         # Restart the service
-  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
+      - name: Tag and push to Private Registry
+        if: github.ref == 'refs/heads/master'
+        run: |
+          # Tag the image for private registry
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.PRIVATE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.PRIVATE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           
-  #         # Wait for service to be active or timeout
-  #         TIMEOUT=30
-  #         STARTTIME=$(date +%s)
+          # Push to private registry
+          docker push ${{ secrets.PRIVATE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ secrets.PRIVATE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           
-  #         while true; do
-  #           NOW=$(date +%s)
-  #           if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
-  #             echo "Timeout waiting for service to become active"
-  #             echo "Last 50 lines of service logs:"
-  #             ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
-  #             exit 1
-  #           fi
-            
-  #           STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
-  #           if [ "$STATUS" = "active" ]; then
-  #             break
-  #           fi
-  #           sleep 2
-  #         done
-
-  #     - name: Rollback on Failure
-  #       if: failure() && steps.restart.outcome == 'failure'
-  #       run: |
-  #         echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
-  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && PATH=$PATH:~/.go/bin make install"
-  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
-          
-  #         # Wait for service to be active or timeout
-  #         TIMEOUT=30
-  #         STARTTIME=$(date +%s)
-          
-  #         while true; do
-  #           NOW=$(date +%s)
-  #           if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
-  #             echo "Timeout waiting for service to become active during rollback"
-  #             echo "Last 50 lines of service logs:"
-  #             ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
-  #             exit 1
-  #           fi
-            
-  #           STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
-  #           if [ "$STATUS" = "active" ]; then
-  #             break
-  #           fi
-  #           sleep 2
-  #         done
+          # Verify the push
+          docker pull ${{ secrets.PRIVATE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
