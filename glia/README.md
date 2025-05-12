@@ -115,4 +115,4 @@ The package includes comprehensive tests:
 
 ## License
 
-[License information] 
+[License information]
