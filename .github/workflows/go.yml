@@ -41,8 +41,8 @@ jobs:
       - name: Configure Docker for private registry
         if: github.ref == 'refs/heads/master'
         run: |
-          mkdir -p /etc/docker/certs.d/${{ secrets.PRIVATE_REGISTRY }}
-          echo "${{ secrets.REGISTRY_CA_CERT }}" | base64 -d > /etc/docker/certs.d/${{ secrets.PRIVATE_REGISTRY }}/ca.crt
+          sudo mkdir -p /etc/docker/certs.d/${{ secrets.PRIVATE_REGISTRY }}
+          echo "${{ secrets.REGISTRY_CA_CERT }}" | base64 -d | sudo tee /etc/docker/certs.d/${{ secrets.PRIVATE_REGISTRY }}/ca.crt
           echo '{"insecure-registries": ["${{ secrets.PRIVATE_REGISTRY }}"]}' | sudo tee /etc/docker/daemon.json
           sudo systemctl restart docker
 
