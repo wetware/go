@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.22"
+          go-version: "1.22.1"
 
       - name: Build
         run: go build -v ./...
@@ -26,100 +26,100 @@ jobs:
       - name: Test
         run: go test -v -race ./...
 
-  deploy:
-    runs-on: ubuntu-latest
-    outputs:
-      previous_commit: ${{ steps.store_commit.outputs.commit }}
+  # deploy:
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     previous_commit: ${{ steps.store_commit.outputs.commit }}
 
-    needs: build
-    if: github.ref == 'refs/heads/master'
-    env:
-      SSH_DIR: /home/runner/.ssh
-      SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+  #   needs: build
+  #   if: github.ref == 'refs/heads/master'
+  #   env:
+  #     SSH_DIR: /home/runner/.ssh
+  #     SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
-    steps:
-      - name: SSH Key Setup
-        run: |
-          mkdir -p $SSH_DIR
-          ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
+  #   steps:
+  #     - name: SSH Key Setup
+  #       run: |
+  #         mkdir -p $SSH_DIR
+  #         ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
+  #         ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+  #         ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
-      - name: Store Current Commit
-        id: store_commit
-        run: |
-          PREV_COMMIT=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git rev-parse HEAD")
-          echo "commit=$PREV_COMMIT" >> "$GITHUB_OUTPUT"
+  #     - name: Store Current Commit
+  #       id: store_commit
+  #       run: |
+  #         PREV_COMMIT=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git rev-parse HEAD")
+  #         echo "commit=$PREV_COMMIT" >> "$GITHUB_OUTPUT"
 
-      - name: SSH, Pull, and Install
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
+  #     - name: SSH, Pull, and Install
+  #       run: |
+  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "export PATH=$PATH:~/.go/bin && cd ~/ww-go && git checkout master && git pull && make install"
 
-  restart-service:
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.ref == 'refs/heads/master'
-    env:
-      SSH_DIR: /home/runner/.ssh
-      SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+  # restart-service:
+  #   runs-on: ubuntu-latest
+  #   needs: deploy
+  #   if: github.ref == 'refs/heads/master'
+  #   env:
+  #     SSH_DIR: /home/runner/.ssh
+  #     SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
-    steps:
-      - name: SSH Key Setup
-        run: |
-          mkdir -p $SSH_DIR
-          ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
-          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
+  #   steps:
+  #     - name: SSH Key Setup
+  #       run: |
+  #         mkdir -p $SSH_DIR
+  #         ssh-keyscan ${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} >> $SSH_DIR/known_hosts
+  #         ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+  #         ssh-add - <<< "${{ secrets.RSA_PRIVATE_KEY }}"
 
-      - name: Restart Service and Verify Health
-        id: restart
-        run: |
-          # Restart the service
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
+  #     - name: Restart Service and Verify Health
+  #       id: restart
+  #       run: |
+  #         # Restart the service
+  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
           
-          # Wait for service to be active or timeout
-          TIMEOUT=30
-          STARTTIME=$(date +%s)
+  #         # Wait for service to be active or timeout
+  #         TIMEOUT=30
+  #         STARTTIME=$(date +%s)
           
-          while true; do
-            NOW=$(date +%s)
-            if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
-              echo "Timeout waiting for service to become active"
-              echo "Last 50 lines of service logs:"
-              ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
-              exit 1
-            fi
+  #         while true; do
+  #           NOW=$(date +%s)
+  #           if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
+  #             echo "Timeout waiting for service to become active"
+  #             echo "Last 50 lines of service logs:"
+  #             ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
+  #             exit 1
+  #           fi
             
-            STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
-            if [ "$STATUS" = "active" ]; then
-              break
-            fi
-            sleep 2
-          done
+  #           STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
+  #           if [ "$STATUS" = "active" ]; then
+  #             break
+  #           fi
+  #           sleep 2
+  #         done
 
-      - name: Rollback on Failure
-        if: failure() && steps.restart.outcome == 'failure'
-        run: |
-          echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && PATH=$PATH:~/.go/bin make install"
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
+  #     - name: Rollback on Failure
+  #       if: failure() && steps.restart.outcome == 'failure'
+  #       run: |
+  #         echo "Service restart failed, rolling back to ${{ needs.deploy.outputs.previous_commit }}..."
+  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "cd ~/ww-go && git checkout ${{ needs.deploy.outputs.previous_commit }} && PATH=$PATH:~/.go/bin make install"
+  #         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl restart ww-go.service"
           
-          # Wait for service to be active or timeout
-          TIMEOUT=30
-          STARTTIME=$(date +%s)
+  #         # Wait for service to be active or timeout
+  #         TIMEOUT=30
+  #         STARTTIME=$(date +%s)
           
-          while true; do
-            NOW=$(date +%s)
-            if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
-              echo "Timeout waiting for service to become active during rollback"
-              echo "Last 50 lines of service logs:"
-              ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
-              exit 1
-            fi
+  #         while true; do
+  #           NOW=$(date +%s)
+  #           if [ $((NOW - STARTTIME)) -gt $TIMEOUT ]; then
+  #             echo "Timeout waiting for service to become active during rollback"
+  #             echo "Last 50 lines of service logs:"
+  #             ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/journalctl -u ww-go.service -n 50 --no-pager"
+  #             exit 1
+  #           fi
             
-            STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
-            if [ "$STATUS" = "active" ]; then
-              break
-            fi
-            sleep 2
-          done
+  #           STATUS=$(ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || 22 }} "sudo /usr/bin/systemctl is-active ww-go.service")
+  #           if [ "$STATUS" = "active" ]; then
+  #             break
+  #           fi
+  #           sleep 2
+  #         done
