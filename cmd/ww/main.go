@@ -10,8 +10,8 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/internal/idgen"
-	"github.com/wetware/go/cmd/internal/serve"
+	"github.com/wetware/go/cmd/ww/idgen"
+	"github.com/wetware/go/cmd/ww/serve"
 	"github.com/wetware/go/system"
 )
 
