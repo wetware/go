@@ -7,14 +7,14 @@ RUN apk add --no-cache git
 # Set working directory
 WORKDIR /build
 
-# Copy the entire project
-COPY . .
+# Copy the entire project from root context
+COPY . /build/
 
 # Download dependencies
 RUN go mod download
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ww-go .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ww-go ./cmd/ww
 
 # Final stage
 FROM scratch
