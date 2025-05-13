@@ -1,3 +1,34 @@
+# Container Build
+
+This directory contains the Dockerfile and related files for building the Wetware container image.
+
+## Registries
+
+The container image is pushed to two registries:
+
+1. GitHub Container Registry (ghcr.io)
+   - Public registry
+   - Format: `ghcr.io/wetware/go`
+   - Tags: latest, commit SHA, branch name, tag name
+
+2. Wetware Private Registry
+   - Private registry at container-registry.wetware.run
+   - Format: `container-registry.wetware.run/wetware/go`
+   - Tags: latest, commit SHA
+
+## Building Locally
+
+To build the container locally:
+
+```bash
+docker build -t wetware/go -f build/Dockerfile .
+```
+
+## Registry Access
+
+- GitHub Container Registry (ghcr.io): Public registry, requires GitHub authentication for push
+- Wetware Registry (container-registry.wetware.run): Private registry, requires Wetware registry credentials
+
 # Container Build Process
 
 This directory contains the container build configuration for the Wetware Go project.
