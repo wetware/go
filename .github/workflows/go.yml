@@ -63,7 +63,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true  # Load the image into the local Docker daemon
 
       - name: Verify the push
         if: github.ref == 'refs/heads/master'
