@@ -1,10 +1,9 @@
-package serve
+package publish
 
 import (
 	"crypto/rand"
 	"fmt"
 	"log/slog"
-	insecure_rand "math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -12,140 +11,22 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
-	routedhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/mr-tron/base58"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
-	syncutils "github.com/wetware/go/util/sync"
 	"go.uber.org/multierr"
-	"golang.org/x/time/rate"
 )
 
-func teardown(c *cli.Context) error {
-	// host was started?
-	if env.Host != nil {
-		return env.Host.Close()
-	}
-
-	return nil
+var env struct {
+	IPFS iface.CoreAPI
 }
 
 func setup(c *cli.Context) (err error) {
-	// Set up IPFS and libp2p
-	////
-	if env.IPFS, err = newIPFSClient(c); err != nil {
-		return
-	} else if env.Host, err = newLibp2pHost(c); err != nil {
-		return
-	}
-
-	// Initialize a Dual DHT, which maintains two separate Kademlia routing tables:
-	// one for the Wide Area Network (WAN) and another for the Local Area Network
-	// (LAN). This separation allows for efficient routing in both local and global
-	// contexts.
-	//
-	// The WAN DHT is bootstrapped with public bootstrap peers - well-known nodes
-	// that help new peers join the network by providing initial routing table
-	// entries. These peers are typically operated by IPFS infrastructure providers
-	// and are accessible from anywhere on the internet.
-	//
-	// The LAN DHT is bootstrapped with private bootstrap peers - nodes that are
-	// only accessible within the local network. This enables peer discovery and
-	// content routing to work efficiently in isolated/local network environments,
-	// without having to rely on public infrastructure.
-	//
-	// Both DHTs shuffle their bootstrap peers to prevent hotspots and ensure even
-	// load distribution across the bootstrap nodes. User-provided bootstrap addresses
-	// (-addr flag) are added to both DHTs to support custom network topologies.
-	////
-	env.DHT, err = dual.New(c.Context, env.Host,
-		dual.WanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
-			public := append(
-				env.PublicBootstrapPeers(),
-				dht.GetDefaultBootstrapPeerAddrInfos()...)
-			insecure_rand.Shuffle(len(public), func(i, j int) {
-				public[i], public[j] = public[j], public[i]
-			})
-
-			return append(addrs(c), public...)
-		})),
-		dual.LanDHTOption(dht.BootstrapPeersFunc(func() []peer.AddrInfo {
-			private := env.PrivateBootstrapPeers()
-			insecure_rand.Shuffle(len(private), func(i, j int) {
-				private[i], private[j] = private[j], private[i]
-			})
-
-			return append(addrs(c), private...)
-		})))
-	if err != nil {
-		return
-	}
-
-	// Wrap the host in a routed host, which intercepts all network operations
-	// and uses the DHT for peer routing. This enables automatic peer discovery
-	// and routing through the DHT when direct connections aren't available.
-	// When the host attempts to dial a peer, the routed host will first check
-	// if it has a direct connection. If not, it will query the DHT to find
-	// the peer's addresses before attempting the connection.
-	////
-	env.Host = routedhost.Wrap(env.Host, env.DHT)
-	env.Host.Peerstore().AddAddrs(
-		env.Host.ID(),
-		env.Host.Addrs(),
-		peerstore.PermanentAddrTTL)
-
-	return bootstrap(c)
-}
-
-// bootstrap attempts to establish initial connectivity with the P2P network by
-// connecting to bootstrap peers and initializing the DHT. The process works as
-// follows:
-//
-// 1. For each bootstrap address provided via command line flags:
-//   - Launch a concurrent connection attempt using env.Host.Connect()
-//   - Use a syncutils.Any join strategy, which succeeds if ANY connection works
-//   - This provides fault tolerance - we only need one working bootstrap peer
-//
-// 2. Wait for all connection attempts to complete:
-//   - If no connections succeeded, return the error from syncutils.Any.Wait()
-//   - Otherwise proceed with DHT bootstrap
-//
-// 3. Call env.DHT.Bootstrap() to:
-//   - Initialize the DHT routing tables
-//   - Begin the background DHT maintenance processes
-//   - Enable peer discovery and content routing
-func bootstrap(c *cli.Context) error {
-	var peers []peer.AddrInfo
-	peers = append(peers, addrs(c)...)                               // User-provided peers
-	peers = append(peers, env.PublicBootstrapPeers()...)             // Public peers
-	peers = append(peers, dht.GetDefaultBootstrapPeerAddrInfos()...) // Default IPFS peers
-
-	// Try to connect to bootstrap peers concurrently with rate limiting
-	limiter := rate.NewLimiter(rate.Limit(32), 8) // Allow up to 8 concurrent connection attempts
-	var join syncutils.Any                        // join strategy: any successful connection => ok
-	for _, info := range peers {
-		info := info // capture for closure
-		join.Go(func() error {
-			if err := limiter.Wait(c.Context); err != nil {
-				return err
-			}
-
-			return env.Host.Connect(c.Context, info)
-		})
-	}
-
-	if err := join.Wait(); err != nil {
-		return fmt.Errorf("failed to connect to any bootstrap peers: %w", err)
-	}
-
-	// Now that we have connections, bootstrap the DHT
-	return env.DHT.Bootstrap(c.Context)
+	env.IPFS, err = newIPFSClient(c)
+	return
 }
 
 // newIPFSClient creates and returns an IPFS CoreAPI client based on the

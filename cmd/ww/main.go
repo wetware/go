@@ -11,8 +11,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/wetware/go/cmd/ww/idgen"
-	"github.com/wetware/go/cmd/ww/serve"
-	"github.com/wetware/go/system"
+	"github.com/wetware/go/cmd/ww/publish"
+	"github.com/wetware/go/cmd/ww/pull"
 )
 
 func main() {
@@ -22,10 +22,9 @@ func main() {
 	defer cancel()
 
 	app := &cli.App{
-		Name:           "wetware",
-		Copyright:      "2020 The Wetware Project",
-		Before:         setup,
-		DefaultCommand: "serve",
+		Name:      "wetware",
+		Copyright: "2020 The Wetware Project",
+		Before:    setup,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "json",
@@ -40,8 +39,9 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			serve.Command(),
 			idgen.Command(),
+			publish.Command(),
+			pull.Command(),
 			// export.Command(),
 			// run.Command(),
 		},
@@ -55,8 +55,7 @@ func main() {
 }
 
 func setup(c *cli.Context) (err error) {
-	log := slog.New(logger(c)).With(
-		"version", system.Proto.Version)
+	log := slog.New(logger(c))
 	slog.SetDefault(log)
 	return nil
 }
