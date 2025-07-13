@@ -34,7 +34,7 @@ func Main(c *cli.Context) error {
 }
 
 func run(c *cli.Context, src string) error {
-	tmpdir, err := os.MkdirTemp(os.TempDir(), "ww-run-*")
+	tmpdir, err := os.MkdirTemp("", "ww-run-*")
 	if err != nil {
 		return err
 	}
