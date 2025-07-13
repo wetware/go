@@ -1,4 +1,4 @@
-package publish
+package build
 
 import (
 	"crypto/rand"
