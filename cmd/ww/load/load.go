@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+	"github.com/wetware/go/util"
 )
 
 func Command() *cli.Command {
@@ -38,8 +39,8 @@ func Main(c *cli.Context) error {
 	}
 
 	// Get and expand the storage path
-	wwpath := c.String("path")
-	wwpath, err := expandHome(wwpath)
+	pathArg := c.String("path")
+	wwpath, err := util.ExpandHome(pathArg)
 	if err != nil {
 		return fmt.Errorf("failed to expand WW_PATH: %w", err)
 	}
@@ -154,15 +155,4 @@ func loadOCIWithPipe(ctx context.Context, imageDir string) error {
 
 	fmt.Printf("✅ loaded %s", imageTag)
 	return nil
-}
-
-func expandHome(path string) (string, error) {
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, path[2:]), nil
-	}
-	return path, nil
 }

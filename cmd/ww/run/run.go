@@ -1,12 +1,19 @@
 package run
 
 import (
+	"crypto/rand"
 	"fmt"
-	"log/slog"
 	"os"
-	"os/exec"
+	"path/filepath"
+	"strings"
 
+	"github.com/ipfs/boxo/path"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/urfave/cli/v2"
+	"github.com/wetware/go/system"
+	"github.com/wetware/go/util"
 )
 
 func Command() *cli.Command {
@@ -19,53 +26,135 @@ func Command() *cli.Command {
 	}
 }
 
+type MountError struct {
+	Path   string
+	Status int
+}
+
+func (err MountError) Error() string {
+	return fmt.Sprintf("mount %s: %d", err.Path, err.Status)
+}
+
 func Main(c *cli.Context) error {
 	if c.Args().Len() == 0 {
 		return cli.Exit("missing tarball argument", 1)
 	}
 
-	for _, s := range c.Args().Slice() {
-		if err := run(c, s); err != nil {
-			return err
-		}
+	r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
+		WithCloseOnContextDone(true))
+	defer r.Close(c.Context)
+
+	wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
+	if err != nil {
+		return err
 	}
+	defer wasi.Close(c.Context)
+
+	// TODO:  load WASM src from IPFS
+	bin, err := load(c)
+	if err != nil {
+		return err
+	}
+
+	cm, err := r.CompileModule(c.Context, bin)
+	if err != nil {
+		return err
+	}
+	defer cm.Close(c.Context)
+
+	rc, path, fsConfig := validateMounts(c)
+	if rc != 0 {
+		return cli.Exit(&MountError{
+			Path:   path,
+			Status: rc,
+		}, rc)
+	}
+
+	mod, err := r.InstantiateModule(c.Context, cm, wazero.NewModuleConfig().
+		WithArgs(c.Args().Tail()...).
+		// WithEnv().
+		// WithName()
+		WithFSConfig(fsConfig).
+		WithStdin(c.App.Reader).     // FIXME(security):  require --with-stdin flag
+		WithStdout(c.App.Writer).    // FIXME(security):  require --with-stdin flag
+		WithStderr(c.App.ErrWriter). // FIXME(security):  require --with-stdin flag
+		WithRandSource(rand.Reader)) // FIXME(security):  require --with-rand flag
+	if err != nil {
+		return err
+	}
+	defer mod.Close(c.Context)
 
 	return nil
 }
 
-func run(c *cli.Context, src string) error {
-	tmpdir, err := os.MkdirTemp("", "ww-run-*")
+func load(c *cli.Context) ([]byte, error) {
+	p, err := path.NewPath(c.Args().First())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer func() {
-		if err := os.RemoveAll(tmpdir); err != nil {
-			slog.ErrorContext(c.Context, "failed to clean up temporary directory",
-				"reason", err,
-				"path", tmpdir)
+
+	n, err := env.IPFS.Unixfs().Get(c.Context, p)
+	if err != nil {
+		return nil, err
+	}
+	defer n.Close()
+
+	return util.LoadByteCode(c.Context, n)
+}
+
+func validateMounts(c *cli.Context) (rc int, rootPath string, config wazero.FSConfig) {
+	config = wazero.NewFSConfig().
+		WithFSMount(&system.FS{
+			Ctx:  c.Context,
+			IPFS: env.IPFS,
+		}, "/")
+
+	for _, mount := range c.StringSlice("mount") {
+		if len(mount) == 0 {
+			fmt.Fprintln(c.App.ErrWriter, "invalid mount: empty string")
+			return 1, rootPath, config
 		}
-	}()
 
-	// Step 1: Ensure the image is loaded using `ww load <src>`
-	loadCmd := exec.CommandContext(c.Context, os.Args[0], "load", src)
-	loadCmd.Stdout = os.Stdout
-	loadCmd.Stderr = os.Stderr
+		readOnly := false
+		if trimmed := strings.TrimSuffix(mount, ":ro"); trimmed != mount {
+			mount = trimmed
+			readOnly = true
+		}
 
-	if err := loadCmd.Run(); err != nil {
-		return fmt.Errorf("load: %w", err)
+		// TODO: Support wasm paths with colon in them.
+		var dir, guestPath string
+		if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
+			dir, guestPath = mount[:clnIdx], mount[clnIdx+1:]
+		} else {
+			dir = mount
+			guestPath = dir
+		}
+
+		// Eagerly validate the mounts as we know they should be on the host.
+		if abs, err := filepath.Abs(dir); err != nil {
+			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q invalid: %v\n", dir, err)
+			return 1, rootPath, config
+		} else {
+			dir = abs
+		}
+
+		if stat, err := os.Stat(dir); err != nil {
+			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q error: %v\n", dir, err)
+			return 1, rootPath, config
+		} else if !stat.IsDir() {
+			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q is not a directory\n", dir)
+		}
+
+		root := sysfs.DirFS(dir)
+		if readOnly {
+			root = &sysfs.ReadFS{FS: root}
+		}
+
+		config = config.(sysfs.FSConfig).WithSysFSMount(root, guestPath)
+
+		if util.StripPrefixesAndTrailingSlash(guestPath) == "" {
+			rootPath = dir
+		}
 	}
-
-	imageTag := "wetware:" + src
-
-	// Step 2: Run the container (attached, auto-remove)
-	runCmd := exec.CommandContext(c.Context, "podman", "run", "--rm", "--pull=never", imageTag)
-	runCmd.Stdin = c.App.Reader
-	runCmd.Stdout = c.App.Writer
-	runCmd.Stderr = c.App.ErrWriter
-
-	if err := runCmd.Run(); err != nil { // ✅ actually run the command
-		return fmt.Errorf("podman run failed: %w", err)
-	}
-
-	return nil
+	return 0, rootPath, config
 }

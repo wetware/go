@@ -10,10 +10,11 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/ww/build"
-	"github.com/wetware/go/cmd/ww/idgen"
-	"github.com/wetware/go/cmd/ww/load"
-	"github.com/wetware/go/cmd/ww/run"
+	ww_build "github.com/wetware/go/cmd/ww/build"
+	ww_idgen "github.com/wetware/go/cmd/ww/idgen"
+	ww_init "github.com/wetware/go/cmd/ww/init"
+	ww_load "github.com/wetware/go/cmd/ww/load"
+	ww_run "github.com/wetware/go/cmd/ww/run"
 )
 
 func main() {
@@ -27,6 +28,10 @@ func main() {
 		Copyright: "2020 The Wetware Project",
 		Before:    setup,
 		Flags: []cli.Flag{
+			&cli.PathFlag{
+				Name:  "path",
+				Value: "~/.ww",
+			},
 			&cli.BoolFlag{
 				Name:    "json",
 				EnvVars: []string{"WW_JSON"},
@@ -40,12 +45,11 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			idgen.Command(),
-			build.Command(),
-			load.Command(),
-			run.Command(),
-
-			// export.Command(),
+			ww_init.Command(),
+			ww_idgen.Command(),
+			ww_build.Command(),
+			ww_load.Command(),
+			ww_run.Command(),
 		},
 	}
 
