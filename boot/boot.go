@@ -1,4 +1,4 @@
-//go:generate capnp compile -I.. -I$GOPATH/src/capnproto.org/go/capnp/std -ogo boot.capnp
+//go:generate capnp compile -I../api -I$GOPATH/src/capnproto.org/go/capnp/std -ogo boot.capnp
 
 package boot
 
