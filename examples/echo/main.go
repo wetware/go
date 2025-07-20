@@ -25,10 +25,9 @@ func main() {
 				"reason", err)
 			os.Exit(1)
 		}
-
-	} else {
+	} else if len(os.Args) > 0 {
 		w := bufio.NewWriter(os.Stdout)
-		for _, arg := range os.Args[1:] {
+		for _, arg := range os.Args {
 			w.WriteString(arg)
 			w.WriteString(" ")
 			if err := w.Flush(); err != nil {

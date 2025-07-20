@@ -3,13 +3,13 @@ module github.com/wetware/go
 go 1.24
 
 require (
-	github.com/ipfs/boxo v0.28.0
+	bazil.org/fuse v0.0.0-20200117225306-7b5117fecadc
+	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.41.0
 	github.com/lmittmann/tint v1.0.4
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.15.0
-	github.com/tetratelabs/wazero v1.9.0
 	github.com/urfave/cli/v2 v2.27.5
 	go.uber.org/multierr v1.11.0
 )
@@ -20,6 +20,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
@@ -48,6 +49,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
+	github.com/ipfs/boxo v0.28.0 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.2.0 // indirect
 	github.com/ipfs/go-cid v0.5.0 // indirect

@@ -1,160 +1,176 @@
 package run
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
-	"path/filepath"
-	"strings"
+	"os/exec"
 
-	"github.com/ipfs/boxo/path"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/experimental/sysfs"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"capnproto.org/go/capnp/v3/std/capnp/schema"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
-	"github.com/wetware/go/system"
-	"github.com/wetware/go/util"
+	"github.com/wetware/go/auth"
+	"github.com/wetware/go/boot"
 )
 
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:      "run",
-		ArgsUsage: "<source-dir>",
-		Before:    setup,
-		Action:    Main,
+		Name: "run",
+		// ArgsUsage: "<source-dir>",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "ipfs",
+				Value: "/dns4/localhost/tcp/5001/http",
+			},
+			&cli.StringSliceFlag{
+				Name:    "env",
+				EnvVars: []string{"WW_ENV"},
+			},
+		},
+		Subcommands: []*cli.Command{
+			{
+				Name:   "membrane",
+				Hidden: true,
+				Action: isolate,
+			},
+		},
+		Before: setup,
+		Action: Main,
 		// After: teardown,
 	}
 }
 
-type MountError struct {
-	Path   string
-	Status int
-}
-
-func (err MountError) Error() string {
-	return fmt.Sprintf("mount %s: %d", err.Path, err.Status)
-}
-
 func Main(c *cli.Context) error {
-	if c.Args().Len() == 0 {
-		return cli.Exit("missing tarball argument", 1)
+	// Set up temporary filesystem
+	////
+	tmpDir, err := os.MkdirTemp("", "ww-*")
+	if err != nil {
+		return fmt.Errorf("mkdirtemp: %w", err)
 	}
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			slog.ErrorContext(c.Context, "failed to remove tempdir",
+				"path", tmpDir,
+				"reason", err)
+		}
+	}()
 
-	r := wazero.NewRuntimeWithConfig(c.Context, wazero.NewRuntimeConfig().
-		WithCloseOnContextDone(true))
-	defer r.Close(c.Context)
-
-	wasi, err := wasi_snapshot_preview1.Instantiate(c.Context, r)
+	cellDir, err := os.MkdirTemp(tmpDir, "cell-*")
 	if err != nil {
 		return err
 	}
-	defer wasi.Close(c.Context)
+	defer func() {
+		if err := os.RemoveAll(cellDir); err != nil {
+			slog.ErrorContext(c.Context, "failed to remove cell dir",
+				"path", cellDir,
+				"reason", err)
+		}
+	}()
+	fmt.Println(cellDir)
 
-	// TODO:  load WASM src from IPFS
-	bin, err := load(c)
+	// Set up Host
+	////
+	secret, secretFile, err := bind(cellDir)
 	if err != nil {
 		return err
 	}
 
-	cm, err := r.CompileModule(c.Context, bin)
+	signer := &auth.SignOnce{PrivKey: secret}
+	user := auth.Signer_ServerToClient(signer)
+
+	// Step 2:  set up the host capnp environment
+
+	host, guest, err := boot.DefaultLoader[auth.DefaultTerminal]{
+		Term: auth.DefaultTerminal{
+			// This is the bootstrap terminal we will provide to the guest.
+			// It is important that this be the ONLY place where effectful
+			// things are passed into the guest.
+
+			Rand: rand.Reader,
+			// crypto rand is an example of an effectful thing that is worth
+			// passing down to the guest.
+
+			Policy: auth.SingleUser[Cell]{
+				// Policy determines which bootstrap capability is exported
+				// to the guest.
+				//
+				// auth.SingleUser implements Policy.  It provides the node
+				// only to guests that log in as `user`.
+
+				User: user,
+				Rand: rand.Reader,
+				Node: Cell{Rand: rand.Reader, IPFS: env.IPFS},
+				Type: schema.Node{}}, // FIXME:  empty schema.Node{}
+		}}.Boot()
 	if err != nil {
+		return fmt.Errorf("bind: %w", err)
+	}
+	defer host.Close()
+	defer guest.Close()
+
+	// Set up the guest
+	////
+
+	// Step 1: rewrite "ww run foo [...]" ==> "ww run isolate foo [...]"
+	args := append([]string{"run", "membrane"}, c.Args().Tail()...)
+
+	// Step 2:  run the subcommand
+	cmd := exec.CommandContext(c.Context, "ww", args...)
+	cmd.Dir = cellDir
+	cmd.Env = c.StringSlice("env")
+	cmd.Stdin = guest
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.ExtraFiles = []*os.File{secretFile} // fd 3 in child
+
+	if err := cmd.Start(); err != nil {
 		return err
 	}
-	defer cm.Close(c.Context)
+	defer cmd.Cancel()
 
-	rc, path, fsConfig := validateMounts(c)
-	if rc != 0 {
-		return cli.Exit(&MountError{
-			Path:   path,
-			Status: rc,
-		}, rc)
-	}
+	/*		SCRATCH		*/
 
-	mod, err := r.InstantiateModule(c.Context, cm, wazero.NewModuleConfig().
-		WithArgs(c.Args().Tail()...).
-		// WithEnv().
-		// WithName()
-		WithFSConfig(fsConfig).
-		WithStdin(c.App.Reader).     // FIXME(security):  require --with-stdin flag
-		WithStdout(c.App.Writer).    // FIXME(security):  require --with-stdin flag
-		WithStderr(c.App.ErrWriter). // FIXME(security):  require --with-stdin flag
-		WithRandSource(rand.Reader)) // FIXME(security):  require --with-rand flag
-	if err != nil {
-		return err
-	}
-	defer mod.Close(c.Context)
+	// // Run host loop
+	// ////
+	// client := conn.Bootstrap(c.Context)
+	// defer client.Release()
 
-	return nil
+	// TODO:
+	// for each stream that comes into libp2p
+	// export a `client` to the remote endpoint
+	// hold until done
+
+	return cmd.Wait()
 }
 
-func load(c *cli.Context) ([]byte, error) {
-	p, err := path.NewPath(c.Args().First())
+func bind(cellDir string) (crypto.PrivKey, *os.File, error) {
+	identity, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	n, err := env.IPFS.Unixfs().Get(c.Context, p)
+	accountSecretBytes, err := crypto.MarshalPrivateKey(identity)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer n.Close()
 
-	return util.LoadByteCode(c.Context, n)
-}
-
-func validateMounts(c *cli.Context) (rc int, rootPath string, config wazero.FSConfig) {
-	config = wazero.NewFSConfig().
-		WithFSMount(&system.FS{
-			Ctx:  c.Context,
-			IPFS: env.IPFS,
-		}, "/")
-
-	for _, mount := range c.StringSlice("mount") {
-		if len(mount) == 0 {
-			fmt.Fprintln(c.App.ErrWriter, "invalid mount: empty string")
-			return 1, rootPath, config
-		}
-
-		readOnly := false
-		if trimmed := strings.TrimSuffix(mount, ":ro"); trimmed != mount {
-			mount = trimmed
-			readOnly = true
-		}
-
-		// TODO: Support wasm paths with colon in them.
-		var dir, guestPath string
-		if clnIdx := strings.LastIndexByte(mount, ':'); clnIdx != -1 {
-			dir, guestPath = mount[:clnIdx], mount[clnIdx+1:]
-		} else {
-			dir = mount
-			guestPath = dir
-		}
-
-		// Eagerly validate the mounts as we know they should be on the host.
-		if abs, err := filepath.Abs(dir); err != nil {
-			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q invalid: %v\n", dir, err)
-			return 1, rootPath, config
-		} else {
-			dir = abs
-		}
-
-		if stat, err := os.Stat(dir); err != nil {
-			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q error: %v\n", dir, err)
-			return 1, rootPath, config
-		} else if !stat.IsDir() {
-			fmt.Fprintf(c.App.ErrWriter, "invalid mount: path %q is not a directory\n", dir)
-		}
-
-		root := sysfs.DirFS(dir)
-		if readOnly {
-			root = &sysfs.ReadFS{FS: root}
-		}
-
-		config = config.(sysfs.FSConfig).WithSysFSMount(root, guestPath)
-
-		if util.StripPrefixesAndTrailingSlash(guestPath) == "" {
-			rootPath = dir
-		}
+	// Create temporary identity file
+	identityPath := cellDir + "/identity"
+	fileWriter, err := os.OpenFile(identityPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, nil, err
 	}
-	return 0, rootPath, config
+	defer fileWriter.Close()
+
+	_, err = io.Copy(fileWriter, bytes.NewReader(accountSecretBytes))
+	if err != nil { // always close identityFile
+		return nil, nil, err
+	}
+
+	// Reopen for reading to pass to child
+	f, err := os.Open(identityPath)
+	return identity, f, err
 }

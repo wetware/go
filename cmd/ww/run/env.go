@@ -4,11 +4,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
-	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -17,6 +15,7 @@ import (
 	"github.com/mr-tron/base58"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
+	"github.com/wetware/go/util"
 	"go.uber.org/multierr"
 )
 
@@ -25,35 +24,25 @@ var env struct {
 }
 
 func setup(c *cli.Context) (err error) {
-	env.IPFS, err = newIPFSClient(c)
+	for _, bind := range []bindFunc{
+		func(ctx *cli.Context) (err error) {
+			env.IPFS, err = util.LoadIPFSFromName(c.String("ipfs"))
+			return
+		},
+		// func(ctx *cli.Context) (err error) {
+		// 	env.Host, err = util.LoadHost(env.IPFS)
+		// 	return
+		// },
+	} {
+		if err = bind(c); bind != nil {
+			break
+		}
+	}
+
 	return
 }
 
-// newIPFSClient creates and returns an IPFS CoreAPI client based on the
-// configuration provided. The client can be configured in two ways:
-//
-// 1. Default local client:
-//   - Used when no "ipfs" flag is set
-//   - Creates a new local API client with default settings
-//   - Suitable for embedded IPFS nodes
-//
-// 2. Remote client:
-//   - Used when "ipfs" flag contains a multiaddr
-//   - Parses the multiaddr to determine connection endpoint
-//   - Creates HTTP client to connect to remote IPFS node
-//   - Enables integration with external IPFS daemons
-func newIPFSClient(c *cli.Context) (iface.CoreAPI, error) {
-	if !c.IsSet("ipfs") {
-		return rpc.NewLocalApi()
-	}
-
-	a, err := ma.NewMultiaddr(c.String("ipfs"))
-	if err != nil {
-		return nil, err
-	}
-
-	return rpc.NewApiWithClient(a, http.DefaultClient)
-}
+type bindFunc func(*cli.Context) (err error)
 
 // identity configures libp2p host identity using a private key. The key can be provided
 // in several ways:

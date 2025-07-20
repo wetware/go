@@ -2,24 +2,59 @@ package system
 
 import (
 	"context"
-	"errors"
-	"io/fs"
 	"os"
+	"syscall"
 
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 	iface "github.com/ipfs/kubo/core/coreiface"
 )
 
 var _ fs.FS = (*FS)(nil)
 
-type FS struct {
-	Ctx  context.Context
-	IPFS iface.CoreAPI
+// FS implements the hello world file system.
+type FS struct{ iface.CoreAPI }
+
+func (FS) Root() (fs.Node, error) {
+	return Dir{}, nil
 }
 
-func (fs FS) Open(name string) (fs.File, error) {
-	return nil, &os.PathError{
-		Op:   "open",
-		Path: name,
-		Err:  errors.New("fopen::NOT IMPLEMENTED"),
+// Dir implements both Node and Handle for the root directory.
+type Dir struct{}
+
+func (Dir) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Inode = 1
+	a.Mode = os.ModeDir | 0o555
+	return nil
+}
+
+func (Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	if name == "hello" {
+		return File{}, nil
 	}
+	return nil, syscall.ENOENT
+}
+
+var dirDirs = []fuse.Dirent{
+	{Inode: 2, Name: "hello", Type: fuse.DT_File},
+}
+
+func (Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+	return dirDirs, nil
+}
+
+// File implements both Node and Handle for the hello file.
+type File struct{}
+
+const greeting = "hello, world\n"
+
+func (File) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Inode = 2
+	a.Mode = 0o444
+	a.Size = uint64(len(greeting))
+	return nil
+}
+
+func (File) ReadAll(ctx context.Context) ([]byte, error) {
+	return []byte(greeting), nil
 }

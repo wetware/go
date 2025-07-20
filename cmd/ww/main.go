@@ -10,10 +10,7 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	ww_build "github.com/wetware/go/cmd/ww/build"
 	ww_idgen "github.com/wetware/go/cmd/ww/idgen"
-	ww_init "github.com/wetware/go/cmd/ww/init"
-	ww_load "github.com/wetware/go/cmd/ww/load"
 	ww_run "github.com/wetware/go/cmd/ww/run"
 )
 
@@ -25,6 +22,7 @@ func main() {
 
 	app := &cli.App{
 		Name:      "wetware",
+		Version:   "0.1.0",
 		Copyright: "2020 The Wetware Project",
 		Before:    setup,
 		Flags: []cli.Flag{
@@ -45,10 +43,7 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			ww_init.Command(),
 			ww_idgen.Command(),
-			ww_build.Command(),
-			ww_load.Command(),
 			ww_run.Command(),
 		},
 	}
