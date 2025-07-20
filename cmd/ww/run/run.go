@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -35,7 +36,14 @@ func Command() *cli.Command {
 				Name:   "membrane",
 				Hidden: true,
 				Action: func(c *cli.Context) error {
-					return isolate(c.Context)
+					ctx, cancel := context.WithCancel(c.Context)
+					defer cancel()
+
+					// To anyone tempted to collapse this function by
+					// refactoring `isolate` to consume `c`, be aware
+					// that we are deliberately withholding CLI input
+					// from the isolated code paths.
+					return isolate(ctx)
 				},
 			},
 		},
