@@ -34,7 +34,9 @@ func Command() *cli.Command {
 			{
 				Name:   "membrane",
 				Hidden: true,
-				Action: isolate,
+				Action: func(c *cli.Context) error {
+					return isolate(c.Context)
+				},
 			},
 		},
 		Before: setup,

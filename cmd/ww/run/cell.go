@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,11 +9,10 @@ import (
 	"capnproto.org/go/capnp/v3/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
 )
 
-func isolate(c *cli.Context) error {
+func isolate(ctx context.Context) error {
 	identity := os.NewFile(3, "identity")
 	defer identity.Close()
 
@@ -33,8 +33,8 @@ func isolate(c *cli.Context) error {
 	})
 	defer conn.Close()
 
-	term := auth.Terminal(conn.Bootstrap(c.Context))
-	f, release := term.Login(c.Context, user(id))
+	term := auth.Terminal(conn.Bootstrap(ctx))
+	f, release := term.Login(ctx, user(id))
 	defer release()
 
 	// Resolve the future to get the actual results
