@@ -87,6 +87,7 @@ func Main(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	defer secretFile.Close()
 
 	signer := &auth.SignOnce{PrivKey: secret}
 	user := auth.Signer_ServerToClient(signer)
@@ -134,6 +135,7 @@ func Main(c *cli.Context) error {
 	cmd.Stdin = guest
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = sysProcAttr(cellDir)  // TODO:  identity file is visible here; do we want that?
 	cmd.ExtraFiles = []*os.File{secretFile} // fd 3 in child
 
 	if err := cmd.Start(); err != nil {
