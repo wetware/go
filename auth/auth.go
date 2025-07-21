@@ -6,8 +6,12 @@ import (
 	context "context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
+	capnp "capnproto.org/go/capnp/v3"
+	schema "capnproto.org/go/capnp/v3/std/capnp/schema"
+	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/record"
 )
@@ -82,4 +86,36 @@ func (once *SignOnce) bind(call Signer_sign) error {
 	}
 
 	return res.SetRawEnvelope(envelopePayload)
+}
+
+type SessionConfig struct {
+	Rand io.Reader
+	IPFS iface.CoreAPI
+}
+
+func (conf SessionConfig) Must() Env {
+	env, err := conf.New()
+	if err != nil {
+		panic(err)
+	}
+
+	return env
+}
+
+func (conf SessionConfig) New() (Env, error) {
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	if err != nil {
+		return Env{}, err
+	}
+
+	env, err := NewRootEnv(seg)
+	if err != nil {
+		return Env{}, err
+	}
+
+	if err := env.SetSchema(schema.Node{ /* FIXME */ }); err != nil {
+		return Env{}, err
+	}
+
+	return env, err
 }

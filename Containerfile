@@ -17,7 +17,7 @@ COPY . .
 # -trimpath strips file system paths, -s -w strip symbol table/debug info
 RUN go build -o ww \
     -trimpath \
-    -ldflags="-s -w" \
+    # -ldflags="-s -w" \
     ./cmd/ww
 
 # └───────────────────────────────────────┘

@@ -6,8 +6,4 @@ $Go.package("ww");
 $Go.import("github.com/wetware/go");
 
 
-struct Value {
-    
-}
 
-using 

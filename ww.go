@@ -3,8 +3,11 @@
 package ww
 
 import (
+	"io"
+
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/std/capnp/schema"
+	iface "github.com/ipfs/kubo/core/coreiface"
 )
 
 type Node[T ~capnp.ClientKind] interface {
@@ -18,4 +21,9 @@ func Connect[T ~capnp.ClientKind](n Node[T]) T {
 	//        not what we expect (per schema).
 
 	return T(n.Client()) // succeed
+}
+
+type DefaultEnv struct {
+	Rand io.Reader
+	IPFS iface.CoreAPI
 }

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 
-	"capnproto.org/go/capnp/v3/std/capnp/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
@@ -104,7 +103,7 @@ func Main(c *cli.Context) error {
 			// crypto rand is an example of an effectful thing that is worth
 			// passing down to the guest.
 
-			Policy: auth.SingleUser[Cell]{
+			Policy: auth.SingleUser[auth.Env]{
 				// Policy determines which bootstrap capability is exported
 				// to the guest.
 				//
@@ -113,8 +112,7 @@ func Main(c *cli.Context) error {
 
 				User: user,
 				Rand: rand.Reader,
-				Node: Cell{Rand: rand.Reader, IPFS: env.IPFS},
-				Type: schema.Node{}}, // FIXME:  empty schema.Node{}
+				Env:  auth.SessionConfig{Rand: rand.Reader, IPFS: env.IPFS}.Must()},
 		}}.Boot()
 	if err != nil {
 		return fmt.Errorf("bind: %w", err)

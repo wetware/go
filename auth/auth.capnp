@@ -15,11 +15,11 @@ interface Signer {
 
 
 interface Terminal {
-    login @0 (account :Signer) -> (
-        node :Capability,
-        type :import "/schema.capnp".Node
-    );
+    login @0 (account :Signer) -> (session :Env);
 }
 
 
+struct Env {
+    schema @0 :import "/schema.capnp".Node;
+}
 

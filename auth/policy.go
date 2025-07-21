@@ -7,31 +7,23 @@ import (
 	"io"
 
 	capnp "capnproto.org/go/capnp/v3"
-	schema "capnproto.org/go/capnp/v3/std/capnp/schema"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/record"
-	ww "github.com/wetware/go"
 )
 
 type Challenge func(Signer_sign_Params) error
 
-type Session interface {
-	SetNode(capnp.Client) error
-	SetType(schema.Node) error
-}
-
 type Policy interface {
-	Bind(context.Context, Session, peer.ID) error // TODO:  use another type instead of peer.ID to represent accounts
+	Bind(context.Context, Terminal_login_Results, peer.ID) error // TODO:  use another type instead of peer.ID to represent accounts
 }
 
-type SingleUser[T ww.Env_Server] struct {
+type SingleUser[T ~capnp.StructKind] struct {
 	User Signer
 	Rand io.Reader
-	Node T
-	Type schema.Node
+	Env  T
 }
 
-func (policy SingleUser[T]) Bind(ctx context.Context, sess Session, user peer.ID) error {
+func (policy SingleUser[T]) Bind(ctx context.Context, sess Terminal_login_Results, user peer.ID) error {
 	var n Nonce
 	f, release := policy.User.Sign(ctx, func(call Signer_sign_Params) error {
 		if n, err := io.ReadFull(policy.Rand, n[:]); err != nil {
@@ -60,15 +52,15 @@ func (policy SingleUser[T]) Bind(ctx context.Context, sess Session, user peer.ID
 		return errors.New("rejected: users don't match")
 	}
 
-	if err := sess.SetType(policy.Type); err != nil {
-		return err
-	}
+	// if err := sess.SetType(policy.Type); err != nil {
+	// 	return err
+	// }
 
-	client := capnp.NewClient(ww.Env_NewServer(policy.Node))
-	if err := sess.SetNode(client); err != nil {
-		defer client.Release()
-		return err
-	}
+	// client := capnp.NewClient(Env_NewServer(policy.Env))
+	// if err := sess.SetNode(client); err != nil {
+	// 	defer client.Release()
+	// 	return err
+	// }
 
 	return nil
 }

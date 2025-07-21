@@ -475,7 +475,7 @@ func (c Terminal_login) Args() Terminal_login_Params {
 
 // AllocResults allocates the results struct.
 func (c Terminal_login) AllocResults() (Terminal_login_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
 	return Terminal_login_Results(r), err
 }
 
@@ -579,12 +579,12 @@ type Terminal_login_Results capnp.Struct
 const Terminal_login_Results_TypeID = 0x9baeae5a95f57921
 
 func NewTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
 	return Terminal_login_Results(st), err
 }
 
 func NewRootTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
 	return Terminal_login_Results(st), err
 }
 
@@ -620,44 +620,27 @@ func (s Terminal_login_Results) Message() *capnp.Message {
 func (s Terminal_login_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Terminal_login_Results) Node() capnp.Client {
-	p, _ := capnp.Struct(s).Ptr(0)
-	return p.Interface().Client()
+func (s Terminal_login_Results) Session() (Env, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return Env(p.Struct()), err
 }
 
-func (s Terminal_login_Results) HasNode() bool {
+func (s Terminal_login_Results) HasSession() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Terminal_login_Results) SetNode(c capnp.Client) error {
-	if !c.IsValid() {
-		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
-	}
-	seg := s.Segment()
-	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(c))
-	return capnp.Struct(s).SetPtr(0, in.ToPtr())
-}
-func (s Terminal_login_Results) Type() (schema.Node, error) {
-	p, err := capnp.Struct(s).Ptr(1)
-	return schema.Node(p.Struct()), err
+func (s Terminal_login_Results) SetSession(v Env) error {
+	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
 }
 
-func (s Terminal_login_Results) HasType() bool {
-	return capnp.Struct(s).HasPtr(1)
-}
-
-func (s Terminal_login_Results) SetType(v schema.Node) error {
-	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
-}
-
-// NewType sets the type field to a newly
-// allocated schema.Node struct, preferring placement in s's segment.
-func (s Terminal_login_Results) NewType() (schema.Node, error) {
-	ss, err := schema.NewNode(capnp.Struct(s).Segment())
+// NewSession sets the session field to a newly
+// allocated Env struct, preferring placement in s's segment.
+func (s Terminal_login_Results) NewSession() (Env, error) {
+	ss, err := NewEnv(capnp.Struct(s).Segment())
 	if err != nil {
-		return schema.Node{}, err
+		return Env{}, err
 	}
-	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
+	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
 	return ss, err
 }
 
@@ -666,7 +649,7 @@ type Terminal_login_Results_List = capnp.StructList[Terminal_login_Results]
 
 // NewTerminal_login_Results creates a new list of Terminal_login_Results.
 func NewTerminal_login_Results_List(s *capnp.Segment, sz int32) (Terminal_login_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
 	return capnp.StructList[Terminal_login_Results](l), err
 }
 
@@ -677,44 +660,132 @@ func (f Terminal_login_Results_Future) Struct() (Terminal_login_Results, error) 
 	p, err := f.Future.Ptr()
 	return Terminal_login_Results(p.Struct()), err
 }
-func (p Terminal_login_Results_Future) Node() capnp.Client {
-	return p.Future.Field(0, nil).Client()
-}
-func (p Terminal_login_Results_Future) Type() schema.Node_Future {
-	return schema.Node_Future{Future: p.Future.Field(1, nil)}
+func (p Terminal_login_Results_Future) Session() Env_Future {
+	return Env_Future{Future: p.Future.Field(0, nil)}
 }
 
-const schema_e82706a772b0927b = "x\xda\x8c\x92Ok\x13Q\x14\xc5\xcf\x99\x99\xf4=\xff" +
-	"\xc4\xe4e\"\xd5\x8dE\x0dT+\x0d\xd5\x0aBA\x1b" +
-	"\x0a\xa5\x1b\x17y\xad+\x11e\x8cC\x0cL^\xc2$" +
-	"\xb1\x04)\x05\xbfA+\x82 n\xaa\xe2B(]\x0b" +
-	"\x82\x82\xdf\xc1\x8d\xe0N\\\xb8Q,\xa2\x12Ff0" +
-	"\x7fT\x04w\x8f{\x1f\xe7w\xcf\xb9w&\xb0J\xce" +
-	"\xe9\xf4d\x06\x96\xdeI\x8dE\x17v__Y[\xb8" +
-	"z\x17*G E\x01\xb8]\xf1\x19t\xd7\xc4<\x18" +
-	"\x1d\xed\xee\xde\xbb\xbc\xbd\xfd\x00*\x1f\xf7-\x01\xcc>" +
-	"\x149\x82\xee\x13\xb1\x0aF\xbd\x17\xcf{\x9f\x1e\xbdz" +
-	"\x09\xb5\xcf\x8eno\xee\x84O\xc7&?\x00t)\xb7" +
-	"\xdc=2\xd6K\xc9%w:~E\xd9\xb7\xef\xc6s" +
-	"\xf7\xf5\xc7Q\xdaA\xf9\x1dt\x0f\xcb\x98v\xe0\\\xa9" +
-	"\xfa\xe5\xc8\xca\xd7_\xb4\xb8?{^\xee\x8di\x8b\xc9" +
-	"\x87k\x1bo\xd6\xf5\xa9\x1f\xbd\xbfh\xbe\xdct\xeb\x09" +
-	"\xad&\x97\xdc\x0d)\x10a+\xf2:\xed\x9b\xc5\x8a\xd7" +
-	"\xb4Lsn\xa5V5~Xl\xd5\xaa\xa6P\x9e\xf0" +
-	"B\xaf\xde\xd2\x8e\xed\x00\x0e\x01\x95>\x06hiS\xe7" +
-	"-\x8aVXa\x1a\x16\xd3\xe0@\xc26\xcd\xb9K~" +
-	"X\xaf\x19/(\x06\x8dj\xcd\x14\x96\xfdV'h\xb3" +
-	"\xa5\xe5@\xe6\xe4\x14\xa0\x0b6\xf5\x8cEE\xe6\x19\x17" +
-	"\xa7\xe3\xe2\x09\x9b\xfa\xac\xc5\x8ci\xdc\xf0\x99sl\x90" +
-	"90\xd3\xee6}f\xa3\xf1\xc7\xc7\xbf]|v\xe7" +
-	"=@fG\xa8\xecS\x85\xf1\x822\xa9\x1d;\x05\x0c" +
-	"rb\x7f=J\x9d\x81\xa5Rb\"\x99\xac\xc42\xf9" +
-	"O\xf3\xcb\xf3\xc9\xdc\xbf\xb9\xbf\x0e\xe8\xfd6\xf5!\x8b" +
-	"Q\xe8\xad.\x9a[~\x00\xd1h\xfa\xff\x93C9\x09" +
-	"\x13\x18\x15\\\x18\xc6\xb9\xeeU*\x8d\x8eiS\x0d\xd7" +
-	"\x07R\xfda3\x19\x91\xe1\xd0d\xff4\xd9\xbf\x1a\xa5" +
-	"\xa6\x12\x93\x99\xd8F\xe2\xf1g\x00\x00\x00\xff\xff\xb6\"" +
-	"\xb9\xdc"
+type Env capnp.Struct
+
+// Env_TypeID is the unique identifier for the type Env.
+const Env_TypeID = 0xa799dfba4daa7d3b
+
+func NewEnv(s *capnp.Segment) (Env, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Env(st), err
+}
+
+func NewRootEnv(s *capnp.Segment) (Env, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Env(st), err
+}
+
+func ReadRootEnv(msg *capnp.Message) (Env, error) {
+	root, err := msg.Root()
+	return Env(root.Struct()), err
+}
+
+func (s Env) String() string {
+	str, _ := text.Marshal(0xa799dfba4daa7d3b, capnp.Struct(s))
+	return str
+}
+
+func (s Env) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Env) DecodeFromPtr(p capnp.Ptr) Env {
+	return Env(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Env) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Env) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Env) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Env) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Env) Schema() (schema.Node, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return schema.Node(p.Struct()), err
+}
+
+func (s Env) HasSchema() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Env) SetSchema(v schema.Node) error {
+	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
+}
+
+// NewSchema sets the schema field to a newly
+// allocated schema.Node struct, preferring placement in s's segment.
+func (s Env) NewSchema() (schema.Node, error) {
+	ss, err := schema.NewNode(capnp.Struct(s).Segment())
+	if err != nil {
+		return schema.Node{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
+	return ss, err
+}
+
+// Env_List is a list of Env.
+type Env_List = capnp.StructList[Env]
+
+// NewEnv creates a new list of Env.
+func NewEnv_List(s *capnp.Segment, sz int32) (Env_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Env](l), err
+}
+
+// Env_Future is a wrapper for a Env promised by a client call.
+type Env_Future struct{ *capnp.Future }
+
+func (f Env_Future) Struct() (Env, error) {
+	p, err := f.Future.Ptr()
+	return Env(p.Struct()), err
+}
+func (p Env_Future) Schema() schema.Node_Future {
+	return schema.Node_Future{Future: p.Future.Field(0, nil)}
+}
+
+const schema_e82706a772b0927b = "x\xda\x8c\x92Ok\x13Q\x14\xc5\xcf\x9dI\xfa\x1e\xd6" +
+	"\xd8\xbc\xbcJucQ+\xa2B\xf0\xcfB\x88hB" +
+	"\xa1tc!\xd3\xeaFD\x19\x87!\x1d\x98\xbc\x0c3" +
+	"I\xa5\x96\x10\xf0\x1bX\x11\x14WV\xa5\xa8P\\\xb8" +
+	"*\x08\x0an\\\xbar#t'.\xdcT\x0c\xa2\x12" +
+	"Ff\xeat\xd2J\xc1\xdd\x83w\xf8\xdds\xce\xbd'" +
+	"\x17\xb4J\xe6T\xae3\x04\xcdx\x95\x1d\x08/t\xdf" +
+	"]m\x8f_\xbb\x0bQ  K\x0c\x90O\xd97\x90" +
+	"|\xc6\xca\xa0\xf0\xe0|\xf7\xde\x95\x95\x95\x87\x10\xc3\xc9" +
+	"\xff\x99\xf7\xac@ \xf9!\x16\x9ck?\x9fZ]{" +
+	"\xb0\x0c1H\xe1\xc2\xe2K\x7fy\xe0\xe8\x97\xbf\xa0u" +
+	"vKv\xd9\xc6+\xd2\xf6^\xaf\xf6\xd6\x1f\xbf}\x03" +
+	"1\xa8\xa7Z\x90\x14|I\xee\xe7\x91p/\x9f\x94\xe7" +
+	"\xa3W\x98\xff\xb46R\xb8o|\xedwv\x84\xff\x02" +
+	"\xc9c<\x82\xed9[\xa9}?0\xf3\xa3\xdf\xd9\x14" +
+	"\xdf\x159\xbb\x1c\x0b\xae\xdf\xf9\xd81N\xfc\xee\xfd3" +
+	"\xad\xc5\x17e;\x9e6\xcf'\xe5#\xce\x10b)4" +
+	"[\xcd\xd9\xa2ez\x9a\xf2J3NM\xd9~1p" +
+	"jj\xac:j\xfaf=02z\x06\xc8\x10 r" +
+	"\x87\x00\x83\xebd\x0ck\xc4\x02\xdf\xa2\x1c4\xca\x816" +
+	"\x11\xba\xf2J\x97l\xbf\xee(\xd3-\xba\x8d\x9a\xa3\xc6" +
+	"\xa6\xed\xa0\xe56i\x0bf<\xc5t\x02;\x08\x9c\x86" +
+	"\xa2|Z(\x88\xf2}P\x94\x95W\x9aPsU\xa2" +
+	"~H)\x85\x94\x03k\xd6\xae\x9b\x94\x0fG\x9e\x1c\xfe" +
+	"y\xf1\xc5\xed\xcf\xdb\x19\x94\x18c\xcat7@Y`" +
+	"\xb3JJ\xb6-\xc4ih\"\xcbFc\xf3\x15\xaa\x12" +
+	"\xed\xd8\xcft9\x8e\xb6%\xd9\x0d\xc0\xd8\xad\x93\xb1O" +
+	"\xa3\xd07oN\xa89\xdb\x05kx\xf6\xffTU\x8d" +
+	"\xfb\x06v\xaa\xca\xb4\xacFK5I\xa4\x1b\x06\x91\xd8" +
+	"\x163\xb6H~\x1a2\xb9tJ\x0eK\x88\xe3q\xc8" +
+	"\xa1(F\x9c\xf1O\x00\x00\x00\xff\xffw\x87\xd8\xb5"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
@@ -722,6 +793,7 @@ func RegisterSchema(reg *schemas.Registry) {
 		Nodes: []uint64{
 			0x935e427d5cc4f53e,
 			0x9baeae5a95f57921,
+			0xa799dfba4daa7d3b,
 			0xc0c1a3f1fdbabdfd,
 			0xec51981217dfdc10,
 			0xf7531ef46740370e,
