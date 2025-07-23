@@ -15,11 +15,9 @@ interface Signer {
 
 
 interface Terminal {
-    login @0 (account :Signer) -> (session :Env);
+    login @0 (account :Signer) -> (session :SchemaProvider);
 }
 
-
-struct Env {
-    schema @0 :import "/schema.capnp".Node;
+interface SchemaProvider {
+    schema @0 () -> (schema :import "/schema.capnp".Node);
 }
-

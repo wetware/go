@@ -3,7 +3,6 @@ module github.com/wetware/go
 go 1.24
 
 require (
-	bazil.org/fuse v0.0.0-20200117225306-7b5117fecadc
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.41.0
