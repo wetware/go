@@ -17,7 +17,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/util"
 )
+
+var env util.Env
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -53,9 +56,9 @@ func Command() *cli.Command {
 				},
 			},
 		},
-		Before: setup,
+		Before: env.Setup,
 		Action: Main,
-		// After: teardown,
+		After:  env.Teardown,
 	}
 }
 

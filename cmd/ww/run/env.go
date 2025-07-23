@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -15,35 +14,8 @@ import (
 	"github.com/mr-tron/base58"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
-	"github.com/wetware/go/util"
 	"go.uber.org/multierr"
 )
-
-var env struct {
-	IPFS iface.CoreAPI
-	Host host.Host
-}
-
-func setup(c *cli.Context) (err error) {
-	for _, bind := range []bindFunc{
-		func(ctx *cli.Context) (err error) {
-			env.IPFS, err = util.LoadIPFSFromName(c.String("ipfs"))
-			return
-		},
-		// func(ctx *cli.Context) (err error) {
-		// 	env.Host, err = util.LoadHost(env.IPFS)
-		// 	return
-		// },
-	} {
-		if err = bind(c); bind != nil {
-			break
-		}
-	}
-
-	return
-}
-
-type bindFunc func(*cli.Context) (err error)
 
 // identity configures libp2p host identity using a private key. The key can be provided
 // in several ways:
