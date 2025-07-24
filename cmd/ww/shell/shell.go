@@ -14,6 +14,8 @@ import (
 	"github.com/spy16/slurp/repl"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/lang"
+	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -84,7 +86,7 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	defer ipfs.Release()
 
 	env := core.New(map[string]core.Any{
-		// "ipfs"
+		"ipfs": lang.Invokable[system.IPFS]{Client: ipfs},
 	})
 
 	interpreter := slurp.New(
