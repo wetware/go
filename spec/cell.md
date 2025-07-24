@@ -1,8 +1,10 @@
 # Wetware Cell API Specification
 
-## Overview
+## Motivation
 
-The Wetware Cell API defines the interface between a host process (running `ww run`) and a cell process (child process managed by `ww run`) that runs in a controlled execution environment with attenuated capabilities. 
+The Wetware Cell API defines the interface between a host process (running `ww run`) and a cell process (child process managed by `ww run`) that runs in a controlled execution environment with attenuated capabilities.
+
+This document is for users who want to write their own cells. Simply adhere to this specification, and then you can `ww run <yourbinary>`, and your application will run in a secure, decentralized environment with access to capabilities like IPFS. 
 
 ## Process Interface
 
@@ -78,6 +80,29 @@ The following status codes are reserved for future standardization:
 - **65**: Capability access denied
 - **66**: Resource limit exceeded
 - **67**: Isolation violation detected
+
+## Reference Implementations
+
+### ww run
+The `ww run` subcommand is a reference implementation that demonstrates the cell API. It:
+- Creates a jailed execution environment
+- Generates fresh Ed25519 credentials for the cell
+- Sets up the Unix domain socket pair for RPC communication
+- Launches the specified executable with the required file descriptors
+
+### ww shell
+The `ww shell` subcommand is a reference implementation that runs an interactive shell within a cell. It:
+- Uses `ww run` to create a cell running the same `ww` binary
+- Executes the `shell membrane` subcommand within that cell
+- The `membrane` subcommand authenticates with the host and creates a REPL
+- Provides an interactive shell with access to cell capabilities
+- Demonstrates how to build interactive applications that interact with the cell session
+
+### membrane Subcommand
+Both `ww run` and `ww shell` use the `membrane` subcommand as the cell entry point. This subcommand:
+- Is part of the `ww` binary itself (not a separate executable)
+- Handles the cell-side authentication and capability negotiation
+- Provides the interface between the cell environment and the host's capabilities
 
 ## Security Model
 
