@@ -1,6 +1,7 @@
 # Wetware
 .envrc
 cmd/scratch/**
+ww
 
 # Binaries for programs and plugins
 *.exe
