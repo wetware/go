@@ -4,6 +4,7 @@ import (
 	context "context"
 	"errors"
 
+	schema "capnproto.org/go/capnp/v3/std/capnp/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -16,7 +17,7 @@ type Policy interface {
 
 type SingleUser struct {
 	User   crypto.PubKey
-	Export SchemaProvider
+	Schema schema.Node
 }
 
 func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, user peer.ID) error {
@@ -29,5 +30,6 @@ func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, u
 		return errors.New("user not allowed")
 	}
 
-	return env.SetSession(policy.Export)
+	// TODO:  as we add more fields to Terminal_login_Results, we'll need to populate them here.
+	return env.SetSchema(policy.Schema)
 }

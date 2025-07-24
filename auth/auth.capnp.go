@@ -620,22 +620,28 @@ func (s Terminal_login_Results) Message() *capnp.Message {
 func (s Terminal_login_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Terminal_login_Results) Session() SchemaProvider {
-	p, _ := capnp.Struct(s).Ptr(0)
-	return SchemaProvider(p.Interface().Client())
+func (s Terminal_login_Results) Schema() (schema.Node, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return schema.Node(p.Struct()), err
 }
 
-func (s Terminal_login_Results) HasSession() bool {
+func (s Terminal_login_Results) HasSchema() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Terminal_login_Results) SetSession(v SchemaProvider) error {
-	if !v.IsValid() {
-		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
+func (s Terminal_login_Results) SetSchema(v schema.Node) error {
+	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
+}
+
+// NewSchema sets the schema field to a newly
+// allocated schema.Node struct, preferring placement in s's segment.
+func (s Terminal_login_Results) NewSchema() (schema.Node, error) {
+	ss, err := schema.NewNode(capnp.Struct(s).Segment())
+	if err != nil {
+		return schema.Node{}, err
 	}
-	seg := s.Segment()
-	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(capnp.Client(v)))
-	return capnp.Struct(s).SetPtr(0, in.ToPtr())
+	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
+	return ss, err
 }
 
 // Terminal_login_Results_List is a list of Terminal_login_Results.
@@ -654,376 +660,48 @@ func (f Terminal_login_Results_Future) Struct() (Terminal_login_Results, error) 
 	p, err := f.Future.Ptr()
 	return Terminal_login_Results(p.Struct()), err
 }
-func (p Terminal_login_Results_Future) Session() SchemaProvider {
-	return SchemaProvider(p.Future.Field(0, nil).Client())
-}
-
-type SchemaProvider capnp.Client
-
-// SchemaProvider_TypeID is the unique identifier for the type SchemaProvider.
-const SchemaProvider_TypeID = 0xf3406a1c7c568bc0
-
-func (c SchemaProvider) Schema(ctx context.Context, params func(SchemaProvider_schema_Params) error) (SchemaProvider_schema_Results_Future, capnp.ReleaseFunc) {
-
-	s := capnp.Send{
-		Method: capnp.Method{
-			InterfaceID:   0xf3406a1c7c568bc0,
-			MethodID:      0,
-			InterfaceName: "auth.capnp:SchemaProvider",
-			MethodName:    "schema",
-		},
-	}
-	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 0}
-		s.PlaceArgs = func(s capnp.Struct) error { return params(SchemaProvider_schema_Params(s)) }
-	}
-
-	ans, release := capnp.Client(c).SendCall(ctx, s)
-	return SchemaProvider_schema_Results_Future{Future: ans.Future()}, release
-
-}
-
-func (c SchemaProvider) WaitStreaming() error {
-	return capnp.Client(c).WaitStreaming()
-}
-
-// String returns a string that identifies this capability for debugging
-// purposes.  Its format should not be depended on: in particular, it
-// should not be used to compare clients.  Use IsSame to compare clients
-// for equality.
-func (c SchemaProvider) String() string {
-	return "SchemaProvider(" + capnp.Client(c).String() + ")"
-}
-
-// AddRef creates a new Client that refers to the same capability as c.
-// If c is nil or has resolved to null, then AddRef returns nil.
-func (c SchemaProvider) AddRef() SchemaProvider {
-	return SchemaProvider(capnp.Client(c).AddRef())
-}
-
-// Release releases a capability reference.  If this is the last
-// reference to the capability, then the underlying resources associated
-// with the capability will be released.
-//
-// Release will panic if c has already been released, but not if c is
-// nil or resolved to null.
-func (c SchemaProvider) Release() {
-	capnp.Client(c).Release()
-}
-
-// Resolve blocks until the capability is fully resolved or the Context
-// expires.
-func (c SchemaProvider) Resolve(ctx context.Context) error {
-	return capnp.Client(c).Resolve(ctx)
-}
-
-func (c SchemaProvider) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
-	return capnp.Client(c).EncodeAsPtr(seg)
-}
-
-func (SchemaProvider) DecodeFromPtr(p capnp.Ptr) SchemaProvider {
-	return SchemaProvider(capnp.Client{}.DecodeFromPtr(p))
-}
-
-// IsValid reports whether c is a valid reference to a capability.
-// A reference is invalid if it is nil, has resolved to null, or has
-// been released.
-func (c SchemaProvider) IsValid() bool {
-	return capnp.Client(c).IsValid()
-}
-
-// IsSame reports whether c and other refer to a capability created by the
-// same call to NewClient.  This can return false negatives if c or other
-// are not fully resolved: use Resolve if this is an issue.  If either
-// c or other are released, then IsSame panics.
-func (c SchemaProvider) IsSame(other SchemaProvider) bool {
-	return capnp.Client(c).IsSame(capnp.Client(other))
-}
-
-// Update the flowcontrol.FlowLimiter used to manage flow control for
-// this client. This affects all future calls, but not calls already
-// waiting to send. Passing nil sets the value to flowcontrol.NopLimiter,
-// which is also the default.
-func (c SchemaProvider) SetFlowLimiter(lim fc.FlowLimiter) {
-	capnp.Client(c).SetFlowLimiter(lim)
-}
-
-// Get the current flowcontrol.FlowLimiter used to manage flow control
-// for this client.
-func (c SchemaProvider) GetFlowLimiter() fc.FlowLimiter {
-	return capnp.Client(c).GetFlowLimiter()
-}
-
-// A SchemaProvider_Server is a SchemaProvider with a local implementation.
-type SchemaProvider_Server interface {
-	Schema(context.Context, SchemaProvider_schema) error
-}
-
-// SchemaProvider_NewServer creates a new Server from an implementation of SchemaProvider_Server.
-func SchemaProvider_NewServer(s SchemaProvider_Server) *server.Server {
-	c, _ := s.(server.Shutdowner)
-	return server.New(SchemaProvider_Methods(nil, s), s, c)
-}
-
-// SchemaProvider_ServerToClient creates a new Client from an implementation of SchemaProvider_Server.
-// The caller is responsible for calling Release on the returned Client.
-func SchemaProvider_ServerToClient(s SchemaProvider_Server) SchemaProvider {
-	return SchemaProvider(capnp.NewClient(SchemaProvider_NewServer(s)))
-}
-
-// SchemaProvider_Methods appends Methods to a slice that invoke the methods on s.
-// This can be used to create a more complicated Server.
-func SchemaProvider_Methods(methods []server.Method, s SchemaProvider_Server) []server.Method {
-	if cap(methods) == 0 {
-		methods = make([]server.Method, 0, 1)
-	}
-
-	methods = append(methods, server.Method{
-		Method: capnp.Method{
-			InterfaceID:   0xf3406a1c7c568bc0,
-			MethodID:      0,
-			InterfaceName: "auth.capnp:SchemaProvider",
-			MethodName:    "schema",
-		},
-		Impl: func(ctx context.Context, call *server.Call) error {
-			return s.Schema(ctx, SchemaProvider_schema{call})
-		},
-	})
-
-	return methods
-}
-
-// SchemaProvider_schema holds the state for a server call to SchemaProvider.schema.
-// See server.Call for documentation.
-type SchemaProvider_schema struct {
-	*server.Call
-}
-
-// Args returns the call's arguments.
-func (c SchemaProvider_schema) Args() SchemaProvider_schema_Params {
-	return SchemaProvider_schema_Params(c.Call.Args())
-}
-
-// AllocResults allocates the results struct.
-func (c SchemaProvider_schema) AllocResults() (SchemaProvider_schema_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return SchemaProvider_schema_Results(r), err
-}
-
-// SchemaProvider_List is a list of SchemaProvider.
-type SchemaProvider_List = capnp.CapList[SchemaProvider]
-
-// NewSchemaProvider creates a new list of SchemaProvider.
-func NewSchemaProvider_List(s *capnp.Segment, sz int32) (SchemaProvider_List, error) {
-	l, err := capnp.NewPointerList(s, sz)
-	return capnp.CapList[SchemaProvider](l), err
-}
-
-type SchemaProvider_schema_Params capnp.Struct
-
-// SchemaProvider_schema_Params_TypeID is the unique identifier for the type SchemaProvider_schema_Params.
-const SchemaProvider_schema_Params_TypeID = 0x8f021be2e356aa5e
-
-func NewSchemaProvider_schema_Params(s *capnp.Segment) (SchemaProvider_schema_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
-	return SchemaProvider_schema_Params(st), err
-}
-
-func NewRootSchemaProvider_schema_Params(s *capnp.Segment) (SchemaProvider_schema_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
-	return SchemaProvider_schema_Params(st), err
-}
-
-func ReadRootSchemaProvider_schema_Params(msg *capnp.Message) (SchemaProvider_schema_Params, error) {
-	root, err := msg.Root()
-	return SchemaProvider_schema_Params(root.Struct()), err
-}
-
-func (s SchemaProvider_schema_Params) String() string {
-	str, _ := text.Marshal(0x8f021be2e356aa5e, capnp.Struct(s))
-	return str
-}
-
-func (s SchemaProvider_schema_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
-	return capnp.Struct(s).EncodeAsPtr(seg)
-}
-
-func (SchemaProvider_schema_Params) DecodeFromPtr(p capnp.Ptr) SchemaProvider_schema_Params {
-	return SchemaProvider_schema_Params(capnp.Struct{}.DecodeFromPtr(p))
-}
-
-func (s SchemaProvider_schema_Params) ToPtr() capnp.Ptr {
-	return capnp.Struct(s).ToPtr()
-}
-func (s SchemaProvider_schema_Params) IsValid() bool {
-	return capnp.Struct(s).IsValid()
-}
-
-func (s SchemaProvider_schema_Params) Message() *capnp.Message {
-	return capnp.Struct(s).Message()
-}
-
-func (s SchemaProvider_schema_Params) Segment() *capnp.Segment {
-	return capnp.Struct(s).Segment()
-}
-
-// SchemaProvider_schema_Params_List is a list of SchemaProvider_schema_Params.
-type SchemaProvider_schema_Params_List = capnp.StructList[SchemaProvider_schema_Params]
-
-// NewSchemaProvider_schema_Params creates a new list of SchemaProvider_schema_Params.
-func NewSchemaProvider_schema_Params_List(s *capnp.Segment, sz int32) (SchemaProvider_schema_Params_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
-	return capnp.StructList[SchemaProvider_schema_Params](l), err
-}
-
-// SchemaProvider_schema_Params_Future is a wrapper for a SchemaProvider_schema_Params promised by a client call.
-type SchemaProvider_schema_Params_Future struct{ *capnp.Future }
-
-func (f SchemaProvider_schema_Params_Future) Struct() (SchemaProvider_schema_Params, error) {
-	p, err := f.Future.Ptr()
-	return SchemaProvider_schema_Params(p.Struct()), err
-}
-
-type SchemaProvider_schema_Results capnp.Struct
-
-// SchemaProvider_schema_Results_TypeID is the unique identifier for the type SchemaProvider_schema_Results.
-const SchemaProvider_schema_Results_TypeID = 0x95c4153175fbdfbd
-
-func NewSchemaProvider_schema_Results(s *capnp.Segment) (SchemaProvider_schema_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return SchemaProvider_schema_Results(st), err
-}
-
-func NewRootSchemaProvider_schema_Results(s *capnp.Segment) (SchemaProvider_schema_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return SchemaProvider_schema_Results(st), err
-}
-
-func ReadRootSchemaProvider_schema_Results(msg *capnp.Message) (SchemaProvider_schema_Results, error) {
-	root, err := msg.Root()
-	return SchemaProvider_schema_Results(root.Struct()), err
-}
-
-func (s SchemaProvider_schema_Results) String() string {
-	str, _ := text.Marshal(0x95c4153175fbdfbd, capnp.Struct(s))
-	return str
-}
-
-func (s SchemaProvider_schema_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
-	return capnp.Struct(s).EncodeAsPtr(seg)
-}
-
-func (SchemaProvider_schema_Results) DecodeFromPtr(p capnp.Ptr) SchemaProvider_schema_Results {
-	return SchemaProvider_schema_Results(capnp.Struct{}.DecodeFromPtr(p))
-}
-
-func (s SchemaProvider_schema_Results) ToPtr() capnp.Ptr {
-	return capnp.Struct(s).ToPtr()
-}
-func (s SchemaProvider_schema_Results) IsValid() bool {
-	return capnp.Struct(s).IsValid()
-}
-
-func (s SchemaProvider_schema_Results) Message() *capnp.Message {
-	return capnp.Struct(s).Message()
-}
-
-func (s SchemaProvider_schema_Results) Segment() *capnp.Segment {
-	return capnp.Struct(s).Segment()
-}
-func (s SchemaProvider_schema_Results) Schema() (schema.Node, error) {
-	p, err := capnp.Struct(s).Ptr(0)
-	return schema.Node(p.Struct()), err
-}
-
-func (s SchemaProvider_schema_Results) HasSchema() bool {
-	return capnp.Struct(s).HasPtr(0)
-}
-
-func (s SchemaProvider_schema_Results) SetSchema(v schema.Node) error {
-	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
-}
-
-// NewSchema sets the schema field to a newly
-// allocated schema.Node struct, preferring placement in s's segment.
-func (s SchemaProvider_schema_Results) NewSchema() (schema.Node, error) {
-	ss, err := schema.NewNode(capnp.Struct(s).Segment())
-	if err != nil {
-		return schema.Node{}, err
-	}
-	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
-	return ss, err
-}
-
-// SchemaProvider_schema_Results_List is a list of SchemaProvider_schema_Results.
-type SchemaProvider_schema_Results_List = capnp.StructList[SchemaProvider_schema_Results]
-
-// NewSchemaProvider_schema_Results creates a new list of SchemaProvider_schema_Results.
-func NewSchemaProvider_schema_Results_List(s *capnp.Segment, sz int32) (SchemaProvider_schema_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
-	return capnp.StructList[SchemaProvider_schema_Results](l), err
-}
-
-// SchemaProvider_schema_Results_Future is a wrapper for a SchemaProvider_schema_Results promised by a client call.
-type SchemaProvider_schema_Results_Future struct{ *capnp.Future }
-
-func (f SchemaProvider_schema_Results_Future) Struct() (SchemaProvider_schema_Results, error) {
-	p, err := f.Future.Ptr()
-	return SchemaProvider_schema_Results(p.Struct()), err
-}
-func (p SchemaProvider_schema_Results_Future) Schema() schema.Node_Future {
+func (p Terminal_login_Results_Future) Schema() schema.Node_Future {
 	return schema.Node_Future{Future: p.Future.Field(0, nil)}
 }
 
-const schema_e82706a772b0927b = "x\xdat\x93Oh\x13A\x14\xc6\xdf\xdb\xddt\xa6j" +
-	"4\x93i\xa9\xa8X\xd4\x82\xa0\x10\xadE\x84\x80&\x04" +
-	"$ \x1e\xb2\xad\xf4 ZY\xe3\x92\xae$\x93\xb8\x9b" +
-	"TD\xa5\xe0M<\x88\x95\x82\xe2\xc9\xaa\x08\x15\x8a\x1e" +
-	"\x15\x0b\x15z\xf1\xeaE\x04\xa5\xa8(\x0a^\xfcSD" +
-	"K\xd8\xb2\x93lw\xdb\xb4\xb7\x84\xf7\xed\xef}\xf3\xbd" +
-	"\xf7\xf6O*i\xad7\xba/\x06\x8a\xfe2\xd2\xe6\x0e" +
-	"M\x0e~\xfe\xb4U\xb9\x09l\x0b\x02h\x04\xa0\xafN" +
-	"2\x08\x9a{d~\xf6\xd4\xd5\xcc\xd0m`q\x04\x88" +
-	" \x01\xe0_\xc8/@\xfe\x9d\xa4\x00\xdd\xe9\xb9\x85Z" +
-	"o\xe7\xecx\xe3KY\xefk\xa7\xc7\x10\x90wRO" +
-	"\xb0\xe3\xd2\xfc\xf8\xc9\xa9\xa9{\xc0:\x96\x04\x07i\xdc" +
-	"\x13\x1c\x96\x82\xfa\xf4\x8b\xfa\xcf\x07\xaff\x80\xadW\xdd" +
-	"\xcbcO\xed\xc7m\xbb\xbf\x01 ?M'\xb8I\xbd" +
-	"\x86\x06\xcd\xf2\xeb\xde/7\xf6~\xae+~G\xff\x11" +
-	"\xb6s\x81\xfe\x07\xe45\x09\x9b\xb91xe\xdb\xf9\xf4" +
-	"\xef\x16\xd8]\xfa\x86?\x92\xb0\xfb4\xcb_K\xd8\xc6" +
-	"C\xe9\xc2\x9f\xed\x03\x7f\xc3\xd6\x9e\xd1u\x9e\xb5\xe7\x92" +
-	"v\xe6\xd6\xdbQ}\xefB\xbd\x85\xf6\x8e\x8e\xf1\x8f\x92" +
-	"\xf6\x81fy\xa4\x9d\x80\x0b\x13\xaeQ\xab\x0e'\xf2F" +
-	"\x85\x88Jr ?l\x96\x8c\x9c]\x1e\xb1\xce\x99v" +
-	"\xc2\x91\x7f{r\x86m\x94\x1c\xf0\x85\x9e\xce*\x08\xaf" +
-	"n\x15DO\xae[\x96uM\xd5\x004\x04`\xd1\x9d" +
-	"\x00:UQ\xefP\x908v\x1e\xa3\xa0`\x14p\xa9" +
-	"\x95\xb6f\xab~\xd3\xa9\x15\xab\x0e@\x18\x97\x0cp\xa9" +
-	"\x86\x0ecn\xd7\xc3]\xff\x8e?\xb9\xf6\x15\x001\x16" +
-	"b\xab\xa2\x92<a\xda%K\x18\xc5D\xb1\\\xb0D" +
-	"\x13\x8a\xcb,f\x02\xe6\xa8c:\x8eU\x16\xc8\x82A" +
-	"\x00\"\x0bA\xd1\x87\x12a\x14s\x88\xba\xa6FB\xa3" +
-	"@\x7f]\x18;\x00\x0a\x8b\x90n\xd98\x8d9\x0c\x18" +
-	"\xca\x8a\xdc\xfaS\x8d\xb7\x86]\x9d\x05\xd07\xa8\xa8o" +
-	"V\xd0\xb5\x8d\x8bG\xc5\x88Y\x04R\xae\x98-\x11*" +
-	"+#D;\xf0\xe5\x1f\x06\xfa{\xceXR\xfaj\xc6" +
-	"\xb7\xdc\xd8*\x895'\x0ek%f\xe4\xf3\xe5\x9a\xa8" +
-	"\"\x0b\x96m\x95\xc4\xe4k\xc3\xbe\xfc\xb3D\xff \x18" +
-	"\xdb#}m\xf2\x12\x91\xae\x16\x03\x00\x00\xff\xffp2" +
-	"\x18\xb6"
+const schema_e82706a772b0927b = "x\xda\x8c\x92\xcdk\x13A\x18\xc6\x9fww\xd3Y?" +
+	"b3\x99B=Y\xd4BQ1X=\x089\x98P" +
+	"\x90^<dZ\xbd\x88\x1f\x8c\xcb\x92\x066\x93\xb0\x9b" +
+	"(EJ\xc1\xff\xc0\x8a \x88\x97\xaax\x10J\xcf\x82" +
+	"\xa0\xa0\x07\x0f\x9eEP\xbc\x89\x07/\x15\x8b\xa8\x84\x91" +
+	"\x1d\xd8f\xab\x08\xbd-\xec\xcb\xefy\x7f\xcf\xbc'." +
+	";uo\xba85\x0aG\xae\x17F\xcc\x99\xcdW\x97" +
+	"\x96f\xae\xdc\x01/\x13P \x06\x88E\xf6\x0d$\x96" +
+	"X\x0dd\x0e.n\xde\xbd\xb8\xb6v\x1f|,\xfb\x7f" +
+	"\xea\x01+\x13H<\xb6\x03\x83\xe7\xcf\x06\x1b\x0f_\xbe" +
+	"\x00\xdf\xe3\x9a\x9b+\xeb\xf1\x93\x91\xa9/\x00\x89\xd7l" +
+	"U\xbce)\xef\x0d\x9b\x15\x1b\xe9\x97)}\xf84^" +
+	"\xbe'\xbf\xe6\xd3\xde\xb3_ \xf1\xd1\xc2\xf6\x9d\xae7" +
+	"\xbf\x1f\x98\xff\x91O#\x7fw\x9a\xb6\xcbO\x07\xae\xde" +
+	"~\xb7,\x8f\xfd\x1e\xfc\x93v\xc4_\x11\xd3~\xca;" +
+	"\xee\xcf\x8a\x0b>\x83\xc1\xaaQ\xfd\xdeB%P]G" +
+	"w\xab\xf3\xad\xa6\x0e\xe3J\xd2j\xea\xc9\xc6\x84\x8aU" +
+	";\x91\x9e\xeb\x01\x1e\x01\xbcx\x08\x90\xbeKr\xcc!" +
+	"\x96\xc4\x01\x15\xe1P\x11\xb4\x85pu\xb7z>\x8c\xdb" +
+	"-\xad\xa2J\xd4i\xb6\xf4\xe4\\\x98\xf4\xa3\x1em\xc3" +
+	"T\x87\x98Z\x12,\x84mE%3\xfe\xe8\xf0\xcfs" +
+	"Oo}\x06\x88J9&eL\xa6U\xd4 \x92\x9e" +
+	"[\x00\xb6Z\xa0\xac|\xceO\xc2\xe1\x056as\xeb" +
+	"\xd4 \xfa\xaf\xda\\\xcdn\xb5m\xa9k\x80\xdc\xeb\x92" +
+	"\xdc\xef\x90\x89\xd5\x8d\xb3\xfaz\x18\x81u\xba\xe1N," +
+	"\x1b\xb6* \x0f\x9c\x19Z.\xab \xe8\xf4u\x8f\xf8" +
+	"\xf0q@\xc4\xff\xd2\xb4+R<\x94\xcc\x0e\x8f\xb2\x9b" +
+	"\xe0\xfc\xa8\x95\x1cM5\xac\xe3\x9f\x00\x00\x00\xff\xff\x96" +
+	"\xa2\xb9\xdb"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_e82706a772b0927b,
 		Nodes: []uint64{
-			0x8f021be2e356aa5e,
 			0x935e427d5cc4f53e,
-			0x95c4153175fbdfbd,
 			0x9baeae5a95f57921,
 			0xc0c1a3f1fdbabdfd,
 			0xec51981217dfdc10,
-			0xf3406a1c7c568bc0,
 			0xf7531ef46740370e,
 			0xfdfb2b517fd7915f,
 		},

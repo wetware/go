@@ -5,6 +5,7 @@ using Go = import "/go.capnp";
 $Go.package("auth");
 $Go.import("github.com/wetware/go/auth");
 
+
 # Signer identifies an account.  It is a capability that can be
 # used to sign arbitrary nonces.
 #
@@ -15,9 +16,5 @@ interface Signer {
 
 
 interface Terminal {
-    login @0 (account :Signer) -> (session :SchemaProvider);
-}
-
-interface SchemaProvider {
-    schema @0 () -> (schema :import "/schema.capnp".Node);
+    login @0 (account :Signer) -> (schema :import "/schema.capnp".Node);
 }

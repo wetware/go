@@ -4,11 +4,13 @@ go 1.24
 
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
+	github.com/chzyer/readline v1.5.1
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.41.0
 	github.com/lmittmann/tint v1.0.4
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.15.0
+	github.com/spy16/slurp v0.3.0
 	github.com/urfave/cli/v2 v2.27.5
 	go.uber.org/multierr v1.11.0
 )

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,6 +13,7 @@ import (
 
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
+	"capnproto.org/go/capnp/v3/std/capnp/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
@@ -44,15 +44,7 @@ func Command() *cli.Command {
 					ctx, cancel := context.WithCancel(c.Context)
 					defer cancel()
 
-					// To anyone tempted to collapse this function by
-					// refactoring `login` to consume `c`, be aware
-					// that we are deliberately withholding CLI input
-					// from the isolated code paths.
-
-					t := rpc.NewStreamTransport(os.Stdin)
-					defer t.Close()
-
-					return isolate(ctx, t)
+					return util.Isolate(ctx, cell)
 				},
 			},
 		},
@@ -121,7 +113,7 @@ func Main(c *cli.Context) error {
 				// only to guests that log in as `user`.
 
 				User:   secret.GetPublic(), // user to allow
-				Export: auth.SchemaProvider(capnp.ErrorClient(errors.New("SchemaProvider::not implemented"))),
+				Schema: schema.Node{ /* FIXME */ },
 			},
 		},
 	}.Boot()
@@ -134,18 +126,15 @@ func Main(c *cli.Context) error {
 	// Set up the guest
 	////
 
-	// Step 1: rewrite "ww run foo [...]" ==> "ww run isolate foo [...]"
-	args := append([]string{"run", "membrane"}, c.Args().Tail()...)
-
 	// Step 2:  run the subcommand
-	cmd := exec.CommandContext(c.Context, "ww", args...)
+	cmd := exec.CommandContext(c.Context, c.Args().First(), c.Args().Tail()...)
 	cmd.Dir = cellDir
 	cmd.Env = c.StringSlice("env")
-	cmd.Stdin = guest
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = sysProcAttr(cellDir)  // TODO:  identity file is visible here; do we want that?
-	cmd.ExtraFiles = []*os.File{secretFile} // fd 3 in child
+	cmd.SysProcAttr = sysProcAttr(cellDir)         // TODO:  identity file is visible here; do we want that?
+	cmd.ExtraFiles = []*os.File{guest, secretFile} // fd 3: identity, fd 4: guest socket
 
 	if err := cmd.Start(); err != nil {
 		return err
@@ -215,42 +204,13 @@ func (l BootConfig) Boot() (host *rpc.Conn, guest *os.File, err error) {
 
 	return
 }
-
-func isolate(ctx context.Context, t rpc.Transport) error {
-	identity := os.NewFile(3, "identity")
-	defer identity.Close()
-
-	raw, err := io.ReadAll(identity)
+func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
+	schema, err := sess.Schema()
 	if err != nil {
-		return fmt.Errorf("read identity: %w", err)
-	}
-	identity.Close()
-
-	// Local identity.  Host will accept signed messages with this key.
-	id, err := crypto.UnmarshalPrivateKey(raw)
-	if err != nil {
-		return fmt.Errorf("unmarshal identity: %w", err)
+		return err
 	}
 
-	conn := rpc.NewConn(t, nil)
-	defer conn.Close()
-
-	term := auth.Terminal(conn.Bootstrap(ctx))
-	f, release := term.Login(ctx, user(id))
-	defer release()
-
-	fschema, release := f.Session().Schema(ctx, nil)
-	defer release()
-
-	fmt.Println(fschema.Schema())
+	fmt.Println(schema)
 
 	return nil
-}
-
-func user(privKey crypto.PrivKey) func(auth.Terminal_login_Params) error {
-	return func(call auth.Terminal_login_Params) error {
-		server := &auth.SignOnce{PrivKey: privKey}
-		client := auth.Signer_ServerToClient(server)
-		return call.SetAccount(client)
-	}
 }
