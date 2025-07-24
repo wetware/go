@@ -13,7 +13,6 @@ import (
 
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
-	"capnproto.org/go/capnp/v3/std/capnp/schema"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
@@ -44,7 +43,7 @@ func Command() *cli.Command {
 					ctx, cancel := context.WithCancel(c.Context)
 					defer cancel()
 
-					return util.Isolate(ctx, cell)
+					return util.DialSession(ctx, cell)
 				},
 			},
 		},
@@ -112,8 +111,8 @@ func Main(c *cli.Context) error {
 				// auth.SingleUser implements Policy.  It provides the node
 				// only to guests that log in as `user`.
 
-				User:   secret.GetPublic(), // user to allow
-				Schema: schema.Node{ /* FIXME */ },
+				User: secret.GetPublic(), // user to allow
+				IPFS: env.IPFS,
 			},
 		},
 	}.Boot()
@@ -205,12 +204,8 @@ func (l BootConfig) Boot() (host *rpc.Conn, guest *os.File, err error) {
 	return
 }
 func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
-	schema, err := sess.Schema()
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(schema)
+	ipfs := sess.Ipfs()
+	fmt.Println(ipfs)
 
 	return nil
 }

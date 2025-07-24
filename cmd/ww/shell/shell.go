@@ -29,7 +29,7 @@ func Command() *cli.Command {
 					ctx, cancel := context.WithCancel(c.Context)
 					defer cancel()
 
-					return util.Isolate(ctx, cell)
+					return util.DialSession(ctx, cell)
 				},
 			},
 		},
@@ -80,7 +80,12 @@ func (r *ReadlineInput) Close() error {
 }
 
 func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
-	env := core.New(map[string]core.Any{})
+	ipfs := sess.Ipfs()
+	defer ipfs.Release()
+
+	env := core.New(map[string]core.Any{
+		// "ipfs"
+	})
 
 	interpreter := slurp.New(
 		slurp.WithEnv(env),
