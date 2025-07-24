@@ -4,9 +4,10 @@ import (
 	context "context"
 	"errors"
 
-	schema "capnproto.org/go/capnp/v3/std/capnp/schema"
+	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	system "github.com/wetware/go/system"
 )
 
 type Challenge func(Signer_sign_Params) error
@@ -16,8 +17,8 @@ type Policy interface {
 }
 
 type SingleUser struct {
-	User   crypto.PubKey
-	Schema schema.Node
+	User crypto.PubKey
+	IPFS iface.CoreAPI
 }
 
 func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, user peer.ID) error {
@@ -30,6 +31,8 @@ func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, u
 		return errors.New("user not allowed")
 	}
 
-	// TODO:  as we add more fields to Terminal_login_Results, we'll need to populate them here.
-	return env.SetSchema(policy.Schema)
+	// Bind IPFS capability
+	provider := &system.IPFS_Provider{API: policy.IPFS}
+	ipfs := system.IPFS_ServerToClient(provider)
+	return env.SetIpfs(ipfs)
 }
