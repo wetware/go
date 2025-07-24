@@ -61,9 +61,12 @@ func (env *Env) Teardown(c *cli.Context) (err error) {
 	return
 }
 
-type CellFunc func(context.Context, auth.Terminal_login_Results) error
+type SessionHandler func(context.Context, auth.Terminal_login_Results) error
 
-func Isolate(ctx context.Context, isolate CellFunc) (err error) {
+// DialSession can be called by "membrane" processes (i.e. processes jailed
+// by ww run).  It synchronously logs into the host and passes the session
+// to the handler.  The handler should block until the session is finished.
+func DialSession(ctx context.Context, handler SessionHandler) (err error) {
 	// Get host socket from environment (fd 3)
 	host := os.NewFile(3, "host")
 	defer host.Close()
@@ -90,12 +93,12 @@ func Isolate(ctx context.Context, isolate CellFunc) (err error) {
 	f, release := term.Login(ctx, user(id))
 	defer release()
 
-	session, err := f.Struct()
+	env, err := f.Struct()
 	if err != nil {
 		return err
 	}
 
-	return isolate(ctx, session)
+	return handler(ctx, env)
 }
 
 func user(privKey crypto.PrivKey) func(auth.Terminal_login_Params) error {
