@@ -16,5 +16,7 @@ interface Signer {
 
 
 interface Terminal {
-    login @0 (account :Signer) -> (schema :import "/schema.capnp".Node);
+    login @0 (account :Signer) -> (
+        ipfs :import "/system/system.capnp".IPFS
+    );
 }

@@ -1,4 +1,4 @@
-//go:generate capnp compile -I../api -I$GOPATH/src/capnproto.org/go/capnp/std -ogo auth.capnp
+//go:generate capnp compile -I.. -I$GOPATH/src/capnproto.org/go/capnp/std -ogo auth.capnp
 
 package auth
 
