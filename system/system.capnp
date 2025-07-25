@@ -10,7 +10,7 @@ interface IPFS {
   add @0 (data :Data) -> (cid :Text);
   # Add data to IPFS
   
-  cat @1 (cid :Text) -> (data :Data);
+  cat @1 (cid :Text) -> (body :Data);
   # Get data from IPFS by CID
   
   ls @2 (path :Text) -> (entries :List(Entry));
