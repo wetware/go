@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"capnproto.org/go/capnp/v3/exp/bufferpool"
 	"github.com/ipfs/go-cid"
@@ -461,4 +462,189 @@ func (ip *IPFSPeers) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	return builtin.NewList(result...), nil
+}
+
+// Go implements the go special form for spawning processes across different contexts
+type Go struct {
+	Executor system.Executor
+}
+
+// Invoke implements core.Invokable for Go
+func (g Go) Invoke(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("go requires at least 2 arguments: executable path and body, got %d", len(args))
+	}
+
+	// First argument should be the executable path
+	execPath, ok := args[0].(*UnixPath)
+	if !ok {
+		return nil, fmt.Errorf("go first argument must be UnixPath (executable path), got %T", args[0])
+	}
+
+	// Second argument should be the body (code to execute)
+	body := args[1] // Already core.Any, but may have methods in the future
+
+	// Parse keyword arguments (optional)
+	kwargs := make(map[string]core.Any)
+	for i := 2; i < len(args); i++ {
+		if i+1 >= len(args) {
+			return nil, fmt.Errorf("go keyword argument at position %d has no value", i)
+		}
+
+		key, ok := args[i].(builtin.String)
+		if !ok {
+			return nil, fmt.Errorf("go keyword argument key must be string, got %T", args[i])
+		}
+
+		kwargs[string(key)] = args[i+1]
+		i++ // Skip the value in next iteration
+	}
+
+	// Extract executor from kwargs or use default
+	if execKwarg, exists := kwargs["exec"]; exists {
+		execCap, ok := execKwarg.(system.Executor)
+		if !ok {
+			return nil, fmt.Errorf("go :exec keyword argument must be Executor capability, got %T", execKwarg)
+		}
+		_ = execCap // TODO: Use executor in future implementation
+	}
+
+	// Extract console from kwargs if provided
+	if consoleKwarg, exists := kwargs["console"]; exists {
+		_ = consoleKwarg // TODO: Use console in future implementation
+	}
+
+	// Extract other capabilities from kwargs
+	for key, value := range kwargs {
+		if key == "exec" || key == "console" {
+			continue // Already handled
+		}
+
+		// Convert capability to CapDescriptor
+		// TODO: Implement proper capability conversion
+		_ = key
+		_ = value
+	}
+
+	// Serialize the body to a string representation
+	bodyStr, err := serializeBody(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize body: %w", err)
+	}
+
+	// Prepare arguments for the executor
+	var cmdArgs []string
+	cmdArgs = append(cmdArgs, bodyStr)
+
+	// Add any additional arguments from kwargs
+	for key, value := range kwargs {
+		if key == "exec" || key == "console" {
+			continue // Already handled
+		}
+		// Convert value to string and add as argument
+		argStr := fmt.Sprintf("--%s=%v", key, value)
+		cmdArgs = append(cmdArgs, argStr)
+	}
+
+	// Spawn the process using the executor
+	ctx := context.Background()
+	future, release := g.Executor.Spawn(ctx, func(params system.Executor_spawn_Params) error {
+		// Set the executable path
+		if err := params.SetPath(execPath.String()); err != nil {
+			return fmt.Errorf("failed to set path: %w", err)
+		}
+
+		// Set arguments
+		argsList, err := params.NewArgs(int32(len(cmdArgs)))
+		if err != nil {
+			return fmt.Errorf("failed to create args list: %w", err)
+		}
+		for i, arg := range cmdArgs {
+			if err := argsList.Set(i, arg); err != nil {
+				return fmt.Errorf("failed to set arg %d: %w", i, err)
+			}
+		}
+		if err := params.SetArgs(argsList); err != nil {
+			return fmt.Errorf("failed to set args: %w", err)
+		}
+
+		// Set environment variables (empty for now, could be enhanced)
+		envList, err := params.NewEnv(0)
+		if err != nil {
+			return fmt.Errorf("failed to create env list: %w", err)
+		}
+		if err := params.SetEnv(envList); err != nil {
+			return fmt.Errorf("failed to set env: %w", err)
+		}
+
+		// Set working directory (empty for now, could be enhanced)
+		if err := params.SetDir(""); err != nil {
+			return fmt.Errorf("failed to set dir: %w", err)
+		}
+
+		return nil
+	})
+	defer release()
+
+	// Get the result
+	result, err := future.Struct()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get spawn result: %w", err)
+	}
+
+	// Get the cell
+	optionalCell, err := result.Cell()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cell: %w", err)
+	}
+
+	// Check if spawn was successful
+	if optionalCell.Which() == system.Executor_OptionalCell_Which_err {
+		errStruct := optionalCell.Err()
+		status := errStruct.Status()
+		body, err := errStruct.Body()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get body: %w", err)
+		}
+		return nil, fmt.Errorf("spawn failed with status %d: %s", status, string(body))
+	}
+
+	// Get the cell
+	cell := optionalCell.Cell()
+	if !cell.IsValid() {
+		return nil, fmt.Errorf("spawn returned invalid cell")
+	}
+
+	// Return the cell for further interaction
+	return cell, nil
+}
+
+// serializeBody converts the body to a string representation
+func serializeBody(body core.Any) (string, error) {
+	// Convert body to a string representation
+	var bodyStr string
+
+	switch v := body.(type) {
+	case builtin.String:
+		bodyStr = string(v)
+	case interface {
+		Len() int
+		At(int) core.Any
+	}:
+		// Convert list-like object to s-expression string
+		items := make([]string, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			item := v.At(i)
+			if str, ok := item.(builtin.String); ok {
+				items[i] = fmt.Sprintf("%q", string(str))
+			} else {
+				items[i] = fmt.Sprintf("%v", item)
+			}
+		}
+		bodyStr = fmt.Sprintf("(%s)", strings.Join(items, " "))
+	default:
+		bodyStr = fmt.Sprintf("%v", v)
+	}
+
+	return bodyStr, nil
 }
