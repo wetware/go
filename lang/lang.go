@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"capnproto.org/go/capnp/v3/exp/bufferpool"
 	"github.com/ipfs/go-cid"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -15,15 +16,32 @@ import (
 // IPFSCat implements a standalone cat function for the shell
 // Buffer wraps a *bytes.Buffer for use in the shell
 type Buffer struct {
-	bytes.Buffer
+	Mem []byte
+}
+
+func (b *Buffer) Close() error {
+	bufferpool.Default.Put(b.Mem)
+	return nil
+}
+
+func (b Buffer) NewReader() *bytes.Reader {
+	return bytes.NewReader(b.Mem)
+}
+
+func (b *Buffer) String() string {
+	return string(b.Mem)
+}
+
+func (b *Buffer) SExpr() (string, error) {
+	return b.AsHex(), nil
 }
 
 // AsHex returns a hex representation of the buffer contents
 func (b *Buffer) AsHex() string {
-	if b.Buffer.Len() == 0 {
+	if len(b.Mem) == 0 {
 		return "0x"
 	}
-	return "0x" + hex.EncodeToString(b.Buffer.Bytes())
+	return "0x" + hex.EncodeToString(b.Mem)
 }
 
 type IPFSCat struct {
@@ -70,10 +88,10 @@ func (ic IPFSCat) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	// Create a buffer with the data
-	buffer := &Buffer{}
-	buffer.Write(body)
+	buf := bufferpool.Default.Get(len(body))
+	copy(buf, body)
 
-	return buffer, nil
+	return &Buffer{Mem: buf}, nil
 }
 
 // IPFSAdd adds data to IPFS
@@ -95,7 +113,7 @@ func (ia IPFSAdd) Invoke(args ...core.Any) (core.Any, error) {
 
 	ctx := context.Background()
 	future, release := ia.IPFS.Add(ctx, func(params system.IPFS_add_Params) error {
-		return params.SetData(buf.Bytes())
+		return params.SetData(buf.Mem)
 	})
 	defer release()
 
@@ -131,7 +149,12 @@ func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
 	case builtin.String:
 		pathStr = string(arg)
 	case *UnixPath:
-		pathStr = arg.String()
+		// Extract CID from the path segments (e.g., ["ipfs", "QmHash..."] -> "QmHash...")
+		segments := arg.Path.Segments()
+		if len(segments) < 2 {
+			return nil, fmt.Errorf("invalid IPFS path: insufficient segments")
+		}
+		pathStr = segments[1] // Get the CID part
 	default:
 		return nil, fmt.Errorf("ls argument must be string or UnixPath, got %T", args[0])
 	}

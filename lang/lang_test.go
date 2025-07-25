@@ -42,8 +42,7 @@ func TestBuffer(t *testing.T) {
 
 	// Test buffer with data
 	testData := []byte("test data")
-	buffer := &lang.Buffer{}
-	buffer.Write(testData)
+	buffer := &lang.Buffer{Mem: testData}
 	require.Equal(t, "test data", buffer.String(), "Buffer string representation mismatch")
 	require.Equal(t, "0x746573742064617461", buffer.AsHex(), "Buffer hex representation mismatch")
 }
@@ -58,9 +57,8 @@ func TestIPFSAdd(t *testing.T) {
 	addFunc := lang.IPFSAdd{IPFS: mock}
 
 	// Create a Buffer with test data
-	buffer := &lang.Buffer{}
 	testData := []byte("test data for add")
-	buffer.Write(testData)
+	buffer := &lang.Buffer{Mem: testData}
 
 	// Test with Buffer
 	result, err := addFunc.Invoke(buffer)
