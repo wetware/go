@@ -43,7 +43,7 @@ func (env *Env) Setup(c *cli.Context) (err error) {
 		// 	return
 		// },
 	} {
-		if err = bind(c); bind != nil {
+		if err = bind(c); err != nil {
 			break
 		}
 	}

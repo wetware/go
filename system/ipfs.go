@@ -21,6 +21,10 @@ type IPFSConfig struct {
 }
 
 func (s IPFSConfig) New() IPFS {
+	if s.API == nil {
+		return IPFS{} // null
+	}
+
 	return IPFS_ServerToClient(s)
 }
 

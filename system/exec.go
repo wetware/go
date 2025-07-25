@@ -9,7 +9,8 @@ import (
 var _ Executor_Server = (*ExecConfig)(nil)
 
 type ExecConfig struct {
-	Dir string
+	Enabled bool
+	IPFS    IPFS
 }
 
 func (e ExecConfig) New() Executor {

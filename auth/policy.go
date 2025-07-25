@@ -32,18 +32,26 @@ func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, u
 		return errors.New("user not allowed")
 	}
 
-	// Bind IPFS capability
-	err = env.SetIpfs(policy.IPFS.AddRef())
-	if err != nil {
-		return err
+	// Bind IPFS capability only if it's not nil
+	if policy.IPFS.IsValid() {
+		err = env.SetIpfs(policy.IPFS.AddRef())
+		if err != nil {
+			return err
+		}
 	}
 
-	// Bind Exec capability
-	err = env.SetExec(policy.Exec.AddRef())
-	if err != nil {
-		return err
+	// Bind Exec capability only if it's not nil
+	if policy.Exec.IsValid() {
+		err = env.SetExec(policy.Exec.AddRef())
+		if err != nil {
+			return err
+		}
 	}
 
-	// Bind Console capability
-	return env.SetConsole(policy.Console.AddRef())
+	// Bind Console capability only if it's not nil
+	if policy.Console.IsValid() {
+		return env.SetConsole(policy.Console.AddRef())
+	}
+
+	return nil
 }
