@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/reader"
 )
 
@@ -17,14 +16,14 @@ func TestUnixPathReader(t *testing.T) {
 	}{
 		{
 			name:    "valid ipfs path",
-			input:   "/ipfs/QmHash123",
-			want:    "/ipfs/QmHash123",
+			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 		{
 			name:    "valid ipld path",
-			input:   "/ipld/QmHash456",
-			want:    "/ipld/QmHash456",
+			input:   "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 		{
@@ -41,14 +40,14 @@ func TestUnixPathReader(t *testing.T) {
 		},
 		{
 			name:    "path with trailing whitespace",
-			input:   "/ipfs/QmHash123 ",
-			want:    "/ipfs/QmHash123",
+			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa ",
+			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 		{
 			name:    "path followed by parenthesis",
-			input:   "/ipfs/QmHash123)",
-			want:    "/ipfs/QmHash123",
+			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa)",
+			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 	}
@@ -74,15 +73,15 @@ func TestUnixPathReader(t *testing.T) {
 				return
 			}
 
-			// Check if result is a string
-			str, ok := result.(builtin.String)
+			// Check if result is a UnixPath
+			unixPath, ok := result.(*UnixPath)
 			if !ok {
-				t.Errorf("UnixPathReader() returned %T, want builtin.String", result)
+				t.Errorf("UnixPathReader() returned %T, want *UnixPath", result)
 				return
 			}
 
-			if string(str) != tt.want {
-				t.Errorf("UnixPathReader() = %v, want %v", string(str), tt.want)
+			if unixPath.String() != tt.want {
+				t.Errorf("UnixPathReader() = %v, want %v", unixPath.String(), tt.want)
 			}
 		})
 	}
@@ -91,7 +90,7 @@ func TestUnixPathReader(t *testing.T) {
 func TestUnixPathReaderInContext(t *testing.T) {
 	// Test that the Unix path reader works in a more realistic context
 	// where it's followed by other forms
-	input := "(ipfs.Cat /ipfs/QmHash123) (ipfs.Ls /ipld/QmHash456)"
+	input := "(ipfs.Cat /ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa) (ipfs.Ls /ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa)"
 
 	rd := reader.New(strings.NewReader(input))
 	rd.SetMacro('/', false, UnixPathReader())
@@ -111,4 +110,77 @@ func TestUnixPathReaderInContext(t *testing.T) {
 	// The second form should be a list with "ipfs.Ls" and the path
 
 	t.Logf("Successfully parsed forms: %v", forms)
+}
+
+func TestNewUnixPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "valid ipfs path",
+			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			wantErr: false,
+		},
+		{
+			name:    "valid ipld path",
+			input:   "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			wantErr: false,
+		},
+		{
+			name:    "invalid path starting with slash",
+			input:   "/invalid/path",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "path without slash prefix",
+			input:   "ipfs/QmHash123",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "empty path",
+			input:   "",
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unixPath, err := NewUnixPath(tt.input)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("NewUnixPath() expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("NewUnixPath() unexpected error: %v", err)
+				return
+			}
+
+			if unixPath.String() != tt.want {
+				t.Errorf("NewUnixPath() = %v, want %v", unixPath.String(), tt.want)
+			}
+
+			// Test that the underlying path is accessible
+			if unixPath.String() != tt.want {
+				t.Errorf("UnixPath.Path() = %v, want %v", unixPath.String(), tt.want)
+			}
+
+			// Test ToBuiltinString conversion
+			builtinStr := unixPath.ToBuiltinString()
+			if string(builtinStr) != tt.want {
+				t.Errorf("UnixPath.ToBuiltinString() = %v, want %v", string(builtinStr), tt.want)
+			}
+		})
+	}
 }
