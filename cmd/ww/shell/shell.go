@@ -12,80 +12,9 @@ import (
 	"github.com/spy16/slurp/repl"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/util"
-)
-
-var (
-	flags = []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:     "join",
-			Category: "P2P",
-			Aliases:  []string{"j"},
-			Usage:    "connect to cluster through specified peers",
-			EnvVars:  []string{"WW_JOIN"},
-		},
-		&cli.StringFlag{
-			Name:     "discover",
-			Category: "P2P",
-			Aliases:  []string{"d"},
-			Usage:    "automatic peer discovery settings",
-			Value:    "/mdns",
-			EnvVars:  []string{"WW_DISCOVER"},
-		},
-		&cli.StringFlag{
-			Name:     "namespace",
-			Category: "P2P",
-			Aliases:  []string{"ns"},
-			Usage:    "cluster namespace (must match dial host)",
-			Value:    "ww",
-			EnvVars:  []string{"WW_NAMESPACE"},
-		},
-		&cli.BoolFlag{
-			Name:     "quiet",
-			Category: "OUTPUT",
-			Aliases:  []string{"q"},
-			Usage:    "suppress banner message on interactive startup",
-			EnvVars:  []string{"WW_QUIET"},
-		},
-		&cli.BoolFlag{
-			Name:     "dial",
-			Category: "P2P",
-			Usage:    "dial into a cluster using -join and -discover",
-			EnvVars:  []string{"WW_AUTODIAL"},
-		},
-		&cli.DurationFlag{
-			Name:     "timeout",
-			Category: "P2P",
-			Usage:    "timeout for -dial",
-			Value:    time.Second * 10,
-		},
-		// Capability control flags (same as ww run)
-		&cli.BoolFlag{
-			Name:     "with-full-rights",
-			Category: "CAPABILITIES",
-			Usage:    "grant all capabilities (console, IPFS, exec)",
-			EnvVars:  []string{"WW_WITH_FULL_RIGHTS"},
-		},
-		&cli.BoolFlag{
-			Name:     "with-console",
-			Category: "CAPABILITIES",
-			Usage:    "grant console output capability",
-			EnvVars:  []string{"WW_WITH_CONSOLE"},
-		},
-		&cli.BoolFlag{
-			Name:     "with-ipfs",
-			Category: "CAPABILITIES",
-			Usage:    "grant IPFS capability",
-			EnvVars:  []string{"WW_WITH_IPFS"},
-		},
-		&cli.BoolFlag{
-			Name:     "with-exec",
-			Category: "CAPABILITIES",
-			Usage:    "grant process execution capability",
-			EnvVars:  []string{"WW_WITH_EXEC"},
-		},
-	}
 )
 
 func Command() *cli.Command {
@@ -102,8 +31,50 @@ The shell can be run with different capability levels using the --with-* flags:
 
 If no capability flags are specified, the shell runs with minimal capabilities.
 This provides a secure environment for testing and development.`,
-		Flags:  flags,
-		Action: Main,
+		Flags: append([]cli.Flag{
+			&cli.StringSliceFlag{
+				Name:     "join",
+				Category: "P2P",
+				Aliases:  []string{"j"},
+				Usage:    "connect to cluster through specified peers",
+				EnvVars:  []string{"WW_JOIN"},
+			},
+			&cli.StringFlag{
+				Name:     "discover",
+				Category: "P2P",
+				Aliases:  []string{"d"},
+				Usage:    "automatic peer discovery settings",
+				Value:    "/mdns",
+				EnvVars:  []string{"WW_DISCOVER"},
+			},
+			&cli.StringFlag{
+				Name:     "namespace",
+				Category: "P2P",
+				Aliases:  []string{"ns"},
+				Usage:    "cluster namespace (must match dial host)",
+				Value:    "ww",
+				EnvVars:  []string{"WW_NAMESPACE"},
+			},
+			&cli.BoolFlag{
+				Name:     "dial",
+				Category: "P2P",
+				Usage:    "dial into a cluster using -join and -discover",
+				EnvVars:  []string{"WW_AUTODIAL"},
+			},
+			&cli.DurationFlag{
+				Name:     "timeout",
+				Category: "P2P",
+				Usage:    "timeout for -dial",
+				Value:    time.Second * 10,
+			},
+			&cli.BoolFlag{
+				Name:     "quiet",
+				Category: "OUTPUT",
+				Aliases:  []string{"q"},
+				Usage:    "suppress banner message on interactive startup",
+				EnvVars:  []string{"WW_QUIET"},
+			},
+		}, flags.CapabilityFlags()...),
 		Subcommands: []*cli.Command{
 			{
 				Name:   "membrane",
@@ -116,6 +87,7 @@ This provides a secure environment for testing and development.`,
 				},
 			},
 		},
+		Action: Main,
 	}
 }
 
@@ -162,13 +134,13 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	}
 
 	// Initialize environment with basic functions
-	envMap := make(map[string]core.Any)
+	globals := make(map[string]core.Any)
 
 	// Conditionally add console capability
 	if sess.HasConsole() {
 		console := sess.Console()
 		defer console.Release()
-		envMap["println"] = lang.ConsolePrintln{Console: console}
+		globals["println"] = lang.ConsolePrintln{Console: console}
 	}
 
 	// Conditionally add IPFS capabilities
@@ -176,26 +148,26 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		ipfs := sess.Ipfs()
 		defer ipfs.Release()
 
-		envMap["cat"] = lang.IPFSCat{IPFS: ipfs}
-		envMap["add"] = lang.IPFSAdd{IPFS: ipfs}
-		envMap["ls"] = &lang.IPFSLs{IPFS: ipfs}
-		envMap["stat"] = &lang.IPFSStat{IPFS: ipfs}
-		envMap["pin"] = &lang.IPFSPin{IPFS: ipfs}
-		envMap["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
-		envMap["pins"] = &lang.IPFSPins{IPFS: ipfs}
-		envMap["id"] = &lang.IPFSId{IPFS: ipfs}
-		envMap["connect"] = &lang.IPFSConnect{IPFS: ipfs}
-		envMap["peers"] = &lang.IPFSPeers{IPFS: ipfs}
+		globals["cat"] = lang.IPFSCat{IPFS: ipfs}
+		globals["add"] = lang.IPFSAdd{IPFS: ipfs}
+		globals["ls"] = &lang.IPFSLs{IPFS: ipfs}
+		globals["stat"] = &lang.IPFSStat{IPFS: ipfs}
+		globals["pin"] = &lang.IPFSPin{IPFS: ipfs}
+		globals["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
+		globals["pins"] = &lang.IPFSPins{IPFS: ipfs}
+		globals["id"] = &lang.IPFSId{IPFS: ipfs}
+		globals["connect"] = &lang.IPFSConnect{IPFS: ipfs}
+		globals["peers"] = &lang.IPFSPeers{IPFS: ipfs}
 	}
 
 	// Conditionally add process execution capability
 	if sess.HasExec() {
 		exec := sess.Exec()
 		defer exec.Release()
-		envMap["go"] = lang.Go{Executor: exec}
+		globals["go"] = lang.Go{Executor: exec}
 	}
 
-	env := core.New(envMap)
+	env := core.New(globals)
 
 	interpreter := slurp.New(
 		slurp.WithEnv(env),
