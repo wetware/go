@@ -262,6 +262,105 @@ func TestListReader(t *testing.T) {
 	}
 }
 
+func TestHexReader(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "valid hex string",
+			input:   "0x746573742064617461",
+			want:    "test data",
+			wantErr: false,
+		},
+		{
+			name:    "empty hex string",
+			input:   "0x",
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "single byte hex",
+			input:   "0x41",
+			want:    "A",
+			wantErr: false,
+		},
+		{
+			name:    "invalid hex string",
+			input:   "0xinvalid",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "doesn't start with 0x",
+			input:   "746573742064617461",
+			want:    "746573742064617461",
+			wantErr: false,
+		},
+		{
+			name:    "hex with trailing whitespace",
+			input:   "0x746573742064617461 ",
+			want:    "test data",
+			wantErr: false,
+		},
+		{
+			name:    "hex followed by parenthesis",
+			input:   "0x746573742064617461)",
+			want:    "test data",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use the NewReaderWithHexSupport function instead of setting the macro directly
+			rd := NewReaderWithHexSupport(strings.NewReader(tt.input))
+
+			// Read one form
+			result, err := rd.One()
+
+			if tt.wantErr {
+				require.Error(t, err, "HexReader() expected error but got none")
+				return
+			}
+
+			require.NoError(t, err, "HexReader() unexpected error: %v", err)
+
+			// Check if result is a Buffer (for hex literals) or a number (for regular numbers)
+			if strings.HasPrefix(tt.input, "0x") {
+				buffer, ok := result.(*Buffer)
+				require.True(t, ok, "HexReader() returned %T, want *Buffer", result)
+
+				require.Equal(t, tt.want, buffer.String(), "HexReader() = %v, want %v", buffer.String(), tt.want)
+			} else {
+				// For non-hex numbers, we expect a number type
+				_, ok := result.(builtin.Int64)
+				require.True(t, ok, "HexReader() returned %T, want builtin.Int64", result)
+			}
+		})
+	}
+}
+
+func TestHexReaderInContext(t *testing.T) {
+	// Test that the hex reader works in a more realistic context
+	// where it's used in function calls
+	input := "(add 0x746573742064617461) (cat /ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa)"
+
+	// Use the NewReaderWithHexSupport function
+	rd := NewReaderWithHexSupport(strings.NewReader(input))
+	rd.SetMacro('/', false, UnixPathReader())
+
+	// Read all forms
+	forms, err := rd.All()
+	require.NoError(t, err, "Failed to read forms: %v", err)
+
+	require.Equal(t, 2, len(forms), "Expected 2 forms, got %d", len(forms))
+
+	t.Logf("Successfully parsed forms: %v", forms)
+}
+
 // MockIPFSServer implements system.IPFS_Server for testing
 type MockIPFSServer struct {
 	testValue int
