@@ -6,7 +6,6 @@ import (
 
 	"strings"
 
-	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
 	"github.com/spy16/slurp/reader"
 	"github.com/stretchr/testify/require"
@@ -257,14 +256,14 @@ func TestUnixPathReader(t *testing.T) {
 	}{
 		{
 			name:    "valid ipfs path",
-			input:   "/ipfs/QmHash123",
-			want:    "/ipfs/QmHash123",
+			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 		{
 			name:    "valid ipld path",
-			input:   "/ipld/QmHash456",
-			want:    "/ipld/QmHash456",
+			input:   "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
+			want:    "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
 			wantErr: false,
 		},
 		{
@@ -296,15 +295,15 @@ func TestUnixPathReader(t *testing.T) {
 				return
 			}
 
-			// Check if result is a string
-			str, ok := result.(builtin.String)
+			// Check if result is a UnixPath
+			unixPath, ok := result.(*lang.UnixPath)
 			if !ok {
-				t.Errorf("unixPathReader() returned %T, want builtin.String", result)
+				t.Errorf("unixPathReader() returned %T, want *lang.UnixPath", result)
 				return
 			}
 
-			if string(str) != tt.want {
-				t.Errorf("unixPathReader() = %v, want %v", string(str), tt.want)
+			if unixPath.String() != tt.want {
+				t.Errorf("unixPathReader() = %v, want %v", unixPath.String(), tt.want)
 			}
 		})
 	}
