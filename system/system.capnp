@@ -9,14 +9,35 @@ $Go.import("github.com/wetware/go/system");
 ###
 
 interface Cell {
-    # A cell is a process that can be executed.
+  wait @0 () -> (result :MaybeError);
+
+  struct MaybeError {
+    union {
+        ok @0 :Void;
+        err   :group {
+            status @1 :UInt32;
+            body   @2 :Data;
+        }
+      }
+    }
 }
 
 interface Executor {
     spawn @0 (
+		path :Text,
         args :List(Text),
-        # env :List(Text),
+        env :List(Text),
+		dir :Text,
+		# stdin :Data,
+		# stdout :Data,
+		# stderr :Data,
+		ExtraCaps :List(CapDescriptor)
     ) -> (cell :OptionalCell);
+
+	struct CapDescriptor {
+		name   @0 :Text;
+		client @1 :Capability;
+	}
 
     struct OptionalCell {
         union {
@@ -28,7 +49,6 @@ interface Executor {
         }
     }
 }
-
 
 
 # IPFS
