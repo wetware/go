@@ -10,10 +10,10 @@ import (
 func CapabilityFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.BoolFlag{
-			Name:     "with-full-rights",
+			Name:     "with-all",
 			Category: "CAPABILITIES",
 			Usage:    "grant all capabilities (console, IPFS, exec)",
-			EnvVars:  []string{"WW_WITH_FULL_RIGHTS"},
+			EnvVars:  []string{"WW_WITH_ALL"},
 		},
 		&cli.BoolFlag{
 			Name:     "with-console",
@@ -88,4 +88,4 @@ func OutputFlags() []cli.Flag {
 			EnvVars:  []string{"WW_QUIET"},
 		},
 	}
-} 
+}

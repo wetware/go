@@ -8,7 +8,7 @@ import (
 )
 
 func maybeIPFS(c *cli.Context) iface.CoreAPI {
-	if c.Bool("with-full-rights") || c.Bool("with-ipfs") {
+	if c.Bool("with-all") || c.Bool("with-ipfs") {
 		return env.IPFS
 	}
 
@@ -16,7 +16,7 @@ func maybeIPFS(c *cli.Context) iface.CoreAPI {
 }
 
 func maybeConsoleWriter(c *cli.Context) io.Writer {
-	if c.Bool("with-full-rights") || c.Bool("with-console") {
+	if c.Bool("with-all") || c.Bool("with-console") {
 		return c.App.Writer
 	}
 
@@ -24,7 +24,7 @@ func maybeConsoleWriter(c *cli.Context) io.Writer {
 }
 
 func maybeExec(c *cli.Context) bool {
-	if c.Bool("with-full-rights") || c.Bool("with-exec") {
+	if c.Bool("with-all") || c.Bool("with-exec") {
 		return true
 	}
 

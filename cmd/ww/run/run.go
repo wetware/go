@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
@@ -26,7 +27,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name: "run",
 		// ArgsUsage: "<source-dir>",
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
@@ -36,7 +37,7 @@ func Command() *cli.Command {
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},
 			},
-		},
+		}, flags.CapabilityFlags()...),
 		Subcommands: []*cli.Command{
 			{
 				Name:   "membrane",
@@ -93,13 +94,13 @@ func Main(c *cli.Context) error {
 
 	// Set up capability exports
 	////
-	ipfs := system.IPFSConfig{API: env.IPFS}.New()
+	ipfs := system.IPFSConfig{API: maybeIPFS(c)}.New()
 	defer ipfs.Release()
 
-	exec := system.ExecConfig{}.New()
+	exec := system.ExecConfig{Enabled: maybeExec(c), IPFS: ipfs}.New()
 	defer exec.Release()
 
-	console := system.ConsoleConfig{Writer: os.Stdout}.New()
+	console := system.ConsoleConfig{Writer: maybeConsoleWriter(c)}.New()
 	defer console.Release()
 
 	// Set up the host capnp environment

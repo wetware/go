@@ -24,10 +24,10 @@ func Command() *cli.Command {
 		Description: `Start an interactive REPL session with controlled capabilities.
 
 The shell can be run with different capability levels using the --with-* flags:
-  --with-full-rights    Grant all capabilities (console, IPFS, exec)
-  --with-console        Grant console output capability only
-  --with-ipfs           Grant IPFS capability only  
-  --with-exec           Grant process execution capability only
+  --with-all           Grant all capabilities (console, IPFS, exec)
+  --with-console       Grant console output capability only
+  --with-ipfs          Grant IPFS capability only  
+  --with-exec          Grant process execution capability only
 
 If no capability flags are specified, the shell runs with minimal capabilities.
 This provides a secure environment for testing and development.`,
@@ -105,8 +105,8 @@ func Main(c *cli.Context) error {
 	args := []string{"run"}
 
 	// Add capability flags if specified (these must come before the subcommand)
-	if c.Bool("with-full-rights") {
-		args = append(args, "--with-full-rights")
+	if c.Bool("with-all") {
+		args = append(args, "--with-all")
 	}
 	if c.Bool("with-console") {
 		args = append(args, "--with-console")
