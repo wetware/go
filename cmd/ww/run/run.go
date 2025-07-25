@@ -91,9 +91,10 @@ func Main(c *cli.Context) error {
 	}
 	defer secretFile.Close()
 
-	ipfs := system.IPFS_ServerToClient(&system.DefaultIPFS_Server{API: env.IPFS})
+	ipfs := system.IPFSConfig{API: env.IPFS}.New()
 	defer ipfs.Release()
-	exec := system.Executor_ServerToClient(&system.DefaultExecutor{IPFS: ipfs})
+
+	exec := system.ExecConfig{}.New()
 	defer exec.Release()
 
 	// Set up the host capnp environment
@@ -116,8 +117,8 @@ func Main(c *cli.Context) error {
 				// only to guests that log in as `user`.
 
 				User: secret.GetPublic(), // user to allow
-				IPFS: ipfs,
-				Exec: exec,
+				IPFS: ipfs.AddRef(),
+				Exec: exec.AddRef(),
 			},
 		},
 	}.Boot()

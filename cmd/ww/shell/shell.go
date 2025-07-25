@@ -171,14 +171,14 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		// IPFS
 		"cat":     lang.IPFSCat{IPFS: ipfs},
 		"add":     lang.IPFSAdd{IPFS: ipfs},
-		"ls":      lang.IPFSLs{IPFS: ipfs},
-		"stat":    lang.IPFSStat{IPFS: ipfs},
-		"pin":     lang.IPFSPin{IPFS: ipfs},
-		"unpin":   lang.IPFSUnpin{IPFS: ipfs},
-		"pins":    lang.IPFSPins{IPFS: ipfs},
-		"id":      lang.IPFSId{IPFS: ipfs},
-		"connect": lang.IPFSConnect{IPFS: ipfs},
-		"peers":   lang.IPFSPeers{IPFS: ipfs},
+		"ls":      &lang.IPFSLs{IPFS: ipfs},
+		"stat":    &lang.IPFSStat{IPFS: ipfs},
+		"pin":     &lang.IPFSPin{IPFS: ipfs},
+		"unpin":   &lang.IPFSUnpin{IPFS: ipfs},
+		"pins":    &lang.IPFSPins{IPFS: ipfs},
+		"id":      &lang.IPFSId{IPFS: ipfs},
+		"connect": &lang.IPFSConnect{IPFS: ipfs},
+		"peers":   &lang.IPFSPeers{IPFS: ipfs},
 	})
 
 	interpreter := slurp.New(
@@ -207,7 +207,8 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 
 func readerFactory(ipfs system.IPFS) repl.ReaderFactoryFunc {
 	return func(r io.Reader) *reader.Reader {
-		rd := reader.New(r)
+		// Create a reader with hex support
+		rd := lang.NewReaderWithHexSupport(r)
 
 		// Set up the Unix path reader macro for '/' character
 		rd.SetMacro('/', false, lang.UnixPathReader())
@@ -230,8 +231,16 @@ func (printer) Print(val interface{}) error {
 	switch v := val.(type) {
 	case *lang.Buffer:
 		fmt.Fprintln(os.Stdout, v.String())
+
+	case core.SExpressable:
+		form, err := v.SExpr()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout, form)
 	case string:
 		fmt.Fprintln(os.Stdout, v)
+
 	case core.Any:
 		// For core.Any types, try to convert to string
 		if str, ok := v.(string); ok {
