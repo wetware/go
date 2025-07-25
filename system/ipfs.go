@@ -14,13 +14,17 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-var _ IPFS_Server = (*DefaultIPFS_Server)(nil)
+var _ IPFS_Server = (*IPFSConfig)(nil)
 
-type DefaultIPFS_Server struct {
+type IPFSConfig struct {
 	API iface.CoreAPI
 }
 
-func (s *DefaultIPFS_Server) Add(ctx context.Context, call IPFS_add) error {
+func (s IPFSConfig) New() IPFS {
+	return IPFS_ServerToClient(s)
+}
+
+func (s IPFSConfig) Add(ctx context.Context, call IPFS_add) error {
 	args := call.Args()
 	data, err := args.Data()
 	if err != nil {
@@ -45,7 +49,7 @@ func (s *DefaultIPFS_Server) Add(ctx context.Context, call IPFS_add) error {
 	return results.SetCid(path.RootCid().String())
 }
 
-func (s *DefaultIPFS_Server) Cat(ctx context.Context, call IPFS_cat) error {
+func (s IPFSConfig) Cat(ctx context.Context, call IPFS_cat) error {
 	args := call.Args()
 	cidStr, err := args.Cid()
 	if err != nil {
@@ -84,7 +88,7 @@ func (s *DefaultIPFS_Server) Cat(ctx context.Context, call IPFS_cat) error {
 	return results.SetBody(buf.Bytes())
 }
 
-func (s *DefaultIPFS_Server) Ls(ctx context.Context, call IPFS_ls) error {
+func (s IPFSConfig) Ls(ctx context.Context, call IPFS_ls) error {
 	args := call.Args()
 	pathStr, err := args.Path()
 	if err != nil {
@@ -145,7 +149,7 @@ func (s *DefaultIPFS_Server) Ls(ctx context.Context, call IPFS_ls) error {
 	return results.SetEntries(entries)
 }
 
-func (s *DefaultIPFS_Server) Stat(ctx context.Context, call IPFS_stat) error {
+func (s IPFSConfig) Stat(ctx context.Context, call IPFS_stat) error {
 	args := call.Args()
 	cidStr, err := args.Cid()
 	if err != nil {
@@ -183,7 +187,7 @@ func (s *DefaultIPFS_Server) Stat(ctx context.Context, call IPFS_stat) error {
 	return results.SetInfo(info)
 }
 
-func (s *DefaultIPFS_Server) Pin(ctx context.Context, call IPFS_pin) error {
+func (s IPFSConfig) Pin(ctx context.Context, call IPFS_pin) error {
 	args := call.Args()
 	cidStr, err := args.Cid()
 	if err != nil {
@@ -213,7 +217,7 @@ func (s *DefaultIPFS_Server) Pin(ctx context.Context, call IPFS_pin) error {
 	return nil
 }
 
-func (s *DefaultIPFS_Server) Unpin(ctx context.Context, call IPFS_unpin) error {
+func (s IPFSConfig) Unpin(ctx context.Context, call IPFS_unpin) error {
 	args := call.Args()
 	cidStr, err := args.Cid()
 	if err != nil {
@@ -243,7 +247,7 @@ func (s *DefaultIPFS_Server) Unpin(ctx context.Context, call IPFS_unpin) error {
 	return nil
 }
 
-func (s *DefaultIPFS_Server) Pins(ctx context.Context, call IPFS_pins) error {
+func (s IPFSConfig) Pins(ctx context.Context, call IPFS_pins) error {
 	// Get all pinned CIDs
 	pins, err := s.API.Pin().Ls(ctx)
 	if err != nil {
@@ -277,7 +281,7 @@ func (s *DefaultIPFS_Server) Pins(ctx context.Context, call IPFS_pins) error {
 	return results.SetCids(cids)
 }
 
-func (s *DefaultIPFS_Server) Id(ctx context.Context, call IPFS_id) error {
+func (s IPFSConfig) Id(ctx context.Context, call IPFS_id) error {
 	// Get peer ID
 	id, err := s.API.Key().Self(ctx)
 	if err != nil {
@@ -326,7 +330,7 @@ func (s *DefaultIPFS_Server) Id(ctx context.Context, call IPFS_id) error {
 	return results.SetPeerInfo(info)
 }
 
-func (s *DefaultIPFS_Server) Connect(ctx context.Context, call IPFS_connect) error {
+func (s IPFSConfig) Connect(ctx context.Context, call IPFS_connect) error {
 	args := call.Args()
 	addrStr, err := args.Addr()
 	if err != nil {
@@ -361,7 +365,7 @@ func (s *DefaultIPFS_Server) Connect(ctx context.Context, call IPFS_connect) err
 	return nil
 }
 
-func (s *DefaultIPFS_Server) Peers(ctx context.Context, call IPFS_peers) error {
+func (s IPFSConfig) Peers(ctx context.Context, call IPFS_peers) error {
 	// Get connected peers
 	peers, err := s.API.Swarm().Peers(ctx)
 	if err != nil {
