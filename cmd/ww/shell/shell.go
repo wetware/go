@@ -160,6 +160,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	ipfs := sess.Ipfs()
 	defer ipfs.Release()
 
+	exec := sess.Exec()
+	defer exec.Release()
+
 	// Get user's home directory for history file
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -179,6 +182,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		"id":      &lang.IPFSId{IPFS: ipfs},
 		"connect": &lang.IPFSConnect{IPFS: ipfs},
 		"peers":   &lang.IPFSPeers{IPFS: ipfs},
+
+		// Process execution
+		"go": lang.Go{Executor: exec},
 	})
 
 	interpreter := slurp.New(
