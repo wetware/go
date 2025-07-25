@@ -177,10 +177,33 @@ func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
 		return nil, fmt.Errorf("failed to get entries: %w", err)
 	}
 
+	// Extract all entry data before release() is called
 	var result []core.Any
+
+	// Add header for better readability
+	if entries.Len() > 0 {
+		header := "NAME                 SIZE       TYPE         CID"
+		result = append(result, builtin.String(header))
+		result = append(result, builtin.String(strings.Repeat("-", len(header))))
+	}
+
 	for i := 0; i < entries.Len(); i++ {
 		entry := entries.At(i)
-		result = append(result, builtin.String(entry.String()))
+
+		// Extract entry data before it gets freed
+		name, err := entry.Name()
+		if err != nil {
+			continue
+		}
+
+		// Create a string representation of the entry
+		entryType := entry.Type()
+		size := entry.Size()
+		cid, _ := entry.Cid()
+
+		// Format with proper spacing for better readability
+		entryStr := fmt.Sprintf("%-20s %10d %-12s %s", name, size, entryType, cid)
+		result = append(result, builtin.String(entryStr))
 	}
 
 	return builtin.NewList(result...), nil
