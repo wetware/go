@@ -28,7 +28,7 @@ func TestIPFSCat(t *testing.T) {
 	buffer, ok := result.(*lang.Buffer)
 	require.True(t, ok, "Expected *lang.Buffer result, got %T", result)
 
-	require.Equal(t, "0x746573742064617461", buffer.String(), "Buffer hex representation mismatch")
+	require.Equal(t, "0x746573742064617461", buffer.AsHex(), "Buffer hex representation mismatch")
 
 	t.Logf("Successfully tested IPFSCat with UnixPath argument")
 }
@@ -37,13 +37,15 @@ func TestIPFSCat(t *testing.T) {
 func TestBuffer(t *testing.T) {
 	// Test empty buffer
 	emptyBuffer := &lang.Buffer{}
-	require.Equal(t, "0x", emptyBuffer.String(), "Empty buffer should return '0x'")
+	require.Equal(t, "", emptyBuffer.String(), "Empty buffer should return ''")
+	require.Equal(t, "0x", emptyBuffer.AsHex(), "Empty buffer should return '0x'")
 
 	// Test buffer with data
 	testData := []byte("test data")
 	buffer := &lang.Buffer{}
 	buffer.Write(testData)
-	require.Equal(t, "0x746573742064617461", buffer.String(), "Buffer hex representation mismatch")
+	require.Equal(t, "test data", buffer.String(), "Buffer string representation mismatch")
+	require.Equal(t, "0x746573742064617461", buffer.AsHex(), "Buffer hex representation mismatch")
 }
 
 // TestIPFSAdd tests the IPFSAdd function

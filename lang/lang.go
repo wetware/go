@@ -18,8 +18,8 @@ type Buffer struct {
 	bytes.Buffer
 }
 
-// String returns a hex representation of the buffer contents
-func (b *Buffer) String() string {
+// AsHex returns a hex representation of the buffer contents
+func (b *Buffer) AsHex() string {
 	if b.Buffer.Len() == 0 {
 		return "0x"
 	}
