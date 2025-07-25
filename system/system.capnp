@@ -5,6 +5,35 @@ using Go = import "/go.capnp";
 $Go.package("system");
 $Go.import("github.com/wetware/go/system");
 
+# Executor
+###
+
+interface Cell {
+    # A cell is a process that can be executed.
+}
+
+interface Executor {
+    spawn @0 (
+        args :List(Text),
+        # env :List(Text),
+    ) -> (cell :OptionalCell);
+
+    struct OptionalCell {
+        union {
+            cell @0 :Cell;
+            err     :group {
+                status @1 :UInt32;
+                body   @2 :Data;
+            }
+        }
+    }
+}
+
+
+
+# IPFS
+###
+
 interface IPFS {
 # IPFS interface for remote operations over libp2p
   add @0 (data :Data) -> (cid :Text);
