@@ -1,17 +1,12 @@
 package util
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	ma "github.com/multiformats/go-multiaddr"
 )
-
-// "path/filepath"
-
-// "github.com/ipfs/boxo/files"
 
 func LoadIPFSFromName(name string) (iface.CoreAPI, error) {
 	switch name {
@@ -32,11 +27,16 @@ func LoadIPFSFromName(name string) (iface.CoreAPI, error) {
 
 		// Else attempt to load as multiaddr
 		if a, err := ma.NewMultiaddr(name); err == nil {
-			return rpc.NewApiWithClient(a, http.DefaultClient)
+			api, err := rpc.NewApiWithClient(a, http.DefaultClient)
+			if err != nil {
+				// Return nil instead of error when IPFS is not available
+				return nil, nil
+			}
+			return api, nil
 		}
 	}
 
-	return nil, errors.New("invalid name")
+	return nil, nil
 }
 
 // // LoadByteCode loads the bytecode from the provided IPFS node.

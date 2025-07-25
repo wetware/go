@@ -75,19 +75,22 @@ This provides a secure environment for testing and development.`,
 				EnvVars:  []string{"WW_QUIET"},
 			},
 		}, flags.CapabilityFlags()...),
-		Subcommands: []*cli.Command{
-			{
-				Name:   "membrane",
-				Hidden: true,
-				Action: func(c *cli.Context) error {
-					ctx, cancel := context.WithCancel(c.Context)
-					defer cancel()
+		Action: func(c *cli.Context) error {
+			// If no subcommand is specified, run the main action
+			if c.Args().Len() == 0 {
+				return Main(c)
+			}
 
-					return util.DialSession(ctx, cell)
-				},
-			},
+			// If a subcommand is specified, handle it
+			subcommand := c.Args().First()
+			if subcommand == "membrane" {
+				ctx, cancel := context.WithCancel(c.Context)
+				defer cancel()
+				return util.DialSession(ctx, cell)
+			}
+
+			return cli.Exit("unknown subcommand: "+subcommand, 1)
 		},
-		Action: Main,
 	}
 }
 
@@ -99,9 +102,9 @@ func Main(c *cli.Context) error {
 	}
 
 	// Build the run command with capability flags
-	args := []string{"run", execPath, "shell", "membrane"}
+	args := []string{"run"}
 
-	// Add capability flags if specified
+	// Add capability flags if specified (these must come before the subcommand)
 	if c.Bool("with-full-rights") {
 		args = append(args, "--with-full-rights")
 	}
@@ -114,6 +117,9 @@ func Main(c *cli.Context) error {
 	if c.Bool("with-exec") {
 		args = append(args, "--with-exec")
 	}
+
+	// Add the subcommand and its arguments
+	args = append(args, execPath, "shell", "membrane")
 
 	cmd := exec.CommandContext(c.Context, execPath, args...)
 	cmd.Stdin = c.App.Reader
