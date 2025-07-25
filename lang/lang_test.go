@@ -46,6 +46,32 @@ func TestBuffer(t *testing.T) {
 	require.Equal(t, "0x746573742064617461", buffer.String(), "Buffer hex representation mismatch")
 }
 
+// TestIPFSAdd tests the IPFSAdd function
+func TestIPFSAdd(t *testing.T) {
+	// Create a mock IPFS server
+	mockServer := &MockIPFSServer{testValue: 42}
+	mock := system.IPFS_ServerToClient(mockServer)
+
+	// Create the IPFSAdd function
+	addFunc := lang.IPFSAdd{IPFS: mock}
+
+	// Create a Buffer with test data
+	buffer := &lang.Buffer{}
+	testData := []byte("test data for add")
+	buffer.Write(testData)
+
+	// Test with Buffer
+	result, err := addFunc.Invoke(buffer)
+	require.NoError(t, err, "Failed to invoke add with Buffer")
+
+	cid, ok := result.(string)
+	require.True(t, ok, "Expected string result, got %T", result)
+
+	require.Equal(t, "QmTest123", cid, "CID mismatch")
+
+	t.Logf("Successfully tested IPFSAdd with Buffer argument")
+}
+
 // MockIPFSServer implements system.IPFS_Server for testing
 type MockIPFSServer struct {
 	testValue int

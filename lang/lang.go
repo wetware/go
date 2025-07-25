@@ -88,21 +88,14 @@ func (ia IPFSAdd) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	// Extract the data from the argument
-	var data []byte
-	switch arg := args[0].(type) {
-	case []byte:
-		data = arg
-	case builtin.String:
-		data = []byte(arg)
-	case string:
-		data = []byte(arg)
-	default:
-		return nil, fmt.Errorf("add argument must be string or []byte, got %T", args[0])
+	buf, ok := args[0].(*Buffer)
+	if !ok {
+		return nil, fmt.Errorf("add argument must be Buffer, got %T", args[0])
 	}
 
 	ctx := context.Background()
 	future, release := ia.IPFS.Add(ctx, func(params system.IPFS_add_Params) error {
-		return params.SetData(data)
+		return params.SetData(buf.Bytes())
 	})
 	defer release()
 
