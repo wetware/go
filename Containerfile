@@ -15,9 +15,9 @@ RUN go mod download
 # Copy the rest of your code and compile
 COPY . .
 # -trimpath strips file system paths, -s -w strip symbol table/debug info
-RUN go build -o ww \
-    -trimpath \
-    # -ldflags="-s -w" \
+RUN CGO_ENABLED=0 \
+    go build -o ww \
+    -ldflags '-extldflags "-static"' \
     ./cmd/ww
 
 # └───────────────────────────────────────┘
@@ -29,6 +29,7 @@ FROM alpine:latest
 # (optional) if your binary uses TLS, pull a CA bundle:
 # FROM alpine:latest AS certs
 # RUN apk --no-cache add ca-certificates
+RUN apk add --no-cache acl
 
 # copy the compiled binary
 COPY --from=builder /src/ww /ww
@@ -37,7 +38,7 @@ COPY --from=builder /src/ww /ww
 # COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # allow CommandContext to find "ww"
-ENV PATH="/:${PATH}"  
+ENV PATH="/:${PATH}"
 
 ENTRYPOINT ["ww"]
 CMD ["--help"]

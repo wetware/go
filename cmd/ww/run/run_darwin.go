@@ -4,6 +4,14 @@ package run
 
 import "syscall"
 
+func provideGuestExecutable(guestDir, guestBin string) error {
+	return nil
+}
+
+func setGuestPermissions(dir string) error {
+	return nil
+}
+
 func sysProcAttr(chroot string) *syscall.SysProcAttr {
 	return nil
 	// // Note: on macOS, SysProcAttr only provides chroot, credential drop,

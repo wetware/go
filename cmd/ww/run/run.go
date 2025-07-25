@@ -78,7 +78,18 @@ func Main(c *cli.Context) error {
 				"reason", err)
 		}
 	}()
-	fmt.Println(cellDir)
+
+	err = provideGuestExecutable(cellDir, "ww")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Configure guest access for %s\n", cellDir)
+	err = setGuestPermissions(cellDir)
+	if err != nil {
+		return err
+	}
+	// time.Sleep(300 * time.Second)
 
 	// Set up Host
 	////
@@ -127,8 +138,9 @@ func Main(c *cli.Context) error {
 	args := append([]string{"run", "membrane"}, c.Args().Tail()...)
 
 	// Step 2:  run the subcommand
-	cmd := exec.CommandContext(c.Context, "ww", args...)
-	cmd.Dir = cellDir
+	// TODO extract guestBin from os.Executable()
+	cmd := exec.CommandContext(c.Context, "/ww", args...)
+	cmd.Dir = "/"
 	cmd.Env = c.StringSlice("env")
 	cmd.Stdin = guest
 	cmd.Stdout = os.Stdout
