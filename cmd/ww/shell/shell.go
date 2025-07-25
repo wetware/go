@@ -15,6 +15,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
 	"github.com/wetware/go/lang"
+	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -100,19 +101,21 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		// repl.WithInput()
 		// repl.WithPrinter()
 		repl.WithPrompts("ww ", "  | "),
-		repl.WithReaderFactory(readerFactory()),
+		repl.WithReaderFactory(readerFactory(ipfs)),
 	)
 
 	// Start the REPL loop
 	return repl.Loop(ctx)
 }
 
-func readerFactory() repl.ReaderFactoryFunc {
+func readerFactory(ipfs system.IPFS) repl.ReaderFactoryFunc {
 	return func(r io.Reader) *reader.Reader {
 		rd := reader.New(r)
 
 		// Set up the Unix path reader macro for '/' character
 		rd.SetMacro('/', false, lang.UnixPathReader())
+		// Set up the custom list reader macro for '(' character
+		rd.SetMacro('(', false, lang.ListReader(ipfs))
 
 		return rd
 	}
