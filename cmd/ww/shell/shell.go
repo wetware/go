@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/chzyer/readline"
+
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/core"
 	"github.com/spy16/slurp/reader"
@@ -104,26 +106,99 @@ type ReadlineInput struct {
 	rl *readline.Instance
 }
 
-// NewReadlineInput creates a new readline-based input
+// NewReadlineInput creates a new readline-based input with enhanced configuration
 func NewReadlineInput(home string) (*ReadlineInput, error) {
+	// Enhanced readline configuration with better formatting and features
 	rl, err := readline.NewEx(&readline.Config{
 		HistoryFile: "history.ww",
 		Stdout:      os.Stdout,
 		Stderr:      os.Stderr,
 
-		InterruptPrompt: "⏎",
-		EOFPrompt:       "exit",
+		// Enhanced prompts with colors and status information
+		InterruptPrompt: "\033[33m⏎\033[0m",    // Yellow interrupt symbol
+		EOFPrompt:       "\033[31mexit\033[0m", // Red exit prompt
 
-		/*
-			TODO(enhancement):  pass in the lang.Ww and configure autocomplete.
-			The lang.Ww instance will need to supply completions.
-		*/
-		// AutoComplete: completer(ww),
+		// Enable advanced features
+		DisableAutoSaveHistory: false,
+		HistorySearchFold:      true,                // Case-insensitive history search
+		AutoComplete:           &WetwareCompleter{}, // Custom autocomplete
+
+		// Enhanced display settings
+		UniqueEditLine: true,
+		Listener:       &WetwareListener{}, // Custom listener for status updates
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &ReadlineInput{rl: rl}, nil
+}
+
+// WetwareCompleter provides intelligent autocomplete for the shell
+type WetwareCompleter struct{}
+
+func (c *WetwareCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
+	// Get the current word being typed
+	word := getCurrentWord(line, pos)
+	if len(word) == 0 {
+		return nil, 0
+	}
+
+	// Built-in commands and functions
+	commands := []string{
+		"cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers", "go",
+		"quit", "exit", "help", "clear", "history", "cd", "pwd",
+	}
+
+	var suggestions [][]rune
+	for _, cmd := range commands {
+		if strings.HasPrefix(cmd, word) {
+			suggestions = append(suggestions, []rune(cmd))
+		}
+	}
+
+	// If we have suggestions, return them
+	if len(suggestions) > 0 {
+		return suggestions, len(word)
+	}
+
+	return nil, 0
+}
+
+// getCurrentWord extracts the current word being typed
+func getCurrentWord(line []rune, pos int) string {
+	if pos == 0 {
+		return ""
+	}
+
+	start := pos - 1
+	for start >= 0 && !isWordBoundary(line[start]) {
+		start--
+	}
+	start++
+
+	return string(line[start:pos])
+}
+
+// isWordBoundary checks if a character is a word boundary
+func isWordBoundary(r rune) bool {
+	return r == ' ' || r == '\t' || r == '(' || r == ')' || r == '[' || r == ']'
+}
+
+// WetwareListener provides custom event handling for the readline instance
+type WetwareListener struct{}
+
+func (l *WetwareListener) OnChange(line []rune, pos int, key rune) (newLine []rune, newPos int, ok bool) {
+	// Handle special key combinations
+	switch key {
+	case readline.CharCtrlL:
+		// Clear screen
+		fmt.Print("\033[2J\033[H")
+		return line, pos, true
+	case 18: // Ctrl+R
+		// Trigger history search
+		return line, pos, true
+	}
+	return line, pos, false
 }
 
 // Readline implements repl.Input.Readline
@@ -132,11 +207,9 @@ func (r *ReadlineInput) Readline() (string, error) {
 		switch line, err := r.rl.Readline(); err {
 		case readline.ErrInterrupt:
 			if len(line) == 0 {
-				/* TODO(enhancement)
-				- swallow ^C
-				- clear the line & reset the prompt
-				*/
+				// Enhanced interrupt handling with visual feedback
 				r.rl.Clean()
+				fmt.Fprintf(os.Stderr, "\033[33m^C\033[0m\n") // Yellow ^C indicator
 				return "", nil
 			}
 			continue
@@ -146,9 +219,28 @@ func (r *ReadlineInput) Readline() (string, error) {
 	}
 }
 
-// Prompt implements repl.Prompter.Prompt
+// Prompt implements repl.Prompter.Prompt with enhanced formatting
 func (r *ReadlineInput) Prompt(prompt string) {
-	r.rl.SetPrompt(prompt)
+	// Enhanced prompt with colors and status information
+	enhancedPrompt := r.enhancePrompt(prompt)
+	r.rl.SetPrompt(enhancedPrompt)
+}
+
+// enhancePrompt adds colors and status information to the prompt
+func (r *ReadlineInput) enhancePrompt(basePrompt string) string {
+	// Add colors and status indicators
+	status := r.getStatusInfo()
+
+	// Format: ww >> [status] prompt
+	return fmt.Sprintf("\033[36m%s\033[0m %s \033[32m%s\033[0m ",
+		basePrompt, status, "›")
+}
+
+// getStatusInfo returns status information for the prompt
+func (r *ReadlineInput) getStatusInfo() string {
+	// This could be enhanced to show actual system status
+	// For now, return a simple indicator
+	return "\033[33m●\033[0m" // Yellow dot indicator
 }
 
 // Close closes the readline instance
@@ -227,35 +319,100 @@ func readerFactory(ipfs system.IPFS) repl.ReaderFactoryFunc {
 
 type printer struct{}
 
+// ANSI color codes for enhanced output formatting
+const (
+	colorReset   = "\033[0m"
+	colorRed     = "\033[31m"
+	colorGreen   = "\033[32m"
+	colorYellow  = "\033[33m"
+	colorBlue    = "\033[34m"
+	colorMagenta = "\033[35m"
+	colorCyan    = "\033[36m"
+	colorWhite   = "\033[37m"
+	colorBold    = "\033[1m"
+	colorDim     = "\033[2m"
+)
+
 func (printer) Print(val interface{}) error {
 	if err, ok := val.(error); ok {
-		_, err := fmt.Fprintf(os.Stdout, "%+v\n", err)
-		return err
+		// Enhanced error formatting with colors
+		fmt.Fprintf(os.Stdout, "%s%s%s\n", colorRed, err.Error(), colorReset)
+		return nil
 	}
 
-	// Handle different types for rendering
+	// Handle different types for rendering with enhanced formatting
 	switch v := val.(type) {
+
 	case *lang.Buffer:
-		fmt.Fprintln(os.Stdout, v.String())
+		// Enhanced buffer display with hex preview
+		if len(v.Mem) > 0 {
+			fmt.Fprintf(os.Stdout, "%sBuffer (%d bytes):%s\n", colorBold, len(v.Mem), colorReset)
+			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorCyan, v.String(), colorReset)
+			if len(v.Mem) <= 64 {
+				fmt.Fprintf(os.Stdout, "%sHex: %s%s\n", colorDim, v.AsHex(), colorReset)
+			}
+		} else {
+			fmt.Fprintf(os.Stdout, "%sEmpty buffer%s\n", colorYellow, colorReset)
+		}
 
 	case core.SExpressable:
 		form, err := v.SExpr()
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, form)
+		// Enhanced s-expression formatting
+		fmt.Fprintf(os.Stdout, "%s%s%s\n", colorDim, form, colorReset)
+
 	case string:
-		fmt.Fprintln(os.Stdout, v)
+		// Enhanced string output with syntax highlighting for IPFS paths
+		if strings.HasPrefix(v, "/ipfs/") || strings.HasPrefix(v, "/ipld/") {
+			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorBlue, v, colorReset)
+		} else {
+			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorGreen, v, colorReset)
+		}
+
+	case lang.Map:
+		// Pretty print maps with indentation
+		printMap(v, 0, true)
 
 	case core.Any:
 		// For core.Any types, try to convert to string
 		if str, ok := v.(string); ok {
-			fmt.Fprintln(os.Stdout, str)
+			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorGreen, str, colorReset)
 		} else {
-			fmt.Fprintf(os.Stdout, "%+v\n", v)
+			fmt.Fprintf(os.Stdout, "%s%+v%s\n", colorYellow, v, colorReset)
 		}
 	default:
-		fmt.Fprintf(os.Stdout, "%+v\n", v)
+		fmt.Fprintf(os.Stdout, "%s%+v%s\n", colorYellow, v, colorReset)
 	}
 	return nil
+}
+
+// printMap recursively prints a map with proper indentation and colors
+func printMap(m lang.Map, indent int, useColors bool) {
+	indentStr := strings.Repeat("  ", indent)
+
+	for key, value := range m {
+		keyStr := fmt.Sprintf("%v", key)
+
+		// Print key with color
+		if useColors {
+			fmt.Fprintf(os.Stdout, "%s%s%s%s: ", indentStr, colorCyan, keyStr, colorReset)
+		} else {
+			fmt.Fprintf(os.Stdout, "%s%s: ", indentStr, keyStr)
+		}
+
+		// Handle nested maps recursively
+		if nestedMap, ok := value.(lang.Map); ok {
+			fmt.Fprintf(os.Stdout, "\n")
+			printMap(nestedMap, indent+1, useColors)
+		} else {
+			// Print value with appropriate color
+			if useColors {
+				fmt.Fprintf(os.Stdout, "%s%v%s\n", colorGreen, value, colorReset)
+			} else {
+				fmt.Fprintf(os.Stdout, "%v\n", value)
+			}
+		}
+	}
 }
