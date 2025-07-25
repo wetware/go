@@ -91,11 +91,16 @@ func Main(c *cli.Context) error {
 	}
 	defer secretFile.Close()
 
+	// Set up capability exports
+	////
 	ipfs := system.IPFSConfig{API: env.IPFS}.New()
 	defer ipfs.Release()
 
 	exec := system.ExecConfig{}.New()
 	defer exec.Release()
+
+	console := system.ConsoleConfig{Writer: os.Stdout}.New()
+	defer console.Release()
 
 	// Set up the host capnp environment
 	////
@@ -116,9 +121,10 @@ func Main(c *cli.Context) error {
 				// auth.SingleUser implements Policy.  It provides the node
 				// only to guests that log in as `user`.
 
-				User: secret.GetPublic(), // user to allow
-				IPFS: ipfs.AddRef(),
-				Exec: exec.AddRef(),
+				User:    secret.GetPublic(), // user to allow
+				IPFS:    ipfs.AddRef(),
+				Exec:    exec.AddRef(),
+				Console: console.AddRef(),
 			},
 		},
 	}.Boot()
