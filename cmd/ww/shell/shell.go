@@ -54,13 +54,44 @@ var (
 			Usage: "timeout for -dial",
 			Value: time.Second * 10,
 		},
+		// Capability control flags (same as ww run)
+		&cli.BoolFlag{
+			Name:    "with-full-rights",
+			Usage:   "grant all capabilities (console, IPFS, exec)",
+			EnvVars: []string{"WW_WITH_FULL_RIGHTS"},
+		},
+		&cli.BoolFlag{
+			Name:    "with-console",
+			Usage:   "grant console output capability",
+			EnvVars: []string{"WW_WITH_CONSOLE"},
+		},
+		&cli.BoolFlag{
+			Name:    "with-ipfs",
+			Usage:   "grant IPFS capability",
+			EnvVars: []string{"WW_WITH_IPFS"},
+		},
+		&cli.BoolFlag{
+			Name:    "with-exec",
+			Usage:   "grant process execution capability",
+			EnvVars: []string{"WW_WITH_EXEC"},
+		},
 	}
 )
 
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:   "shell",
-		Usage:  "start an interactive REPL session",
+		Name:  "shell",
+		Usage: "start an interactive REPL session",
+		Description: `Start an interactive REPL session with controlled capabilities.
+
+The shell can be run with different capability levels using the --with-* flags:
+  --with-full-rights    Grant all capabilities (console, IPFS, exec)
+  --with-console        Grant console output capability only
+  --with-ipfs           Grant IPFS capability only  
+  --with-exec           Grant process execution capability only
+
+If no capability flags are specified, the shell runs with minimal capabilities.
+This provides a secure environment for testing and development.`,
 		Flags:  flags,
 		Action: Main,
 		Subcommands: []*cli.Command{
@@ -85,7 +116,24 @@ func Main(c *cli.Context) error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	cmd := exec.CommandContext(c.Context, execPath, "run", execPath, "shell", "membrane")
+	// Build the run command with capability flags
+	args := []string{"run", execPath, "shell", "membrane"}
+
+	// Add capability flags if specified
+	if c.Bool("with-full-rights") {
+		args = append(args, "--with-full-rights")
+	}
+	if c.Bool("with-console") {
+		args = append(args, "--with-console")
+	}
+	if c.Bool("with-ipfs") {
+		args = append(args, "--with-ipfs")
+	}
+	if c.Bool("with-exec") {
+		args = append(args, "--with-exec")
+	}
+
+	cmd := exec.CommandContext(c.Context, execPath, args...)
 	cmd.Stdin = c.App.Reader
 	cmd.Stdout = c.App.Writer
 	cmd.Stderr = c.App.ErrWriter
@@ -96,15 +144,6 @@ func Main(c *cli.Context) error {
 }
 
 func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
-	ipfs := sess.Ipfs()
-	defer ipfs.Release()
-
-	exec := sess.Exec()
-	defer exec.Release()
-
-	console := sess.Console()
-	defer console.Release()
-
 	// Get user's home directory for history file
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -112,25 +151,41 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		home = os.TempDir()
 	}
 
-	env := core.New(map[string]core.Any{
-		// Console
-		"println": lang.ConsolePrintln{Console: console},
+	// Initialize environment with basic functions
+	envMap := make(map[string]core.Any)
 
-		// IPFS
-		"cat":     lang.IPFSCat{IPFS: ipfs},
-		"add":     lang.IPFSAdd{IPFS: ipfs},
-		"ls":      &lang.IPFSLs{IPFS: ipfs},
-		"stat":    &lang.IPFSStat{IPFS: ipfs},
-		"pin":     &lang.IPFSPin{IPFS: ipfs},
-		"unpin":   &lang.IPFSUnpin{IPFS: ipfs},
-		"pins":    &lang.IPFSPins{IPFS: ipfs},
-		"id":      &lang.IPFSId{IPFS: ipfs},
-		"connect": &lang.IPFSConnect{IPFS: ipfs},
-		"peers":   &lang.IPFSPeers{IPFS: ipfs},
+	// Conditionally add console capability
+	if sess.HasConsole() {
+		console := sess.Console()
+		defer console.Release()
+		envMap["println"] = lang.ConsolePrintln{Console: console}
+	}
 
-		// Process execution
-		"go": lang.Go{Executor: exec},
-	})
+	// Conditionally add IPFS capabilities
+	if sess.HasIpfs() {
+		ipfs := sess.Ipfs()
+		defer ipfs.Release()
+
+		envMap["cat"] = lang.IPFSCat{IPFS: ipfs}
+		envMap["add"] = lang.IPFSAdd{IPFS: ipfs}
+		envMap["ls"] = &lang.IPFSLs{IPFS: ipfs}
+		envMap["stat"] = &lang.IPFSStat{IPFS: ipfs}
+		envMap["pin"] = &lang.IPFSPin{IPFS: ipfs}
+		envMap["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
+		envMap["pins"] = &lang.IPFSPins{IPFS: ipfs}
+		envMap["id"] = &lang.IPFSId{IPFS: ipfs}
+		envMap["connect"] = &lang.IPFSConnect{IPFS: ipfs}
+		envMap["peers"] = &lang.IPFSPeers{IPFS: ipfs}
+	}
+
+	// Conditionally add process execution capability
+	if sess.HasExec() {
+		exec := sess.Exec()
+		defer exec.Release()
+		envMap["go"] = lang.Go{Executor: exec}
+	}
+
+	env := core.New(envMap)
 
 	interpreter := slurp.New(
 		slurp.WithEnv(env),
@@ -144,13 +199,20 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	defer rlInput.Close()
 
 	// Create a REPL with readline input
-	repl := repl.New(interpreter,
+	replConfig := []repl.Option{
 		repl.WithBanner("Wetware Shell - Type 'quit' to exit"),
 		repl.WithPrompts("ww »", "   ›"),
-		repl.WithReaderFactory(readerFactory(ipfs)),
 		repl.WithPrinter(printer{}),
 		repl.WithInput(rlInput, nil),
-	)
+	}
+
+	// Conditionally add IPFS reader factory if IPFS is available
+	if sess.HasIpfs() {
+		ipfs := sess.Ipfs()
+		replConfig = append(replConfig, repl.WithReaderFactory(readerFactory(ipfs)))
+	}
+
+	repl := repl.New(interpreter, replConfig...)
 
 	// Start the REPL loop
 	return repl.Loop(ctx)
