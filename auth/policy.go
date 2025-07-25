@@ -32,7 +32,7 @@ func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, u
 	}
 
 	// Bind IPFS capability
-	provider := &system.IPFS_Provider{API: policy.IPFS}
+	provider := &system.DefaultIPFS_Server{API: policy.IPFS}
 	ipfs := system.IPFS_ServerToClient(provider)
 	return env.SetIpfs(ipfs)
 }
