@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/core"
@@ -32,41 +31,41 @@ The shell can be run with different capability levels using the --with-* flags:
 If no capability flags are specified, the shell runs with minimal capabilities.
 This provides a secure environment for testing and development.`,
 		Flags: append([]cli.Flag{
-			&cli.StringSliceFlag{
-				Name:     "join",
-				Category: "P2P",
-				Aliases:  []string{"j"},
-				Usage:    "connect to cluster through specified peers",
-				EnvVars:  []string{"WW_JOIN"},
-			},
-			&cli.StringFlag{
-				Name:     "discover",
-				Category: "P2P",
-				Aliases:  []string{"d"},
-				Usage:    "automatic peer discovery settings",
-				Value:    "/mdns",
-				EnvVars:  []string{"WW_DISCOVER"},
-			},
-			&cli.StringFlag{
-				Name:     "namespace",
-				Category: "P2P",
-				Aliases:  []string{"ns"},
-				Usage:    "cluster namespace (must match dial host)",
-				Value:    "ww",
-				EnvVars:  []string{"WW_NAMESPACE"},
-			},
-			&cli.BoolFlag{
-				Name:     "dial",
-				Category: "P2P",
-				Usage:    "dial into a cluster using -join and -discover",
-				EnvVars:  []string{"WW_AUTODIAL"},
-			},
-			&cli.DurationFlag{
-				Name:     "timeout",
-				Category: "P2P",
-				Usage:    "timeout for -dial",
-				Value:    time.Second * 10,
-			},
+			// &cli.StringSliceFlag{
+			// 	Name:     "join",
+			// 	Category: "P2P",
+			// 	Aliases:  []string{"j"},
+			// 	Usage:    "connect to cluster through specified peers",
+			// 	EnvVars:  []string{"WW_JOIN"},
+			// },
+			// &cli.StringFlag{
+			// 	Name:     "discover",
+			// 	Category: "P2P",
+			// 	Aliases:  []string{"d"},
+			// 	Usage:    "automatic peer discovery settings",
+			// 	Value:    "/mdns",
+			// 	EnvVars:  []string{"WW_DISCOVER"},
+			// },
+			// &cli.StringFlag{
+			// 	Name:     "namespace",
+			// 	Category: "P2P",
+			// 	Aliases:  []string{"ns"},
+			// 	Usage:    "cluster namespace (must match dial host)",
+			// 	Value:    "ww",
+			// 	EnvVars:  []string{"WW_NAMESPACE"},
+			// },
+			// &cli.BoolFlag{
+			// 	Name:     "dial",
+			// 	Category: "P2P",
+			// 	Usage:    "dial into a cluster using -join and -discover",
+			// 	EnvVars:  []string{"WW_AUTODIAL"},
+			// },
+			// &cli.DurationFlag{
+			// 	Name:     "timeout",
+			// 	Category: "P2P",
+			// 	Usage:    "timeout for -dial",
+			// 	Value:    time.Second * 10,
+			// },
 			&cli.BoolFlag{
 				Name:     "quiet",
 				Category: "OUTPUT",
