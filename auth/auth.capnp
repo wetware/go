@@ -17,6 +17,7 @@ interface Signer {
 
 interface Terminal {
     login @0 (account :Signer) -> (
-        ipfs :import "/system/system.capnp".IPFS
+        ipfs :import "/system/system.capnp".IPFS,
+        exec :import "/system/system.capnp".Executor,
     );
 }
