@@ -8,7 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
+	os_exec "os/exec"
 	"syscall"
 
 	"capnproto.org/go/capnp/v3"
@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
+	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -44,7 +45,7 @@ func Command() *cli.Command {
 					ctx, cancel := context.WithCancel(c.Context)
 					defer cancel()
 
-					return util.DialSession(ctx, cell)
+					return util.DialSession(ctx, run)
 				},
 			},
 		},
@@ -90,8 +91,10 @@ func Main(c *cli.Context) error {
 	}
 	defer secretFile.Close()
 
-	// Build the exports list.
-	////
+	ipfs := system.IPFS_ServerToClient(&system.DefaultIPFS_Server{API: env.IPFS})
+	defer ipfs.Release()
+	exec := system.Executor_ServerToClient(&system.DefaultExecutor{IPFS: ipfs})
+	defer exec.Release()
 
 	// Set up the host capnp environment
 	////
@@ -113,7 +116,8 @@ func Main(c *cli.Context) error {
 				// only to guests that log in as `user`.
 
 				User: secret.GetPublic(), // user to allow
-				IPFS: env.IPFS,
+				IPFS: ipfs,
+				Exec: exec,
 			},
 		},
 	}.Boot()
@@ -126,8 +130,10 @@ func Main(c *cli.Context) error {
 	// Set up the guest
 	////
 
+	// cell.DefaultExecutor{IPFS: ipfs}.Run(c.Context)  // TODO: YOU ARE HERE:  can we move the subcommand setup to the default executor?
+
 	// Step 2:  run the subcommand
-	cmd := exec.CommandContext(c.Context, c.Args().First(), c.Args().Tail()...)
+	cmd := os_exec.CommandContext(c.Context, c.Args().First(), c.Args().Tail()...)
 	cmd.Dir = cellDir
 	cmd.Env = c.StringSlice("env")
 	cmd.Stdin = os.Stdin
@@ -204,7 +210,7 @@ func (l BootConfig) Boot() (host *rpc.Conn, guest *os.File, err error) {
 
 	return
 }
-func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
+func run(ctx context.Context, sess auth.Terminal_login_Results) error {
 	ipfs := sess.Ipfs()
 	fmt.Println(ipfs)
 
