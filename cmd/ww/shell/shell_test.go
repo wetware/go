@@ -148,6 +148,7 @@ func (m *MockIPFSServer) Peers(ctx context.Context, call system.IPFS_peers) erro
 
 // TestShellEnvironment tests that the environment is set up correctly
 func TestShellEnvironment(t *testing.T) {
+	t.Parallel()
 	// Create a simple environment with a test value
 	env := core.New(map[string]core.Any{
 		"test": 42,
@@ -165,6 +166,7 @@ func TestShellEnvironment(t *testing.T) {
 
 // TestEnvironmentWithMultipleValues tests environment with multiple values
 func TestEnvironmentWithMultipleValues(t *testing.T) {
+	t.Parallel()
 	// Create a mock IPFS server
 	mockServer := &MockIPFSServer{testValue: 42}
 
@@ -206,6 +208,7 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 
 // TestInvokableWithMockIPFS tests the Invokable wrapper with mock IPFS
 func TestInvokableWithMockIPFS(t *testing.T) {
+	t.Parallel()
 	// Create a mock IPFS server
 	mockServer := &MockIPFSServer{testValue: 42}
 
@@ -235,6 +238,7 @@ func TestInvokableWithMockIPFS(t *testing.T) {
 
 // TestEnvironmentNotFound tests resolving non-existent values
 func TestEnvironmentNotFound(t *testing.T) {
+	t.Parallel()
 	// Create a simple environment
 	env := core.New(map[string]core.Any{
 		"test": 42,
@@ -248,6 +252,7 @@ func TestEnvironmentNotFound(t *testing.T) {
 }
 
 func TestUnixPathReader(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
