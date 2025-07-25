@@ -20,14 +20,14 @@ var (
 	flags = []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:     "join",
-			Category: "NETWORK",
+			Category: "P2P",
 			Aliases:  []string{"j"},
 			Usage:    "connect to cluster through specified peers",
 			EnvVars:  []string{"WW_JOIN"},
 		},
 		&cli.StringFlag{
 			Name:     "discover",
-			Category: "NETWORK",
+			Category: "P2P",
 			Aliases:  []string{"d"},
 			Usage:    "automatic peer discovery settings",
 			Value:    "/mdns",
@@ -35,7 +35,7 @@ var (
 		},
 		&cli.StringFlag{
 			Name:     "namespace",
-			Category: "NETWORK",
+			Category: "P2P",
 			Aliases:  []string{"ns"},
 			Usage:    "cluster namespace (must match dial host)",
 			Value:    "ww",
@@ -50,13 +50,13 @@ var (
 		},
 		&cli.BoolFlag{
 			Name:     "dial",
-			Category: "NETWORK",
+			Category: "P2P",
 			Usage:    "dial into a cluster using -join and -discover",
 			EnvVars:  []string{"WW_AUTODIAL"},
 		},
 		&cli.DurationFlag{
 			Name:     "timeout",
-			Category: "NETWORK",
+			Category: "P2P",
 			Usage:    "timeout for -dial",
 			Value:    time.Second * 10,
 		},
