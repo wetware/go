@@ -9,6 +9,7 @@ import (
 )
 
 func TestConsoleConfig_New(t *testing.T) {
+	t.Parallel()
 	// Create a buffer to capture output
 	var buf bytes.Buffer
 
@@ -27,6 +28,7 @@ func TestConsoleConfig_New(t *testing.T) {
 }
 
 func TestConsoleConfig_ZeroValue(t *testing.T) {
+	t.Parallel()
 	// Test that zero value ConsoleConfig can be created
 	var config system.ConsoleConfig
 	require.Nil(t, config.Writer, "Zero value should have nil writer")
@@ -38,6 +40,7 @@ func TestConsoleConfig_ZeroValue(t *testing.T) {
 }
 
 func TestConsoleConfig_WithNilWriter(t *testing.T) {
+	t.Parallel()
 	// Test ConsoleConfig with nil writer
 	config := system.ConsoleConfig{Writer: nil}
 
