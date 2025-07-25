@@ -5,6 +5,13 @@ using Go = import "/go.capnp";
 $Go.package("system");
 $Go.import("github.com/wetware/go/system");
 
+# Console
+###
+
+interface Console {
+  println @0 (output :Text) -> (n :UInt32);
+}
+
 # Executor
 ###
 
