@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/spy16/slurp/builtin"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
@@ -70,6 +71,80 @@ func TestIPFSAdd(t *testing.T) {
 	require.Equal(t, "QmTest123", cid, "CID mismatch")
 
 	t.Logf("Successfully tested IPFSAdd with Buffer argument")
+}
+
+// TestGoSpecialForm tests the Go special form argument validation
+func TestGoSpecialForm(t *testing.T) {
+	// Test argument validation
+	goForm := lang.Go{}
+
+	// Test with insufficient arguments
+	_, err := goForm.Invoke()
+	if err == nil {
+		t.Error("Expected error for insufficient arguments")
+	}
+
+	// Test with wrong first argument type
+	_, err = goForm.Invoke("not-a-path", builtin.NewList())
+	if err == nil {
+		t.Error("Expected error for wrong first argument type")
+	}
+}
+
+// TestGoSpecialFormWithMockExecutor tests that the go special form correctly calls the executor
+func TestGoSpecialFormWithMockExecutor(t *testing.T) {
+	mockExecutor := &MockExecutor{
+		spawnCalled:   false,
+		spawnPath:     "",
+		spawnArgs:     nil,
+		spawnDir:      "",
+		spawnEnv:      nil,
+		shouldSucceed: true,
+	}
+
+	// Convert mock to client
+	executorClient := system.Executor_ServerToClient(mockExecutor)
+	defer executorClient.Release()
+
+	// Create the Go special form with the mock executor
+	goForm := lang.Go{Executor: executorClient}
+
+	// Create test arguments
+	execPath, err := lang.NewUnixPath("/ipfs/QmWKKmjmTmbaFuU4Bu92KXob3jaqKJ9vZXRch6Ks8GJESZ/cmd/shell")
+	require.NoError(t, err, "Failed to create UnixPath")
+
+	body := builtin.String("(console.Println \"Hello, World!\")")
+
+	// Test basic invocation
+	_, err = goForm.Invoke(execPath, body)
+	require.NoError(t, err, "Go special form should not return error")
+	require.True(t, mockExecutor.spawnCalled, "Executor.Spawn should have been called")
+	require.Equal(t, "/ipfs/QmWKKmjmTmbaFuU4Bu92KXob3jaqKJ9vZXRch6Ks8GJESZ/cmd/shell", mockExecutor.spawnPath, "Path should match")
+	require.Equal(t, "(console.Println \"Hello, World!\")", mockExecutor.spawnArgs[0], "First argument should be the body")
+	require.Equal(t, "", mockExecutor.spawnDir, "Working directory should be empty")
+
+	// Test with keyword arguments
+	mockExecutor.spawnCalled = false
+	mockExecutor.spawnArgs = nil
+
+	// Create keyword arguments
+	_, err = goForm.Invoke(execPath, body,
+		builtin.String("console"), builtin.String("test-console"),
+		builtin.String("data"), builtin.String("test-data"))
+	require.NoError(t, err, "Go special form with kwargs should not return error")
+	require.True(t, mockExecutor.spawnCalled, "Executor.Spawn should have been called")
+	require.Equal(t, "(console.Println \"Hello, World!\")", mockExecutor.spawnArgs[0], "First argument should be the body")
+	require.Equal(t, "--data=\"test-data\"", mockExecutor.spawnArgs[1], "Second argument should be data kwarg")
+	require.Equal(t, 2, len(mockExecutor.spawnArgs), "Should have exactly 2 arguments (body + data kwarg)")
+
+	// Test error case
+	mockExecutor.shouldSucceed = false
+	mockExecutor.spawnCalled = false
+	mockExecutor.spawnArgs = nil
+
+	_, err = goForm.Invoke(execPath, body)
+	require.Error(t, err, "Go special form should return error when spawn fails")
+	require.True(t, mockExecutor.spawnCalled, "Executor.Spawn should have been called even on error")
 }
 
 // MockIPFSServer implements system.IPFS_Server for testing
@@ -211,4 +286,109 @@ func (m *MockIPFSServer) Peers(ctx context.Context, call system.IPFS_peers) erro
 		return err
 	}
 	return results.SetPeerList(peerList)
+}
+
+// MockExecutor implements system.Executor_Server for testing
+type MockExecutor struct {
+	spawnCalled   bool
+	spawnPath     string
+	spawnArgs     []string
+	spawnDir      string
+	spawnEnv      []string
+	shouldSucceed bool
+}
+
+// Spawn implements system.Executor_Server.Spawn
+func (m *MockExecutor) Spawn(ctx context.Context, call system.Executor_spawn) error {
+	m.spawnCalled = true
+
+	// Get the parameters
+	params := call.Args()
+
+	// Extract path
+	path, err := params.Path()
+	if err == nil {
+		m.spawnPath = path
+	}
+
+	// Extract arguments
+	args, err := params.Args()
+	if err == nil {
+		m.spawnArgs = make([]string, args.Len())
+		for i := 0; i < args.Len(); i++ {
+			arg, err := args.At(i)
+			if err == nil {
+				m.spawnArgs[i] = arg
+			}
+		}
+	}
+
+	// Extract directory
+	dir, err := params.Dir()
+	if err == nil {
+		m.spawnDir = dir
+	}
+
+	// Extract environment
+	env, err := params.Env()
+	if err == nil {
+		m.spawnEnv = make([]string, env.Len())
+		for i := 0; i < env.Len(); i++ {
+			envVar, err := env.At(i)
+			if err == nil {
+				m.spawnEnv[i] = envVar
+			}
+		}
+	}
+
+	// Allocate results
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	if m.shouldSucceed {
+		// Create a successful result with a mock cell
+		optionalCell, err := results.NewCell()
+		if err != nil {
+			return err
+		}
+		// Create a mock cell server and convert to client
+		mockCell := &MockCell{}
+		cellClient := system.Cell_ServerToClient(mockCell)
+		optionalCell.SetCell(cellClient)
+	} else {
+		// Create an error result
+		optionalCell, err := results.NewCell()
+		if err != nil {
+			return err
+		}
+		optionalCell.SetErr()
+		errStruct := optionalCell.Err()
+		errStruct.SetStatus(1)
+		errStruct.SetBody([]byte("mock error"))
+	}
+
+	return nil
+}
+
+// MockCell implements system.Cell_Server for testing
+type MockCell struct{}
+
+// Wait implements system.Cell_Server.Wait
+func (m *MockCell) Wait(ctx context.Context, call system.Cell_wait) error {
+	// Mock implementation - return success
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	// Create a successful result
+	result, err := results.NewResult()
+	if err != nil {
+		return err
+	}
+	result.SetOk()
+
+	return results.SetResult(result)
 }
