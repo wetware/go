@@ -475,7 +475,7 @@ func (c Terminal_login) Args() Terminal_login_Params {
 
 // AllocResults allocates the results struct.
 func (c Terminal_login) AllocResults() (Terminal_login_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 3})
 	return Terminal_login_Results(r), err
 }
 
@@ -579,12 +579,12 @@ type Terminal_login_Results capnp.Struct
 const Terminal_login_Results_TypeID = 0x9baeae5a95f57921
 
 func NewTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
 	return Terminal_login_Results(st), err
 }
 
 func NewRootTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
 	return Terminal_login_Results(st), err
 }
 
@@ -620,16 +620,16 @@ func (s Terminal_login_Results) Message() *capnp.Message {
 func (s Terminal_login_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Terminal_login_Results) Ipfs() system.IPFS {
+func (s Terminal_login_Results) Console() system.Console {
 	p, _ := capnp.Struct(s).Ptr(0)
-	return system.IPFS(p.Interface().Client())
+	return system.Console(p.Interface().Client())
 }
 
-func (s Terminal_login_Results) HasIpfs() bool {
+func (s Terminal_login_Results) HasConsole() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Terminal_login_Results) SetIpfs(v system.IPFS) error {
+func (s Terminal_login_Results) SetConsole(v system.Console) error {
 	if !v.IsValid() {
 		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
 	}
@@ -638,16 +638,16 @@ func (s Terminal_login_Results) SetIpfs(v system.IPFS) error {
 	return capnp.Struct(s).SetPtr(0, in.ToPtr())
 }
 
-func (s Terminal_login_Results) Exec() system.Executor {
+func (s Terminal_login_Results) Ipfs() system.IPFS {
 	p, _ := capnp.Struct(s).Ptr(1)
-	return system.Executor(p.Interface().Client())
+	return system.IPFS(p.Interface().Client())
 }
 
-func (s Terminal_login_Results) HasExec() bool {
+func (s Terminal_login_Results) HasIpfs() bool {
 	return capnp.Struct(s).HasPtr(1)
 }
 
-func (s Terminal_login_Results) SetExec(v system.Executor) error {
+func (s Terminal_login_Results) SetIpfs(v system.IPFS) error {
 	if !v.IsValid() {
 		return capnp.Struct(s).SetPtr(1, capnp.Ptr{})
 	}
@@ -656,12 +656,30 @@ func (s Terminal_login_Results) SetExec(v system.Executor) error {
 	return capnp.Struct(s).SetPtr(1, in.ToPtr())
 }
 
+func (s Terminal_login_Results) Exec() system.Executor {
+	p, _ := capnp.Struct(s).Ptr(2)
+	return system.Executor(p.Interface().Client())
+}
+
+func (s Terminal_login_Results) HasExec() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s Terminal_login_Results) SetExec(v system.Executor) error {
+	if !v.IsValid() {
+		return capnp.Struct(s).SetPtr(2, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(capnp.Client(v)))
+	return capnp.Struct(s).SetPtr(2, in.ToPtr())
+}
+
 // Terminal_login_Results_List is a list of Terminal_login_Results.
 type Terminal_login_Results_List = capnp.StructList[Terminal_login_Results]
 
 // NewTerminal_login_Results creates a new list of Terminal_login_Results.
 func NewTerminal_login_Results_List(s *capnp.Segment, sz int32) (Terminal_login_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
 	return capnp.StructList[Terminal_login_Results](l), err
 }
 
@@ -672,45 +690,51 @@ func (f Terminal_login_Results_Future) Struct() (Terminal_login_Results, error) 
 	p, err := f.Future.Ptr()
 	return Terminal_login_Results(p.Struct()), err
 }
+func (p Terminal_login_Results_Future) Console() system.Console {
+	return system.Console(p.Future.Field(0, nil).Client())
+}
+
 func (p Terminal_login_Results_Future) Ipfs() system.IPFS {
-	return system.IPFS(p.Future.Field(0, nil).Client())
+	return system.IPFS(p.Future.Field(1, nil).Client())
 }
 
 func (p Terminal_login_Results_Future) Exec() system.Executor {
-	return system.Executor(p.Future.Field(1, nil).Client())
+	return system.Executor(p.Future.Field(2, nil).Client())
 }
 
-const schema_e82706a772b0927b = "x\xda\x8c\x92Mh\x13Q\x14\x85\xcfy\x93t^\xd4" +
-	"\x98\xbeLD]\xd4\xa2\x04j+\x0d\xd5\x0aB\x05\x1b" +
-	"+\xb5\x0b\x11\xf2Z\xdd\x88\xb4\x8ca\x8c\x81t\x12f" +
-	"\x12\xab\x88v\xe1\xc2\xb5\x15\xa1\xe0N\x17\xee\x8a.\\" +
-	"(\x08\x15t!\x88[7\x8a[\x17\x8a?\x18\x04%" +
-	"\x8c\xcc\xd0$\x15\x15\xba{\xdc\xfb8\xdf=\xe7\xde\x91" +
-	"e\x91\x8f\xedO\xde\xe8\x85\xd0\xab\xf1\x9e\xe0H\xf3\xf9" +
-	"\xd9\xab\x13\xb3\xb7\xa0\xd2\x04\xe24\x01kP~\x03\xad" +
-	"a9\x0e\x06\xbb/7o\x9fYY\xb9\x03\x95\x09\xfb" +
-	"\xc2\x04FO\xca4A\xeb\xb4\\\x00\x83\xd6\xd3'\xad" +
-	"\xaf\xf7\x9e\xadBm6\x82+K\x0f\xbc\xfb=\x03\x1f" +
-	"\x00Z\x0f\xe5]\xeb\xb1\x0c\xf5\x1e\xc9)\xeb]\xf8\x0a" +
-	"z\xdf\xbe\xdf\x9e^\xd6\x1f\xd7\xd3^\xc8\x9f\xa0\xf52" +
-	"\xa2m=\x94/}\xdf5\xf3c\x8d\x16\xf6G?\xc9" +
-	"M!\xad\x19}\x98\xbb\xf9fQ\xef\xfb\xd5\xfa\x8b\xb6" +
-	"-\xb1d\xf5%B\xbd\x9d\x89)\xebh\xc2D\x80\xd7" +
-	"\x81\xdd\xa8_\xc8\x15\xed\x9apkc3\xe5\x92\xebx" +
-	"9\xbf\\r\xb3\x85~\xdb\xb3\xe7}\x1d3b@\x8c" +
-	"\x80J\xee\x01\xb44\xa83\x82\xa6\xef\x15\x99\x84`\x12" +
-	"\xecH\x18nm\xec\x94\xe3\xcd\x97]\xbb\x92\xabTK" +
-	"e7;\xed\xf8\x8dJ\x9d\xbe\x96\x1d\x99\xc1!@g" +
-	"\x0d\xea\x11AEf\x18\x16\x87\xc3\xe2^\x83\xfa\xa0`" +
-	"\xaa\\;\xefS\x05'\xfa\x0e\x0f\x88\xb9k_\x00R" +
-	"\x81)\xe7\x92S\xa4\x0a\x8eM^?\xee\xce~~\xb5" +
-	"V\xee\xd0\xd9\xa6\x9b\xae])\x90:f\xc4\x81N^" +
-	"l\xafI\xa9\x03\x10*n\xf6G\x13\xe6Y \xff\x1b" +
-	"\xc2\xf4x4\xff\x1f)\x9c\x03\xf4\x16\x83z\x87`\xe0" +
-	"\xd9\x0b\x93\xeeE\xa7\x02\xb3Zs6\x92G!\x0a\x15" +
-	"X/8\xd1\x8du\xd1.\x16\xab\x0d\xb7N\xd5]\xe3" +
-	"?lF#\xd2\xeb\x9al\x9f(\xdb\xd7\xa3\xd4Pd" +
-	"2\x15\xda\x88<\xfe\x0e\x00\x00\xff\xff\xba:\xc0\xcf"
+const schema_e82706a772b0927b = "x\xda\x8cR1h\x13o\x1c}\xef\xbb\xa4\x97\xeb\xbf" +
+	"\xf9\xd7\xaf\x17P\x07-J\xa1P\xa1\xa8\x1d\xc4\x0a6" +
+	"Dc\x15\x15\xf2\xb5\x9dDZ\xce\xe3\x8c\x81\xeb%\xde" +
+	"%j\x11\xcd \x0eNbE\x10\xc4E\x07\xa7V\x1d" +
+	"\\\x04A\xc1\xc1\xa1\x8b\x83HAqu\x10\xaabP" +
+	"\x94prG\x93TTp\xfbx\xbf\x8f\xf7~\xef\xbd" +
+	"\xdf\xf6\x17\"\x9b\xd8\x91\xbe*!\xd4R\xb2+\xdc\xdb" +
+	"x~\xfcBn\xfa:d\x1f\x81$u\xc0\\H}" +
+	"\x06\xcd\x87\xa910\xdc2\xd7\xb8qlq\xf1\x16d" +
+	"&\x9ak:0\xf22\xd5G\xd0\\N\xdd\x07\xc3\xe6" +
+	"\x93\xc7\xcdOw\x9f=\x85\xfcO\x0b\xcf\xcf?\xf0\xef" +
+	"u\x0d\xbe\x07h\x9e6\xee\x98sF\xc4W3\xc6\xcd" +
+	"\xdb\xd1+\\\xf7\xe6\xdd\xfa\xbe\x9b\xea\xc3Z\xb5\xcb\xc6" +
+	"w\xd0\xbcbDj\xff\xef\xca\x16\xbfl\x9e\xfc\xba\xaa" +
+	"\x16\xcdG\x16\x8c\xeeH\xedQ\xfca\xe6\xda\xeb\xba\xda" +
+	"\xf6\xa3\xf9\x9b\xda+c\xde|\x1b\xab-\x1b\xe3&\xbb" +
+	"u\x84X\x09\xadZ\xf5\xd4\xb0mU\x84W\x19\x9d," +
+	"\x15=\xc7\x1f\x0eJEo\xa0\xd0o\xf9\xd6l\xa0\x12" +
+	"Z\x02H\x10\x90\xe9\xad\x80JiT\x19A=\xf0m" +
+	"\xa6!\x98\x06\xdb\x14\x9aW\x19\x9dr\xfc\xd9\x92g\xb9" +
+	"\xc3n\xb9X\xf2\x06&\x9c\xa0\xe6V\x19\xa8\x9e6M" +
+	">\x07\xa8\xacFuDP\x92\x19F\xe0\xa1!@\xed" +
+	"\xd7\xa8\x0a\x82R\x88\x0c\x05 \x8fF\xe0A\x8djJ" +
+	"\xb0n\x97\xbd\xa0\xec:\x94a\xa3\xb1[\x1fml\xfc" +
+	"\x06\x90\x12\xec-UN\x06\x94\xe1\xe1M{\x06\xc5\xcc" +
+	"\xc5\x8f-\xd89\xe7\xd8\x94\xe1\xbe\xfc\xa5\x03\xde\xf4\xca" +
+	"\xd2*\xdc^\x96\xadeu\xcfr\x0b\xa4JhI\xa0" +
+	"\x1d/[\xadJ\xb9\x13B&\xf5\xfe\xd8P\x96\x05\xf2" +
+	"\xaf\x99M\x8c\xc5v\x7f\x09\xed\x04\xa0z4\xaa\x0d\x82" +
+	"\xa1o\x9d\xcd{g\x1c\x17z\xb9\xe2\xfcK|\x85\xb8" +
+	"\x03`-a\xae\xd3B\xdd\xb2\xedr\xcd\xabRvZ" +
+	"\xff\x83\xcdxE\xfa\x1d\x93\xad\x8bf\xeb\xd8\xa4\x1c\x8a" +
+	"M\xf6F6b\x8f?\x03\x00\x00\xff\xff\xed\xcb\xcfE"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
