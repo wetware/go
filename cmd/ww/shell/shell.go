@@ -93,13 +93,37 @@ func Main(c *cli.Context) error {
 	cmd.Stdin = c.App.Reader
 	cmd.Stdout = c.App.Writer
 	cmd.Stderr = c.App.ErrWriter
-	cmd.Env = os.Environ() // Inherit environment variables
+
+	cmd.Env = os.Environ()     // Inherit environment variables
+	cmd.Dir = c.String("home") // Set the home directory for the command
 	return cmd.Run()
 }
 
 // ReadlineInput implements the repl.Input interface using github.com/chzyer/readline
 type ReadlineInput struct {
 	rl *readline.Instance
+}
+
+// NewReadlineInput creates a new readline-based input
+func NewReadlineInput(home string) (*ReadlineInput, error) {
+	rl, err := readline.NewEx(&readline.Config{
+		HistoryFile: "history.ww",
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+
+		InterruptPrompt: "⏎",
+		EOFPrompt:       "exit",
+
+		/*
+			TODO(enhancement):  pass in the lang.Ww and configure autocomplete.
+			The lang.Ww instance will need to supply completions.
+		*/
+		// AutoComplete: completer(ww),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &ReadlineInput{rl: rl}, nil
 }
 
 // Readline implements repl.Input.Readline
@@ -136,7 +160,15 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	ipfs := sess.Ipfs()
 	defer ipfs.Release()
 
+	// Get user's home directory for history file
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to temp directory if home directory is not available
+		home = os.TempDir()
+	}
+
 	env := core.New(map[string]core.Any{
+		// IPFS
 		"cat":     lang.IPFSCat{IPFS: ipfs},
 		"add":     lang.IPFSAdd{IPFS: ipfs},
 		"ls":      lang.IPFSLs{IPFS: ipfs},
@@ -153,12 +185,20 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		slurp.WithEnv(env),
 		slurp.WithAnalyzer(nil))
 
+	// Create readline input
+	rlInput, err := NewReadlineInput(home)
+	if err != nil {
+		return fmt.Errorf("failed to create readline input: %w", err)
+	}
+	defer rlInput.Close()
+
 	// Create a REPL with readline input
 	repl := repl.New(interpreter,
 		repl.WithBanner("Wetware Shell - Type 'quit' to exit"),
 		repl.WithPrompts("ww »", "   ›"),
 		repl.WithReaderFactory(readerFactory(ipfs)),
 		repl.WithPrinter(printer{}),
+		repl.WithInput(rlInput, nil),
 	)
 
 	// Start the REPL loop
