@@ -9,6 +9,7 @@ import (
 )
 
 func TestConsoleConfig_Pattern(t *testing.T) {
+	t.Parallel()
 	// Test that ConsoleConfig follows the same pattern as IPFSConfig and ExecConfig
 
 	// Create a buffer to capture output
@@ -30,6 +31,7 @@ func TestConsoleConfig_Pattern(t *testing.T) {
 }
 
 func TestConsoleConfig_ZeroValue(t *testing.T) {
+	t.Parallel()
 	// Test that zero value ConsoleConfig can be created
 	var config system.ConsoleConfig
 	require.Nil(t, config.Writer, "Zero value should have nil writer")
@@ -41,6 +43,7 @@ func TestConsoleConfig_ZeroValue(t *testing.T) {
 }
 
 func TestConsoleConfig_WithNilWriter(t *testing.T) {
+	t.Parallel()
 	// Test ConsoleConfig with nil writer
 	config := system.ConsoleConfig{Writer: nil}
 
