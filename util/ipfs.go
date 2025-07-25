@@ -3,7 +3,6 @@ package util
 import (
 	"errors"
 	"net/http"
-	"net/url"
 
 	"github.com/ipfs/kubo/client/rpc"
 	iface "github.com/ipfs/kubo/core/coreiface"
@@ -20,16 +19,16 @@ func LoadIPFSFromName(name string) (iface.CoreAPI, error) {
 		return rpc.NewLocalApi()
 
 	default:
-		// name is URI?
-		if u, err := url.ParseRequestURI(name); err == nil {
-			switch u.Scheme {
-			case "file":
-				return rpc.NewPathApi(u.Path)
+		// // name is URI?
+		// if u, err := url.ParseRequestURI(name); err == nil {
+		// 	switch u.Scheme {
+		// 	case "file":
+		// 		return rpc.NewPathApi(u.Path)
 
-			default:
-				return rpc.NewURLApiWithClient(u.String(), http.DefaultClient)
-			}
-		}
+		// 	default:
+		// 		return rpc.NewURLApiWithClient(u.String(), http.DefaultClient)
+		// 	}
+		// }
 
 		// Else attempt to load as multiaddr
 		if a, err := ma.NewMultiaddr(name); err == nil {
