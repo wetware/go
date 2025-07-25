@@ -4,134 +4,46 @@ import (
 	"context"
 	"testing"
 
-	"github.com/spy16/slurp/core"
+	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 )
 
-var _ core.Invokable = (*lang.Session)(nil)
-
-func TestIPFSWrapper(t *testing.T) {
+// TestIPFSCat tests the standalone IPFSCat function
+func TestIPFSCat(t *testing.T) {
 	// Create a mock IPFS server
 	mockServer := &MockIPFSServer{testValue: 42}
-
-	// Create the IPFS wrapper
 	mock := system.IPFS_ServerToClient(mockServer)
-	wrapper := lang.Session{IPFS: mock}
 
-	// Test Cat method
-	data, err := wrapper.Cat("QmTest123")
-	if err != nil {
-		t.Fatalf("Failed to call Cat: %v", err)
-	}
-	t.Logf("Direct Cat call returned: '%s' (length: %d)", string(data), len(data))
-	if string(data) != "test data" {
-		t.Errorf("Expected 'test data', got '%s'", string(data))
-	}
+	// Create the IPFSCat function
+	catFunc := lang.IPFSCat{IPFS: mock}
 
-	// Test Add method
-	cid, err := wrapper.Add([]byte("test data"))
-	if err != nil {
-		t.Fatalf("Failed to call Add: %v", err)
-	}
-	if cid != "QmTest123" {
-		t.Errorf("Expected 'QmTest123', got '%s'", cid)
-	}
+	// Test with UnixPath
+	unixPath, err := lang.NewUnixPath("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
+	require.NoError(t, err, "Failed to create UnixPath")
 
-	// Test Pins method
-	pins, err := wrapper.Pins()
-	if err != nil {
-		t.Fatalf("Failed to call Pins: %v", err)
-	}
-	if len(pins) != 2 {
-		t.Errorf("Expected 2 pins, got %d", len(pins))
-	}
-	if pins[0] != "QmTest1" || pins[1] != "QmTest2" {
-		t.Errorf("Expected ['QmTest1', 'QmTest2'], got %v", pins)
-	}
+	result, err := catFunc.Invoke(unixPath)
+	require.NoError(t, err, "Failed to invoke cat with UnixPath")
 
-	// Test Invoke method with Cat
-	result, err := wrapper.Invoke("Cat", "QmTest123")
-	if err != nil {
-		t.Fatalf("Failed to invoke Cat: %v", err)
-	}
-	data, ok := result.([]byte)
-	if !ok {
-		t.Fatalf("Expected []byte result, got %T", result)
-	}
-	t.Logf("Invoke Cat call returned: '%s' (length: %d)", string(data), len(data))
-	if string(data) != "test data" {
-		t.Errorf("Expected 'test data', got '%s'", string(data))
-	}
+	buffer, ok := result.(*lang.Buffer)
+	require.True(t, ok, "Expected *lang.Buffer result, got %T", result)
 
-	// Test Invoke method with no arguments
-	result, err = wrapper.Invoke()
-	if err != nil {
-		t.Fatalf("Failed to invoke with no arguments: %v", err)
-	}
-	if result != wrapper {
-		t.Errorf("Expected wrapper to return itself, got %v", result)
-	}
+	require.Equal(t, "0x746573742064617461", buffer.String(), "Buffer hex representation mismatch")
 
-	t.Logf("Successfully tested IPFSWrapper with mock server")
+	t.Logf("Successfully tested IPFSCat with UnixPath argument")
 }
 
-// TestDotNotation tests the dot notation syntax like (ipfs.Cat "QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
-func TestDotNotation(t *testing.T) {
-	// Create a mock IPFS server
-	mockServer := &MockIPFSServer{testValue: 42}
+// TestBuffer tests the Buffer type directly
+func TestBuffer(t *testing.T) {
+	// Test empty buffer
+	emptyBuffer := &lang.Buffer{}
+	require.Equal(t, "0x", emptyBuffer.String(), "Empty buffer should return '0x'")
 
-	// Create the IPFS wrapper
-	mock := system.IPFS_ServerToClient(mockServer)
-	session := lang.Session{IPFS: mock}
-
-	// Create an environment with the ipfs session
-	env := core.New(map[string]core.Any{
-		"ipfs": session,
-	})
-
-	// Test resolving ipfs from the environment
-	ipfsValue, err := env.Resolve("ipfs")
-	if err != nil {
-		t.Fatalf("Failed to resolve ipfs: %v", err)
-	}
-
-	// ipfs should resolve to our session
-	ipfsSession, ok := ipfsValue.(lang.Session)
-	if !ok {
-		t.Fatalf("Expected ipfs to resolve to Session, got %T", ipfsValue)
-	}
-
-	// Test resolving Cat method from the session
-	catMethod, err := ipfsSession.Resolve("Cat")
-	if err != nil {
-		t.Fatalf("Failed to resolve Cat method: %v", err)
-	}
-
-	// Cat should be invokable
-	invokable, ok := catMethod.(core.Invokable)
-	if !ok {
-		t.Fatalf("Expected Cat to be invokable, got %T", catMethod)
-	}
-
-	// Test invoking Cat with a CID
-	result, err := invokable.Invoke("QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
-	if err != nil {
-		t.Fatalf("Failed to invoke Cat: %v", err)
-	}
-
-	// Result should be the data from IPFS
-	data, ok := result.([]byte)
-	if !ok {
-		t.Fatalf("Expected []byte result, got %T", result)
-	}
-
-	t.Logf("Dot notation test returned: '%s' (length: %d)", string(data), len(data))
-	if string(data) != "test data" {
-		t.Errorf("Expected 'test data', got '%s'", string(data))
-	}
-
-	t.Logf("Successfully tested dot notation: (ipfs.Cat \"QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa\")")
+	// Test buffer with data
+	testData := []byte("test data")
+	buffer := &lang.Buffer{}
+	buffer.Write(testData)
+	require.Equal(t, "0x746573742064617461", buffer.String(), "Buffer hex representation mismatch")
 }
 
 // MockIPFSServer implements system.IPFS_Server for testing
@@ -156,7 +68,8 @@ func (m *MockIPFSServer) Cat(ctx context.Context, call system.IPFS_cat) error {
 	if err != nil {
 		return err
 	}
-	return results.SetBody([]byte("test data"))
+	testData := []byte("test data")
+	return results.SetBody(testData)
 }
 
 // Ls implements system.IPFS_Server.Ls

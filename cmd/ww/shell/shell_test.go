@@ -176,7 +176,7 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		"number":     42,
 		"string":     "hello",
 		"bool":       true,
-		"capability": lang.Session{IPFS: mock},
+		"capability": lang.IPFSCat{IPFS: mock},
 	})
 
 	// Test resolving each value
@@ -188,7 +188,7 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		{"number", "number", 42},
 		{"string", "string", "hello"},
 		{"bool", "bool", true},
-		{"capability", "capability", lang.Session{IPFS: mock}},
+		{"capability", "capability", lang.IPFSCat{IPFS: mock}},
 	}
 
 	for _, tc := range testCases {
@@ -213,7 +213,7 @@ func TestInvokableWithMockIPFS(t *testing.T) {
 	mock := system.IPFS_ServerToClient(mockServer)
 
 	// Create the invokable wrapper
-	sess := lang.Session{IPFS: mock}
+	sess := lang.IPFSCat{IPFS: mock}
 
 	// Test that we can access the client
 	if sess.IPFS != mock {
