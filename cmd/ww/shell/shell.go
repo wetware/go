@@ -102,6 +102,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	exec := sess.Exec()
 	defer exec.Release()
 
+	console := sess.Console()
+	defer console.Release()
+
 	// Get user's home directory for history file
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -110,6 +113,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	}
 
 	env := core.New(map[string]core.Any{
+		// Console
+		"println": lang.ConsolePrintln{Console: console},
+
 		// IPFS
 		"cat":     lang.IPFSCat{IPFS: ipfs},
 		"add":     lang.IPFSAdd{IPFS: ipfs},
