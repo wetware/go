@@ -392,3 +392,99 @@ func (m *MockCell) Wait(ctx context.Context, call system.Cell_wait) error {
 
 	return results.SetResult(result)
 }
+
+// TestConsolePrintln tests the ConsolePrintln command
+func TestConsolePrintln(t *testing.T) {
+	// Create a mock console server
+	mockConsole := &MockConsoleServer{
+		output:       "",
+		bytesWritten: 0,
+	}
+	consoleClient := system.Console_ServerToClient(mockConsole)
+	defer consoleClient.Release()
+
+	// Create the ConsolePrintln function
+	printlnFunc := lang.ConsolePrintln{Console: consoleClient}
+
+	// Test with string argument
+	result, err := printlnFunc.Invoke("Hello, Wetware!")
+	require.NoError(t, err, "Failed to invoke println with string")
+
+	bytesWritten, ok := result.(builtin.Int64)
+	require.True(t, ok, "Expected builtin.Int64 result, got %T", result)
+	require.Equal(t, builtin.Int64(16), bytesWritten, "Expected 16 bytes written (including newline)")
+	require.Equal(t, "Hello, Wetware!", mockConsole.output, "Console should have received the correct output")
+
+	// Test with builtin.String argument
+	mockConsole.output = ""
+	mockConsole.bytesWritten = 0
+
+	result, err = printlnFunc.Invoke(builtin.String("Test String"))
+	require.NoError(t, err, "Failed to invoke println with builtin.String")
+
+	bytesWritten, ok = result.(builtin.Int64)
+	require.True(t, ok, "Expected builtin.Int64 result, got %T", result)
+	require.Equal(t, builtin.Int64(12), bytesWritten, "Expected 12 bytes written (including newline)")
+	require.Equal(t, "Test String", mockConsole.output, "Console should have received the correct output")
+
+	// Test with Buffer argument
+	mockConsole.output = ""
+	mockConsole.bytesWritten = 0
+
+	buffer := &lang.Buffer{Mem: []byte("Buffer content")}
+	result, err = printlnFunc.Invoke(buffer)
+	require.NoError(t, err, "Failed to invoke println with Buffer")
+
+	bytesWritten, ok = result.(builtin.Int64)
+	require.True(t, ok, "Expected builtin.Int64 result, got %T", result)
+	require.Equal(t, builtin.Int64(15), bytesWritten, "Expected 15 bytes written (including newline)")
+	require.Equal(t, "Buffer content", mockConsole.output, "Console should have received the correct output")
+
+	// Test with no arguments (identity law)
+	result, err = printlnFunc.Invoke()
+	require.NoError(t, err, "Failed to invoke println with no arguments")
+
+	// Should return the function itself
+	returnedFunc, ok := result.(lang.ConsolePrintln)
+	require.True(t, ok, "Expected ConsolePrintln result, got %T", result)
+	require.Equal(t, consoleClient, returnedFunc.Console, "Returned function should have the same console")
+
+	// Test with wrong number of arguments
+	_, err = printlnFunc.Invoke("arg1", "arg2")
+	require.Error(t, err, "Expected error for wrong number of arguments")
+	require.Contains(t, err.Error(), "println requires exactly 1 argument, got 2", "Error message should be descriptive")
+
+	// Test with unsupported argument type
+	_, err = printlnFunc.Invoke(42)
+	require.NoError(t, err, "Should handle unsupported types gracefully")
+	require.Equal(t, "42", mockConsole.output, "Console should have received string representation of number")
+}
+
+// MockConsoleServer implements system.Console_Server for testing
+type MockConsoleServer struct {
+	output       string
+	bytesWritten uint32
+}
+
+// Println implements system.Console_Server.Println
+func (m *MockConsoleServer) Println(ctx context.Context, call system.Console_println) error {
+	// Get the output data from the call
+	output, err := call.Args().Output()
+	if err != nil {
+		return err
+	}
+
+	// Store the output for testing
+	m.output = output
+	m.bytesWritten = uint32(len(output) + 1) // +1 for newline
+
+	// Set the result (number of bytes written)
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	results.SetN(m.bytesWritten)
+
+	return nil
+}
