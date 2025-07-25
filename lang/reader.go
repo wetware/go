@@ -1,9 +1,13 @@
 package lang
 
 import (
+	"encoding/hex"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 
+	"capnproto.org/go/capnp/v3/exp/bufferpool"
 	"github.com/ipfs/boxo/path"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -90,6 +94,74 @@ func UnixPathReader() reader.Macro {
 	}
 }
 
+// HexReader implements a reader macro for hex-encoded bytes starting with "0x"
+// This allows users to directly use hex literals in the shell.
+// Examples:
+//
+//	0x746573742064617461 -> returns Buffer with decoded bytes ("test data")
+//	0x -> returns empty Buffer
+//	0xinvalid -> error: "invalid hex string"
+func HexReader() reader.Macro {
+	return func(rd *reader.Reader, init rune) (core.Any, error) {
+		// Check if the next character is 'x' to confirm this is a hex literal
+		nextRune, err := rd.NextRune()
+		if err != nil {
+			// If we hit EOF, this is just "0" not a hex literal
+			rd.Unread(init)
+			return nil, fmt.Errorf("unexpected EOF")
+		}
+
+		if nextRune != 'x' {
+			// Not a hex literal, put both characters back and let the default reader handle it
+			rd.Unread(nextRune)
+			rd.Unread(init)
+			return nil, fmt.Errorf("not a hex literal")
+		}
+
+		// Read the rest of the hex string character by character until we hit whitespace or other delimiters
+		var b strings.Builder
+		b.WriteRune(init)     // Start with the initial '0'
+		b.WriteRune(nextRune) // Add the 'x'
+
+		for {
+			r, err := rd.NextRune()
+			if err != nil {
+				// If we hit EOF, that's fine - we have a complete hex string
+				break
+			}
+
+			// Stop at whitespace or other delimiters
+			if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == ')' || r == ']' || r == '}' {
+				// Put the character back so the next reader can use it
+				rd.Unread(r)
+				break
+			}
+
+			b.WriteRune(r)
+		}
+
+		hexStr := b.String()
+
+		// Handle empty hex string (just "0x")
+		if hexStr == "0x" {
+			return &Buffer{}, nil
+		}
+
+		// Decode the hex string (skip the "0x" prefix)
+		hexData := hexStr[2:]
+		data, err := hex.DecodeString(hexData)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hex string: %w", err)
+		}
+
+		// Create a buffer with the decoded data
+		buf := bufferpool.Default.Get(len(data))
+		copy(buf, data)
+
+		return &Buffer{Mem: buf}, nil
+	}
+}
+
 // ListReader creates a custom list reader macro that can access the IPFS session
 // This allows for enhanced list processing with IPFS capabilities
 func ListReader(ipfs system.IPFS) reader.Macro {
@@ -113,4 +185,128 @@ func ListReader(ipfs system.IPFS) reader.Macro {
 
 		return builtin.NewList(forms...), nil
 	}
+}
+
+// NewReaderWithHexSupport creates a new reader with support for hex literals
+// This allows users to use hex literals like 0x746573742064617461 in addition to regular numbers
+func NewReaderWithHexSupport(r io.Reader) *reader.Reader {
+	// Create a custom number reader that can handle both hex literals and regular numbers
+	customNumReader := func(rd *reader.Reader, init rune) (core.Any, error) {
+		// Check if this is a hex literal (starts with "0x")
+		if init == '0' {
+			// Check if the next character is 'x' to confirm this is a hex literal
+			nextRune, err := rd.NextRune()
+			if err != nil {
+				// If we hit EOF, this is just "0" not a hex literal
+				rd.Unread(init)
+				return nil, fmt.Errorf("unexpected EOF")
+			}
+
+			if nextRune == 'x' {
+				// This is a hex literal, parse it
+				return parseHexLiteral(rd, init, nextRune)
+			} else {
+				// Not a hex literal, put the character back and parse as regular number
+				rd.Unread(nextRune)
+			}
+		}
+
+		// Parse as a regular number
+		return parseRegularNumber(rd, init)
+	}
+
+	// Create the reader with our custom number reader
+	rd := reader.New(r, reader.WithNumReader(customNumReader))
+
+	return rd
+}
+
+// parseHexLiteral parses a hex literal starting with "0x"
+func parseHexLiteral(rd *reader.Reader, init rune, nextRune rune) (core.Any, error) {
+	// Read the rest of the hex string character by character until we hit whitespace or other delimiters
+	var b strings.Builder
+	b.WriteRune(init)     // Start with the initial '0'
+	b.WriteRune(nextRune) // Add the 'x'
+
+	for {
+		r, err := rd.NextRune()
+		if err != nil {
+			// If we hit EOF, that's fine - we have a complete hex string
+			break
+		}
+
+		// Stop at whitespace or other delimiters
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == ')' || r == ']' || r == '}' {
+			// Put the character back so the next reader can use it
+			rd.Unread(r)
+			break
+		}
+
+		b.WriteRune(r)
+	}
+
+	hexStr := b.String()
+
+	// Handle empty hex string (just "0x")
+	if hexStr == "0x" {
+		return &Buffer{}, nil
+	}
+
+	// Decode the hex string (skip the "0x" prefix)
+	hexData := hexStr[2:]
+	data, err := hex.DecodeString(hexData)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hex string: %w", err)
+	}
+
+	buf := bufferpool.Default.Get(len(data))
+	copy(buf, data)
+
+	// Create a buffer with the decoded data
+	buffer := &Buffer{Mem: buf}
+
+	return buffer, nil
+}
+
+// parseRegularNumber parses a regular number
+func parseRegularNumber(rd *reader.Reader, init rune) (core.Any, error) {
+	var b strings.Builder
+	b.WriteRune(init)
+
+	for {
+		r, err := rd.NextRune()
+		if err != nil {
+			break
+		}
+
+		// Stop at whitespace or other delimiters
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == ')' || r == ']' || r == '}' {
+			rd.Unread(r)
+			break
+		}
+
+		// Allow digits, decimal point, and minus sign
+		if (r >= '0' && r <= '9') || r == '.' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			// Put the character back and stop
+			rd.Unread(r)
+			break
+		}
+	}
+
+	numStr := b.String()
+
+	// Try to parse as an integer first
+	if i, err := strconv.ParseInt(numStr, 10, 64); err == nil {
+		return builtin.Int64(i), nil
+	}
+
+	// Try to parse as a float
+	if f, err := strconv.ParseFloat(numStr, 64); err == nil {
+		return builtin.Float64(f), nil
+	}
+
+	// If all else fails, return as a string
+	return builtin.String(numStr), nil
 }
