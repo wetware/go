@@ -177,36 +177,32 @@ func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
 		return nil, fmt.Errorf("failed to get entries: %w", err)
 	}
 
-	// Extract all entry data before release() is called
-	var result []core.Any
-
-	// Add header for better readability
-	if entries.Len() > 0 {
-		header := "NAME                 SIZE       TYPE         CID"
-		result = append(result, builtin.String(header))
-		result = append(result, builtin.String(strings.Repeat("-", len(header))))
-	}
-
+	// Build a map of entries
+	result := make(Map)
 	for i := 0; i < entries.Len(); i++ {
 		entry := entries.At(i)
-
-		// Extract entry data before it gets freed
 		name, err := entry.Name()
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("failed to get entry name: %w", err)
 		}
 
-		// Create a string representation of the entry
-		entryType := entry.Type()
-		size := entry.Size()
-		cid, _ := entry.Cid()
+		cid, err := entry.Cid()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get entry cid: %w", err)
+		}
 
-		// Format with proper spacing for better readability
-		entryStr := fmt.Sprintf("%-20s %10d %-12s %s", name, size, entryType, cid)
-		result = append(result, builtin.String(entryStr))
+		// Create entry map with all available information
+		// and store it under the name key.
+		result[builtin.Keyword(name)] = Map{
+			builtin.Keyword("name"): builtin.String(name),
+			builtin.Keyword("cid"):  builtin.String(cid),
+			builtin.Keyword("size"): builtin.Int64(entry.Size()),
+			builtin.Keyword("type"): builtin.String(entry.Type().String()),
+		}
+
 	}
+	return result, nil
 
-	return builtin.NewList(result...), nil
 }
 
 // IPFSStat gets information about a CID
