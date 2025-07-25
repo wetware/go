@@ -313,3 +313,208 @@ func TestUnixPathReader(t *testing.T) {
 		})
 	}
 }
+
+// MockTerminalSession implements auth.Terminal_login_Results for testing
+type MockTerminalSession struct {
+	hasConsole bool
+	hasIPFS    bool
+	hasExec    bool
+	console    system.Console
+	ipfs       system.IPFS
+	exec       system.Executor
+}
+
+func (m *MockTerminalSession) HasConsole() bool { return m.hasConsole }
+func (m *MockTerminalSession) HasIpfs() bool    { return m.hasIPFS }
+func (m *MockTerminalSession) HasExec() bool    { return m.hasExec }
+func (m *MockTerminalSession) Console() system.Console {
+	if !m.hasConsole {
+		return system.Console{}
+	}
+	return m.console
+}
+func (m *MockTerminalSession) Ipfs() system.IPFS {
+	if !m.hasIPFS {
+		return system.IPFS{}
+	}
+	return m.ipfs
+}
+func (m *MockTerminalSession) Exec() system.Executor {
+	if !m.hasExec {
+		return system.Executor{}
+	}
+	return m.exec
+}
+
+// TestCapabilityWithholding tests that capabilities are properly withheld when not granted
+func TestCapabilityWithholding(t *testing.T) {
+	t.Parallel()
+
+	// Create mock capabilities
+	mockConsole := system.Console_ServerToClient(&MockConsoleServer{})
+	mockIPFS := system.IPFS_ServerToClient(&MockIPFSServer{})
+	mockExec := system.Executor_ServerToClient(&MockExecutorServer{})
+
+	testCases := []struct {
+		name           string
+		hasConsole     bool
+		hasIPFS        bool
+		hasExec        bool
+		expectedKeys   []string
+		unexpectedKeys []string
+	}{
+		{
+			name:           "no capabilities granted",
+			hasConsole:     false,
+			hasIPFS:        false,
+			hasExec:        false,
+			expectedKeys:   []string{},
+			unexpectedKeys: []string{"println", "cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers", "go"},
+		},
+		{
+			name:           "only console granted",
+			hasConsole:     true,
+			hasIPFS:        false,
+			hasExec:        false,
+			expectedKeys:   []string{"println"},
+			unexpectedKeys: []string{"cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers", "go"},
+		},
+		{
+			name:           "only IPFS granted",
+			hasConsole:     false,
+			hasIPFS:        true,
+			hasExec:        false,
+			expectedKeys:   []string{"cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers"},
+			unexpectedKeys: []string{"println", "go"},
+		},
+		{
+			name:           "only exec granted",
+			hasConsole:     false,
+			hasIPFS:        false,
+			hasExec:        true,
+			expectedKeys:   []string{"go"},
+			unexpectedKeys: []string{"println", "cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers"},
+		},
+		{
+			name:           "all capabilities granted",
+			hasConsole:     true,
+			hasIPFS:        true,
+			hasExec:        true,
+			expectedKeys:   []string{"println", "cat", "add", "ls", "stat", "pin", "unpin", "pins", "id", "connect", "peers", "go"},
+			unexpectedKeys: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create mock session with specified capabilities
+			sess := &MockTerminalSession{
+				hasConsole: tc.hasConsole,
+				hasIPFS:    tc.hasIPFS,
+				hasExec:    tc.hasExec,
+				console:    mockConsole,
+				ipfs:       mockIPFS,
+				exec:       mockExec,
+			}
+
+			// Create environment using the cell function logic
+			globals := make(map[string]core.Any)
+
+			// Conditionally add console capability
+			if sess.HasConsole() {
+				console := sess.Console()
+				globals["println"] = lang.ConsolePrintln{Console: console}
+			}
+
+			// Conditionally add IPFS capabilities
+			if sess.HasIpfs() {
+				ipfs := sess.Ipfs()
+				globals["cat"] = lang.IPFSCat{IPFS: ipfs}
+				globals["add"] = lang.IPFSAdd{IPFS: ipfs}
+				globals["ls"] = &lang.IPFSLs{IPFS: ipfs}
+				globals["stat"] = &lang.IPFSStat{IPFS: ipfs}
+				globals["pin"] = &lang.IPFSPin{IPFS: ipfs}
+				globals["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
+				globals["pins"] = &lang.IPFSPins{IPFS: ipfs}
+				globals["id"] = &lang.IPFSId{IPFS: ipfs}
+				globals["connect"] = &lang.IPFSConnect{IPFS: ipfs}
+				globals["peers"] = &lang.IPFSPeers{IPFS: ipfs}
+			}
+
+			// Conditionally add process execution capability
+			if sess.HasExec() {
+				exec := sess.Exec()
+				globals["go"] = lang.Go{Executor: exec}
+			}
+
+			env := core.New(globals)
+
+			// Test that expected keys are present
+			for _, key := range tc.expectedKeys {
+				value, err := env.Resolve(key)
+				if err != nil {
+					t.Errorf("Expected key '%s' to be present, but got error: %v", key, err)
+				}
+				if value == nil {
+					t.Errorf("Expected key '%s' to have a non-nil value", key)
+				}
+			}
+
+			// Test that unexpected keys are not present
+			for _, key := range tc.unexpectedKeys {
+				_, err := env.Resolve(key)
+				if err == nil {
+					t.Errorf("Expected key '%s' to be absent, but it was found", key)
+				}
+			}
+		})
+	}
+}
+
+// MockConsoleServer implements system.Console_Server for testing
+type MockConsoleServer struct{}
+
+func (m *MockConsoleServer) Println(ctx context.Context, call system.Console_println) error {
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+	results.SetN(10) // Return 10 bytes written
+	return nil
+}
+
+// MockCellServer implements system.Cell_Server for testing
+type MockCellServer struct{}
+
+func (m *MockCellServer) Wait(ctx context.Context, call system.Cell_wait) error {
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+	// Return a mock result
+	result, err := results.NewResult()
+	if err != nil {
+		return err
+	}
+	result.SetOk()
+	return results.SetResult(result)
+}
+
+// MockExecutorServer implements system.Executor_Server for testing
+type MockExecutorServer struct{}
+
+func (m *MockExecutorServer) Spawn(ctx context.Context, call system.Executor_spawn) error {
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+	// Return a mock cell
+	optionalCell, err := results.NewCell()
+	if err != nil {
+		return err
+	}
+	// Create a mock Cell and set it
+	mockCell := system.Cell_ServerToClient(&MockCellServer{})
+	optionalCell.SetCell(mockCell)
+	return results.SetCell(optionalCell)
+}
