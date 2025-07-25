@@ -8,6 +8,7 @@ import (
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
 	"github.com/spy16/slurp/reader"
+	"github.com/wetware/go/system"
 )
 
 // UnixPath represents a validated IPFS/IPLD path
@@ -86,5 +87,30 @@ func UnixPathReader() reader.Macro {
 
 		// Return the UnixPath as a core.Any
 		return unixPath, nil
+	}
+}
+
+// ListReader creates a custom list reader macro that can access the IPFS session
+// This allows for enhanced list processing with IPFS capabilities
+func ListReader(ipfs system.IPFS) reader.Macro {
+	return func(rd *reader.Reader, init rune) (core.Any, error) {
+		const listEnd = ')'
+
+		forms := make([]core.Any, 0, 32) // pre-allocate to improve performance on small lists
+		if err := rd.Container(listEnd, "list", func(val core.Any) error {
+			forms = append(forms, val)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+
+		// For now, we'll just return a regular list like the default reader
+		// In the future, this could be enhanced to handle IPFS-specific list operations
+		// such as:
+		// - Auto-resolving IPFS paths in lists
+		// - Special handling for IPFS commands
+		// - Batch operations on IPFS objects
+
+		return builtin.NewList(forms...), nil
 	}
 }
