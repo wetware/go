@@ -15,7 +15,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
 	"github.com/wetware/go/lang"
-	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -49,6 +48,7 @@ func Main(c *cli.Context) error {
 	cmd.Stdin = c.App.Reader
 	cmd.Stdout = c.App.Writer
 	cmd.Stderr = c.App.ErrWriter
+	cmd.Env = os.Environ() // Inherit environment variables
 	return cmd.Run()
 }
 
@@ -85,8 +85,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	ipfs := sess.Ipfs()
 	defer ipfs.Release()
 
+	ipfsWrapper := lang.Session{IPFS: ipfs}
 	env := core.New(map[string]core.Any{
-		"ipfs": lang.Invokable[system.IPFS]{Client: ipfs},
+		"ipfs": ipfsWrapper,
 	})
 
 	interpreter := slurp.New(

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/spy16/slurp/core"
+	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 )
@@ -31,7 +32,7 @@ func (m *MockIPFSServer) Cat(ctx context.Context, call system.IPFS_cat) error {
 	if err != nil {
 		return err
 	}
-	return results.SetData([]byte("test data"))
+	return results.SetBody([]byte("test data"))
 }
 
 // Ls implements system.IPFS_Server.Ls
@@ -172,7 +173,7 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		"number":     42,
 		"string":     "hello",
 		"bool":       true,
-		"capability": lang.Invokable[system.IPFS]{Client: mock},
+		"capability": lang.Session{IPFS: mock},
 	})
 
 	// Test resolving each value
@@ -184,7 +185,7 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		{"number", "number", 42},
 		{"string", "string", "hello"},
 		{"bool", "bool", true},
-		{"capability", "capability", lang.Invokable[system.IPFS]{Client: mock}},
+		{"capability", "capability", lang.Session{IPFS: mock}},
 	}
 
 	for _, tc := range testCases {
@@ -209,27 +210,21 @@ func TestInvokableWithMockIPFS(t *testing.T) {
 	mock := system.IPFS_ServerToClient(mockServer)
 
 	// Create the invokable wrapper
-	invokable := lang.Invokable[system.IPFS]{Client: mock}
+	sess := lang.Session{IPFS: mock}
 
 	// Test that we can access the client
-	if invokable.Client != mock {
-		t.Errorf("Expected client to be the mock, got %v", invokable.Client)
+	if sess.IPFS != mock {
+		t.Errorf("Expected client to be the mock, got %v", sess.IPFS)
 	}
 
-	// Test that the invokable implements the core.Invokable interface
-	// This is the main purpose of the wrapper
-	var _ core.Invokable = invokable
-
-	// Test that we can return the invokable itself when no arguments are provided
-	result, err := invokable.Invoke()
+	// Test that we can return the session itself when no arguments are provided
+	result, err := sess.Invoke()
 	if err != nil {
 		t.Fatalf("Failed to invoke with no arguments: %v", err)
 	}
 
-	// Should return the invokable itself
-	if result != invokable {
-		t.Errorf("Expected invokable to return itself, got %v", result)
-	}
+	// Should return the session itself
+	require.Equal(t, sess, result, "identity law not verified:  `(session)` should return `session`")
 
 	t.Logf("Successfully created mock IPFS capability wrapped in Invokable")
 	t.Logf("Mock server test value: %d", mockServer.testValue)

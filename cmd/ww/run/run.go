@@ -27,8 +27,9 @@ func Command() *cli.Command {
 		// ArgsUsage: "<source-dir>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "ipfs",
-				Value: "/dns4/localhost/tcp/5001/http",
+				Name:    "ipfs",
+				EnvVars: []string{"WW_IPFS"},
+				Value:   "/dns4/localhost/tcp/5001/http",
 			},
 			&cli.StringSliceFlag{
 				Name:    "env",
