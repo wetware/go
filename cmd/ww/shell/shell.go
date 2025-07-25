@@ -110,7 +110,10 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 func readerFactory() repl.ReaderFactoryFunc {
 	return func(r io.Reader) *reader.Reader {
 		rd := reader.New(r)
-		// rd.SetMacro('/', false, ...)
+
+		// Set up the Unix path reader macro for '/' character
+		rd.SetMacro('/', false, lang.UnixPathReader())
+
 		return rd
 	}
 }
