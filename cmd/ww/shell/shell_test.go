@@ -4,7 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"strings"
+
+	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
+	"github.com/spy16/slurp/reader"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
@@ -241,5 +245,67 @@ func TestEnvironmentNotFound(t *testing.T) {
 	_, err := env.Resolve("nonexistent")
 	if err == nil {
 		t.Error("Expected error when resolving non-existent value")
+	}
+}
+
+func TestUnixPathReader(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "valid ipfs path",
+			input:   "/ipfs/QmHash123",
+			want:    "/ipfs/QmHash123",
+			wantErr: false,
+		},
+		{
+			name:    "valid ipld path",
+			input:   "/ipld/QmHash456",
+			want:    "/ipld/QmHash456",
+			wantErr: false,
+		},
+		{
+			name:    "invalid path starting with slash",
+			input:   "/invalid/path",
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a reader with our custom macro
+			rd := reader.New(strings.NewReader(tt.input))
+			rd.SetMacro('/', false, lang.UnixPathReader())
+
+			// Read one form
+			result, err := rd.One()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("unixPathReader() expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unixPathReader() unexpected error: %v", err)
+				return
+			}
+
+			// Check if result is a string
+			str, ok := result.(builtin.String)
+			if !ok {
+				t.Errorf("unixPathReader() returned %T, want builtin.String", result)
+				return
+			}
+
+			if string(str) != tt.want {
+				t.Errorf("unixPathReader() = %v, want %v", string(str), tt.want)
+			}
+		})
 	}
 }
