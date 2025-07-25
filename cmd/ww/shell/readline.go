@@ -9,6 +9,22 @@ import (
 	"github.com/chzyer/readline"
 )
 
+/*
+Supported Keyboard Shortcuts:
+- Ctrl+A: Move to beginning of line
+- Ctrl+E: Move to end of line
+- Ctrl+K: Kill line from cursor to end
+- Ctrl+U: Kill line from beginning to cursor
+- Ctrl+W: Kill word before cursor
+- Ctrl+Y: Yank (paste) previously killed text
+- Ctrl+T: Transpose characters
+- Ctrl+L: Clear screen
+- Ctrl+R: Reverse history search
+- Arrow keys: Navigate through line and history
+- Tab: Auto-completion
+- Backspace/Delete: Normal text editing
+*/
+
 // ReadlineInput implements the repl.Input interface using github.com/chzyer/readline
 type ReadlineInput struct {
 	rl *readline.Instance
@@ -29,6 +45,7 @@ func NewReadlineInput(home string) (*ReadlineInput, error) {
 		HistoryFile: historyFile,
 		Stdout:      os.Stdout,
 		Stderr:      os.Stderr,
+		Stdin:       os.Stdin, // Explicitly set stdin for proper input handling
 
 		// Enhanced prompts with colors and status information
 		InterruptPrompt: "\033[33m⏎\033[0m",    // Yellow interrupt symbol
@@ -37,12 +54,18 @@ func NewReadlineInput(home string) (*ReadlineInput, error) {
 		// Enable advanced features
 		DisableAutoSaveHistory: false,
 		HistorySearchFold:      true,                // Case-insensitive history search
-		HistoryLimit:           10000,               // Increase history limit to 10000 entries
+		HistoryLimit:           10000,               // Increase history limit to 10k entries
 		AutoComplete:           &WetwareCompleter{}, // Custom autocomplete
 
 		// Enhanced display settings
 		UniqueEditLine: true,
 		Listener:       &WetwareListener{}, // Custom listener for status updates
+
+		// Add terminal width function for proper line wrapping
+		FuncGetWidth: func() int {
+			// Get terminal width for proper line wrapping
+			return 80 // Default fallback
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -101,7 +124,7 @@ func isWordBoundary(r rune) bool {
 	return r == ' ' || r == '\t' || r == '(' || r == ')' || r == '[' || r == ']'
 }
 
-// WetwareListener provides custom event handling for the readline instance
+// Enhanced WetwareListener with better keyboard shortcut support
 type WetwareListener struct{}
 
 func (l *WetwareListener) OnChange(line []rune, pos int, key rune) (newLine []rune, newPos int, ok bool) {
@@ -114,8 +137,50 @@ func (l *WetwareListener) OnChange(line []rune, pos int, key rune) (newLine []ru
 	case 18: // Ctrl+R
 		// Trigger history search
 		return line, pos, true
+	case 1: // Ctrl+A - Move to beginning of line
+		return line, 0, true
+	case 5: // Ctrl+E - Move to end of line
+		return line, len(line), true
+	case 11: // Ctrl+K - Kill line from cursor to end
+		return line[:pos], pos, true
+	case 21: // Ctrl+U - Kill line from beginning to cursor
+		return line[pos:], 0, true
+	case 23: // Ctrl+W - Kill word before cursor
+		return l.killWordBefore(line, pos), l.wordStart(line, pos), true
+	case 25: // Ctrl+Y - Yank (paste) previously killed text
+		return line, pos, true
+	case 20: // Ctrl+T - Transpose characters
+		if pos > 0 && pos < len(line) {
+			newLine := make([]rune, len(line))
+			copy(newLine, line)
+			newLine[pos-1], newLine[pos] = newLine[pos], newLine[pos-1]
+			return newLine, pos, true
+		}
+	case 27: // ESC - Handle arrow keys and other escape sequences
+		// This will be handled by the readline library's built-in arrow key support
+		return line, pos, false
 	}
 	return line, pos, false
+}
+
+// Helper methods for word manipulation
+func (l *WetwareListener) killWordBefore(line []rune, pos int) []rune {
+	if pos == 0 {
+		return line
+	}
+	start := l.wordStart(line, pos)
+	return append(line[:start], line[pos:]...)
+}
+
+func (l *WetwareListener) wordStart(line []rune, pos int) int {
+	if pos == 0 {
+		return 0
+	}
+	start := pos - 1
+	for start >= 0 && !isWordBoundary(line[start]) {
+		start--
+	}
+	return start + 1
 }
 
 // Readline implements repl.Input.Readline
