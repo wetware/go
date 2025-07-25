@@ -86,9 +86,17 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	ipfs := sess.Ipfs()
 	defer ipfs.Release()
 
-	ipfsWrapper := lang.Session{IPFS: ipfs}
 	env := core.New(map[string]core.Any{
-		"ipfs": ipfsWrapper,
+		"cat":     lang.IPFSCat{IPFS: ipfs},
+		"add":     lang.IPFSAdd{IPFS: ipfs},
+		"ls":      lang.IPFSLs{IPFS: ipfs},
+		"stat":    lang.IPFSStat{IPFS: ipfs},
+		"pin":     lang.IPFSPin{IPFS: ipfs},
+		"unpin":   lang.IPFSUnpin{IPFS: ipfs},
+		"pins":    lang.IPFSPins{IPFS: ipfs},
+		"id":      lang.IPFSId{IPFS: ipfs},
+		"connect": lang.IPFSConnect{IPFS: ipfs},
+		"peers":   lang.IPFSPeers{IPFS: ipfs},
 	})
 
 	interpreter := slurp.New(
