@@ -4,7 +4,6 @@ import (
 	context "context"
 	"errors"
 
-	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	system "github.com/wetware/go/system"
@@ -18,7 +17,8 @@ type Policy interface {
 
 type SingleUser struct {
 	User crypto.PubKey
-	IPFS iface.CoreAPI
+	IPFS system.IPFS
+	Exec system.Executor
 }
 
 func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, user peer.ID) error {
@@ -32,7 +32,10 @@ func (policy SingleUser) Bind(ctx context.Context, env Terminal_login_Results, u
 	}
 
 	// Bind IPFS capability
-	provider := &system.DefaultIPFS_Server{API: policy.IPFS}
-	ipfs := system.IPFS_ServerToClient(provider)
-	return env.SetIpfs(ipfs)
+	err = env.SetIpfs(policy.IPFS.AddRef())
+	if err != nil {
+		return err
+	}
+
+	return env.SetExec(policy.Exec.AddRef())
 }
