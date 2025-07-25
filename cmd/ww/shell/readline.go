@@ -25,13 +25,13 @@ Supported Keyboard Shortcuts:
 - Backspace/Delete: Normal text editing
 */
 
-// ReadlineInput implements the repl.Input interface using github.com/chzyer/readline
-type ReadlineInput struct {
-	rl *readline.Instance
+// InteractiveInput implements the repl.Input interface using github.com/chzyer/readline
+type InteractiveInput struct {
+	*readline.Instance
 }
 
 // NewReadlineInput creates a new readline-based input with enhanced configuration
-func NewReadlineInput(home string) (*ReadlineInput, error) {
+func NewReadlineInput(home string) (*InteractiveInput, error) {
 	// Create history file path in the user's home directory
 	historyFile := filepath.Join(home, ".ww_history")
 
@@ -41,7 +41,7 @@ func NewReadlineInput(home string) (*ReadlineInput, error) {
 	}
 
 	// Enhanced readline configuration with better formatting and features
-	rl, err := readline.NewEx(&readline.Config{
+	i, err := readline.NewEx(&readline.Config{
 		HistoryFile: historyFile,
 		Stdout:      os.Stdout,
 		Stderr:      os.Stderr,
@@ -70,7 +70,7 @@ func NewReadlineInput(home string) (*ReadlineInput, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ReadlineInput{rl: rl}, nil
+	return &InteractiveInput{Instance: i}, nil
 }
 
 // WetwareCompleter provides intelligent autocomplete for the shell
@@ -184,13 +184,13 @@ func (l *WetwareListener) wordStart(line []rune, pos int) int {
 }
 
 // Readline implements repl.Input.Readline
-func (r *ReadlineInput) Readline() (string, error) {
+func (r *InteractiveInput) Readline() (string, error) {
 	for {
-		switch line, err := r.rl.Readline(); err {
+		switch line, err := r.Instance.Readline(); err {
 		case readline.ErrInterrupt:
 			if len(line) == 0 {
 				// Enhanced interrupt handling with visual feedback
-				r.rl.Clean()
+				r.Instance.Clean()
 				fmt.Fprintf(os.Stderr, "\033[33m^C\033[0m\n") // Yellow ^C indicator
 				return "", nil
 			}
@@ -202,14 +202,14 @@ func (r *ReadlineInput) Readline() (string, error) {
 }
 
 // Prompt implements repl.Prompter.Prompt with enhanced formatting
-func (r *ReadlineInput) Prompt(prompt string) {
+func (r *InteractiveInput) Prompt(prompt string) {
 	// Enhanced prompt with colors and status information
 	enhancedPrompt := r.enhancePrompt(prompt)
-	r.rl.SetPrompt(enhancedPrompt)
+	r.Instance.SetPrompt(enhancedPrompt)
 }
 
 // enhancePrompt adds colors and status information to the prompt
-func (r *ReadlineInput) enhancePrompt(basePrompt string) string {
+func (r *InteractiveInput) enhancePrompt(basePrompt string) string {
 	// Add colors and status indicators
 	status := r.getStatusInfo()
 
@@ -219,18 +219,18 @@ func (r *ReadlineInput) enhancePrompt(basePrompt string) string {
 }
 
 // getStatusInfo returns status information for the prompt
-func (r *ReadlineInput) getStatusInfo() string {
+func (r *InteractiveInput) getStatusInfo() string {
 	// This could be enhanced to show actual system status
 	// For now, return a simple indicator
 	return "\033[33m●\033[0m" // Yellow dot indicator
 }
 
 // Close closes the readline instance
-func (r *ReadlineInput) Close() error {
+func (r *InteractiveInput) Close() error {
 	// Ensure history is saved before closing
-	if err := r.rl.SaveHistory(""); err != nil {
+	if err := r.Instance.SaveHistory(""); err != nil {
 		// Log the error but don't fail the close operation
 		fmt.Fprintf(os.Stderr, "Warning: failed to save history: %v\n", err)
 	}
-	return r.rl.Close()
+	return r.Instance.Close()
 }
