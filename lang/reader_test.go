@@ -12,6 +12,7 @@ import (
 )
 
 func TestUnixPathReader(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -92,6 +93,7 @@ func TestUnixPathReader(t *testing.T) {
 }
 
 func TestUnixPathReaderInContext(t *testing.T) {
+	t.Parallel()
 	// Test that the Unix path reader works in a more realistic context
 	// where it's followed by other forms
 	input := "(ipfs.Cat /ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa) (ipfs.Ls /ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa)"
@@ -117,6 +119,7 @@ func TestUnixPathReaderInContext(t *testing.T) {
 }
 
 func TestNewUnixPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -190,6 +193,7 @@ func TestNewUnixPath(t *testing.T) {
 }
 
 func TestListReader(t *testing.T) {
+	t.Parallel()
 	// Create a mock IPFS server for testing
 	mockServer := &MockIPFSServer{testValue: 42}
 	mock := system.IPFS_ServerToClient(mockServer)
@@ -263,6 +267,7 @@ func TestListReader(t *testing.T) {
 }
 
 func TestHexReader(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   string
@@ -344,6 +349,7 @@ func TestHexReader(t *testing.T) {
 }
 
 func TestHexReaderInContext(t *testing.T) {
+	t.Parallel()
 	// Test that the hex reader works in a more realistic context
 	// where it's used in function calls
 	input := "(add 0x746573742064617461) (cat /ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa)"

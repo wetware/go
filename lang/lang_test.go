@@ -12,6 +12,7 @@ import (
 
 // TestIPFSCat tests the standalone IPFSCat function
 func TestIPFSCat(t *testing.T) {
+	t.Parallel()
 	// Create a mock IPFS server
 	mockServer := &MockIPFSServer{testValue: 42}
 	mock := system.IPFS_ServerToClient(mockServer)
@@ -36,6 +37,7 @@ func TestIPFSCat(t *testing.T) {
 
 // TestBuffer tests the Buffer type directly
 func TestBuffer(t *testing.T) {
+	t.Parallel()
 	// Test empty buffer
 	emptyBuffer := &lang.Buffer{}
 	require.Equal(t, "", emptyBuffer.String(), "Empty buffer should return ''")
@@ -50,6 +52,7 @@ func TestBuffer(t *testing.T) {
 
 // TestIPFSAdd tests the IPFSAdd function
 func TestIPFSAdd(t *testing.T) {
+	t.Parallel()
 	// Create a mock IPFS server
 	mockServer := &MockIPFSServer{testValue: 42}
 	mock := system.IPFS_ServerToClient(mockServer)
@@ -75,6 +78,7 @@ func TestIPFSAdd(t *testing.T) {
 
 // TestGoSpecialForm tests the Go special form argument validation
 func TestGoSpecialForm(t *testing.T) {
+	t.Parallel()
 	// Test argument validation
 	goForm := lang.Go{}
 
@@ -93,6 +97,7 @@ func TestGoSpecialForm(t *testing.T) {
 
 // TestGoSpecialFormWithMockExecutor tests that the go special form correctly calls the executor
 func TestGoSpecialFormWithMockExecutor(t *testing.T) {
+	t.Parallel()
 	mockExecutor := &MockExecutor{
 		spawnCalled:   false,
 		spawnPath:     "",
@@ -395,6 +400,7 @@ func (m *MockCell) Wait(ctx context.Context, call system.Cell_wait) error {
 
 // TestConsolePrintln tests the ConsolePrintln command
 func TestConsolePrintln(t *testing.T) {
+	t.Parallel()
 	// Create a mock console server
 	mockConsole := &MockConsoleServer{
 		output:       "",
