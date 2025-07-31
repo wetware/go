@@ -292,6 +292,16 @@ func (m *MockIPFSServer) Peers(ctx context.Context, call system.IPFS_peers) erro
 	return results.SetPeerList(peerList)
 }
 
+// ResolveNode implements system.IPFS_Server.ResolveNode
+func (m *MockIPFSServer) ResolveNode(ctx context.Context, call system.IPFS_resolveNode) error {
+	// Mock implementation - return test CID
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+	return results.SetCid("QmTestResolved")
+}
+
 // MockExecutor implements system.Executor_Server for testing
 type MockExecutor struct {
 	spawnCalled   bool
