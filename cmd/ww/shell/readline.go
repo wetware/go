@@ -58,7 +58,7 @@ func NewReadlineInput(home string) (*InteractiveInput, error) {
 		AutoComplete:           &WetwareCompleter{}, // Custom autocomplete
 
 		// Enhanced display settings
-		UniqueEditLine: true,
+		UniqueEditLine: false, // Keep input lines visible after submission
 		Listener:       &WetwareListener{}, // Custom listener for status updates
 
 		// Add terminal width function for proper line wrapping
