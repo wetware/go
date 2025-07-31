@@ -30,21 +30,24 @@ interface Cell {
 }
 
 interface Executor {
-    spawn @0 (
-		path :Text,
-        args :List(Text),
-        env :List(Text),
-		dir :Text,
-		# stdin :Data,
-		# stdout :Data,
-		# stderr :Data,
-		ExtraCaps :List(CapDescriptor)
-    ) -> (cell :OptionalCell);
+    spawn @0 (IPFS :IPFS, command :Command) -> (cell :OptionalCell);
 
-	struct CapDescriptor {
-		name   @0 :Text;
-		client @1 :Capability;
-	}
+  struct Command {
+    # Command to execute
+		path @0 :Text;
+    args @1 :List(Text);
+    env @2 :List(Text);
+		dir @3 :Text;
+		# stdin @4 :Data,
+		# stdout @5 :Data,
+		# stderr @6 :Data,
+	  extraCaps @4 :List(CapDescriptor);
+
+    struct CapDescriptor {
+      name   @0 :Text;
+      client @1 :Capability;
+    }
+  }
 
     struct OptionalCell {
         union {
@@ -114,8 +117,26 @@ struct NodeInfo {
   cid @0 :Text;
   size @1 :UInt64;
   cumulativeSize @2 :UInt64;
-  type @3 :Text;
-  links @4 :List(Link);
+  nodeType :union {
+    file @3 :FileInfo;
+    directory @4 :DirectoryInfo;
+    symlink @5 :SymlinkInfo;
+  }
+}
+
+struct FileInfo {
+# Information about a file node
+  # No additional fields needed for files
+}
+
+struct DirectoryInfo {
+# Information about a directory node
+  links @0 :List(Link);
+}
+
+struct SymlinkInfo {
+# Information about a symlink node
+  target @0 :Text;
 }
 
 struct Link {

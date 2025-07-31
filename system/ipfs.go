@@ -177,15 +177,59 @@ func (s IPFSConfig) Stat(ctx context.Context, call IPFS_stat) error {
 		return err
 	}
 
+	// Set basic node information
 	info.SetCid(c.String())
-	info.SetSize(0) // We'll set this to 0 for now as getting actual size requires more complex logic
-	info.SetCumulativeSize(0)
-	info.SetType("file") // Default to file type
 
-	// Set links if any (for now empty as we're just getting data)
-	_, err = info.NewLinks(0)
+	// Get the node to determine its type and properties
+	node, err := s.API.Dag().Get(ctx, c)
 	if err != nil {
-		return err
+		// If we can't get the node, default to file type
+		_, err := info.NodeType().NewFile()
+		if err != nil {
+			return err
+		}
+		info.SetSize(0)
+		info.SetCumulativeSize(0)
+	} else {
+		// Set size information - use node size if available
+		nodeSize := uint64(0)
+		if size, err := node.Size(); err == nil && size > 0 {
+			nodeSize = uint64(size)
+		}
+		info.SetSize(nodeSize)
+		info.SetCumulativeSize(nodeSize) // For now, use same as size
+
+		links := node.Links()
+
+		// Determine node type based on content
+		if len(links) > 0 {
+			// It's a directory - create DirectoryInfo
+			dirInfo, err := info.NodeType().NewDirectory()
+			if err != nil {
+				return err
+			}
+
+			// Populate the links list
+			linkList, err := dirInfo.NewLinks(int32(len(links)))
+			if err != nil {
+				return err
+			}
+
+			for i, link := range links {
+				linkEntry := linkList.At(i)
+				linkEntry.SetName(link.Name)
+				linkEntry.SetSize(link.Size)
+				linkEntry.SetCid(link.Cid.String())
+			}
+		} else {
+			// Check if it's a symlink by examining the node data
+			// For now, we'll treat it as a file, but in a full implementation
+			// we'd check the node's data format to detect symlinks
+			_, err := info.NodeType().NewFile()
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return results.SetInfo(info)

@@ -14,7 +14,7 @@ type ConsoleConfig struct {
 // New creates a new Console client from the config
 func (c ConsoleConfig) New() Console {
 	if c.Writer == nil {
-		return Console{} // null
+		return Console{ /* null capability */ }
 	}
 
 	return Console_ServerToClient(c)

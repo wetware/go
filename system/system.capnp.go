@@ -801,7 +801,7 @@ func (c Executor) Spawn(ctx context.Context, params func(Executor_spawn_Params) 
 		},
 	}
 	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 5}
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 2}
 		s.PlaceArgs = func(s capnp.Struct) error { return params(Executor_spawn_Params(s)) }
 	}
 
@@ -946,81 +946,251 @@ func NewExecutor_List(s *capnp.Segment, sz int32) (Executor_List, error) {
 	return capnp.CapList[Executor](l), err
 }
 
-type Executor_CapDescriptor capnp.Struct
+type Executor_Command capnp.Struct
 
-// Executor_CapDescriptor_TypeID is the unique identifier for the type Executor_CapDescriptor.
-const Executor_CapDescriptor_TypeID = 0xf30cce4f6b9ea63a
+// Executor_Command_TypeID is the unique identifier for the type Executor_Command.
+const Executor_Command_TypeID = 0xa31767d7d652c0cb
 
-func NewExecutor_CapDescriptor(s *capnp.Segment) (Executor_CapDescriptor, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return Executor_CapDescriptor(st), err
+func NewExecutor_Command(s *capnp.Segment) (Executor_Command, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5})
+	return Executor_Command(st), err
 }
 
-func NewRootExecutor_CapDescriptor(s *capnp.Segment) (Executor_CapDescriptor, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return Executor_CapDescriptor(st), err
+func NewRootExecutor_Command(s *capnp.Segment) (Executor_Command, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5})
+	return Executor_Command(st), err
 }
 
-func ReadRootExecutor_CapDescriptor(msg *capnp.Message) (Executor_CapDescriptor, error) {
+func ReadRootExecutor_Command(msg *capnp.Message) (Executor_Command, error) {
 	root, err := msg.Root()
-	return Executor_CapDescriptor(root.Struct()), err
+	return Executor_Command(root.Struct()), err
 }
 
-func (s Executor_CapDescriptor) String() string {
-	str, _ := text.Marshal(0xf30cce4f6b9ea63a, capnp.Struct(s))
+func (s Executor_Command) String() string {
+	str, _ := text.Marshal(0xa31767d7d652c0cb, capnp.Struct(s))
 	return str
 }
 
-func (s Executor_CapDescriptor) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+func (s Executor_Command) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
 	return capnp.Struct(s).EncodeAsPtr(seg)
 }
 
-func (Executor_CapDescriptor) DecodeFromPtr(p capnp.Ptr) Executor_CapDescriptor {
-	return Executor_CapDescriptor(capnp.Struct{}.DecodeFromPtr(p))
+func (Executor_Command) DecodeFromPtr(p capnp.Ptr) Executor_Command {
+	return Executor_Command(capnp.Struct{}.DecodeFromPtr(p))
 }
 
-func (s Executor_CapDescriptor) ToPtr() capnp.Ptr {
+func (s Executor_Command) ToPtr() capnp.Ptr {
 	return capnp.Struct(s).ToPtr()
 }
-func (s Executor_CapDescriptor) IsValid() bool {
+func (s Executor_Command) IsValid() bool {
 	return capnp.Struct(s).IsValid()
 }
 
-func (s Executor_CapDescriptor) Message() *capnp.Message {
+func (s Executor_Command) Message() *capnp.Message {
 	return capnp.Struct(s).Message()
 }
 
-func (s Executor_CapDescriptor) Segment() *capnp.Segment {
+func (s Executor_Command) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Executor_CapDescriptor) Name() (string, error) {
+func (s Executor_Command) Path() (string, error) {
 	p, err := capnp.Struct(s).Ptr(0)
 	return p.Text(), err
 }
 
-func (s Executor_CapDescriptor) HasName() bool {
+func (s Executor_Command) HasPath() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Executor_CapDescriptor) NameBytes() ([]byte, error) {
+func (s Executor_Command) PathBytes() ([]byte, error) {
 	p, err := capnp.Struct(s).Ptr(0)
 	return p.TextBytes(), err
 }
 
-func (s Executor_CapDescriptor) SetName(v string) error {
+func (s Executor_Command) SetPath(v string) error {
 	return capnp.Struct(s).SetText(0, v)
 }
 
-func (s Executor_CapDescriptor) Client() capnp.Client {
+func (s Executor_Command) Args() (capnp.TextList, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return capnp.TextList(p.List()), err
+}
+
+func (s Executor_Command) HasArgs() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Executor_Command) SetArgs(v capnp.TextList) error {
+	return capnp.Struct(s).SetPtr(1, v.ToPtr())
+}
+
+// NewArgs sets the args field to a newly
+// allocated capnp.TextList, preferring placement in s's segment.
+func (s Executor_Command) NewArgs(n int32) (capnp.TextList, error) {
+	l, err := capnp.NewTextList(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp.TextList{}, err
+	}
+	err = capnp.Struct(s).SetPtr(1, l.ToPtr())
+	return l, err
+}
+func (s Executor_Command) Env() (capnp.TextList, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return capnp.TextList(p.List()), err
+}
+
+func (s Executor_Command) HasEnv() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s Executor_Command) SetEnv(v capnp.TextList) error {
+	return capnp.Struct(s).SetPtr(2, v.ToPtr())
+}
+
+// NewEnv sets the env field to a newly
+// allocated capnp.TextList, preferring placement in s's segment.
+func (s Executor_Command) NewEnv(n int32) (capnp.TextList, error) {
+	l, err := capnp.NewTextList(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp.TextList{}, err
+	}
+	err = capnp.Struct(s).SetPtr(2, l.ToPtr())
+	return l, err
+}
+func (s Executor_Command) Dir() (string, error) {
+	p, err := capnp.Struct(s).Ptr(3)
+	return p.Text(), err
+}
+
+func (s Executor_Command) HasDir() bool {
+	return capnp.Struct(s).HasPtr(3)
+}
+
+func (s Executor_Command) DirBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(3)
+	return p.TextBytes(), err
+}
+
+func (s Executor_Command) SetDir(v string) error {
+	return capnp.Struct(s).SetText(3, v)
+}
+
+func (s Executor_Command) ExtraCaps() (Executor_Command_CapDescriptor_List, error) {
+	p, err := capnp.Struct(s).Ptr(4)
+	return Executor_Command_CapDescriptor_List(p.List()), err
+}
+
+func (s Executor_Command) HasExtraCaps() bool {
+	return capnp.Struct(s).HasPtr(4)
+}
+
+func (s Executor_Command) SetExtraCaps(v Executor_Command_CapDescriptor_List) error {
+	return capnp.Struct(s).SetPtr(4, v.ToPtr())
+}
+
+// NewExtraCaps sets the extraCaps field to a newly
+// allocated Executor_Command_CapDescriptor_List, preferring placement in s's segment.
+func (s Executor_Command) NewExtraCaps(n int32) (Executor_Command_CapDescriptor_List, error) {
+	l, err := NewExecutor_Command_CapDescriptor_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Executor_Command_CapDescriptor_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(4, l.ToPtr())
+	return l, err
+}
+
+// Executor_Command_List is a list of Executor_Command.
+type Executor_Command_List = capnp.StructList[Executor_Command]
+
+// NewExecutor_Command creates a new list of Executor_Command.
+func NewExecutor_Command_List(s *capnp.Segment, sz int32) (Executor_Command_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5}, sz)
+	return capnp.StructList[Executor_Command](l), err
+}
+
+// Executor_Command_Future is a wrapper for a Executor_Command promised by a client call.
+type Executor_Command_Future struct{ *capnp.Future }
+
+func (f Executor_Command_Future) Struct() (Executor_Command, error) {
+	p, err := f.Future.Ptr()
+	return Executor_Command(p.Struct()), err
+}
+
+type Executor_Command_CapDescriptor capnp.Struct
+
+// Executor_Command_CapDescriptor_TypeID is the unique identifier for the type Executor_Command_CapDescriptor.
+const Executor_Command_CapDescriptor_TypeID = 0xcd9913609a5c2ef6
+
+func NewExecutor_Command_CapDescriptor(s *capnp.Segment) (Executor_Command_CapDescriptor, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Executor_Command_CapDescriptor(st), err
+}
+
+func NewRootExecutor_Command_CapDescriptor(s *capnp.Segment) (Executor_Command_CapDescriptor, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Executor_Command_CapDescriptor(st), err
+}
+
+func ReadRootExecutor_Command_CapDescriptor(msg *capnp.Message) (Executor_Command_CapDescriptor, error) {
+	root, err := msg.Root()
+	return Executor_Command_CapDescriptor(root.Struct()), err
+}
+
+func (s Executor_Command_CapDescriptor) String() string {
+	str, _ := text.Marshal(0xcd9913609a5c2ef6, capnp.Struct(s))
+	return str
+}
+
+func (s Executor_Command_CapDescriptor) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Executor_Command_CapDescriptor) DecodeFromPtr(p capnp.Ptr) Executor_Command_CapDescriptor {
+	return Executor_Command_CapDescriptor(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Executor_Command_CapDescriptor) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Executor_Command_CapDescriptor) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Executor_Command_CapDescriptor) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Executor_Command_CapDescriptor) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Executor_Command_CapDescriptor) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Executor_Command_CapDescriptor) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Executor_Command_CapDescriptor) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Executor_Command_CapDescriptor) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Executor_Command_CapDescriptor) Client() capnp.Client {
 	p, _ := capnp.Struct(s).Ptr(1)
 	return p.Interface().Client()
 }
 
-func (s Executor_CapDescriptor) HasClient() bool {
+func (s Executor_Command_CapDescriptor) HasClient() bool {
 	return capnp.Struct(s).HasPtr(1)
 }
 
-func (s Executor_CapDescriptor) SetClient(c capnp.Client) error {
+func (s Executor_Command_CapDescriptor) SetClient(c capnp.Client) error {
 	if !c.IsValid() {
 		return capnp.Struct(s).SetPtr(1, capnp.Ptr{})
 	}
@@ -1029,23 +1199,23 @@ func (s Executor_CapDescriptor) SetClient(c capnp.Client) error {
 	return capnp.Struct(s).SetPtr(1, in.ToPtr())
 }
 
-// Executor_CapDescriptor_List is a list of Executor_CapDescriptor.
-type Executor_CapDescriptor_List = capnp.StructList[Executor_CapDescriptor]
+// Executor_Command_CapDescriptor_List is a list of Executor_Command_CapDescriptor.
+type Executor_Command_CapDescriptor_List = capnp.StructList[Executor_Command_CapDescriptor]
 
-// NewExecutor_CapDescriptor creates a new list of Executor_CapDescriptor.
-func NewExecutor_CapDescriptor_List(s *capnp.Segment, sz int32) (Executor_CapDescriptor_List, error) {
+// NewExecutor_Command_CapDescriptor creates a new list of Executor_Command_CapDescriptor.
+func NewExecutor_Command_CapDescriptor_List(s *capnp.Segment, sz int32) (Executor_Command_CapDescriptor_List, error) {
 	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
-	return capnp.StructList[Executor_CapDescriptor](l), err
+	return capnp.StructList[Executor_Command_CapDescriptor](l), err
 }
 
-// Executor_CapDescriptor_Future is a wrapper for a Executor_CapDescriptor promised by a client call.
-type Executor_CapDescriptor_Future struct{ *capnp.Future }
+// Executor_Command_CapDescriptor_Future is a wrapper for a Executor_Command_CapDescriptor promised by a client call.
+type Executor_Command_CapDescriptor_Future struct{ *capnp.Future }
 
-func (f Executor_CapDescriptor_Future) Struct() (Executor_CapDescriptor, error) {
+func (f Executor_Command_CapDescriptor_Future) Struct() (Executor_Command_CapDescriptor, error) {
 	p, err := f.Future.Ptr()
-	return Executor_CapDescriptor(p.Struct()), err
+	return Executor_Command_CapDescriptor(p.Struct()), err
 }
-func (p Executor_CapDescriptor_Future) Client() capnp.Client {
+func (p Executor_Command_CapDescriptor_Future) Client() capnp.Client {
 	return p.Future.Field(1, nil).Client()
 }
 
@@ -1220,12 +1390,12 @@ type Executor_spawn_Params capnp.Struct
 const Executor_spawn_Params_TypeID = 0xb8078038290eb30b
 
 func NewExecutor_spawn_Params(s *capnp.Segment) (Executor_spawn_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
 	return Executor_spawn_Params(st), err
 }
 
 func NewRootExecutor_spawn_Params(s *capnp.Segment) (Executor_spawn_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
 	return Executor_spawn_Params(st), err
 }
 
@@ -1261,110 +1431,46 @@ func (s Executor_spawn_Params) Message() *capnp.Message {
 func (s Executor_spawn_Params) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Executor_spawn_Params) Path() (string, error) {
-	p, err := capnp.Struct(s).Ptr(0)
-	return p.Text(), err
+func (s Executor_spawn_Params) IPFS() IPFS {
+	p, _ := capnp.Struct(s).Ptr(0)
+	return IPFS(p.Interface().Client())
 }
 
-func (s Executor_spawn_Params) HasPath() bool {
+func (s Executor_spawn_Params) HasIPFS() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Executor_spawn_Params) PathBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(0)
-	return p.TextBytes(), err
+func (s Executor_spawn_Params) SetIPFS(v IPFS) error {
+	if !v.IsValid() {
+		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(capnp.Client(v)))
+	return capnp.Struct(s).SetPtr(0, in.ToPtr())
 }
 
-func (s Executor_spawn_Params) SetPath(v string) error {
-	return capnp.Struct(s).SetText(0, v)
-}
-
-func (s Executor_spawn_Params) Args() (capnp.TextList, error) {
+func (s Executor_spawn_Params) Command() (Executor_Command, error) {
 	p, err := capnp.Struct(s).Ptr(1)
-	return capnp.TextList(p.List()), err
+	return Executor_Command(p.Struct()), err
 }
 
-func (s Executor_spawn_Params) HasArgs() bool {
+func (s Executor_spawn_Params) HasCommand() bool {
 	return capnp.Struct(s).HasPtr(1)
 }
 
-func (s Executor_spawn_Params) SetArgs(v capnp.TextList) error {
-	return capnp.Struct(s).SetPtr(1, v.ToPtr())
+func (s Executor_spawn_Params) SetCommand(v Executor_Command) error {
+	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
 }
 
-// NewArgs sets the args field to a newly
-// allocated capnp.TextList, preferring placement in s's segment.
-func (s Executor_spawn_Params) NewArgs(n int32) (capnp.TextList, error) {
-	l, err := capnp.NewTextList(capnp.Struct(s).Segment(), n)
+// NewCommand sets the command field to a newly
+// allocated Executor_Command struct, preferring placement in s's segment.
+func (s Executor_spawn_Params) NewCommand() (Executor_Command, error) {
+	ss, err := NewExecutor_Command(capnp.Struct(s).Segment())
 	if err != nil {
-		return capnp.TextList{}, err
+		return Executor_Command{}, err
 	}
-	err = capnp.Struct(s).SetPtr(1, l.ToPtr())
-	return l, err
-}
-func (s Executor_spawn_Params) Env() (capnp.TextList, error) {
-	p, err := capnp.Struct(s).Ptr(2)
-	return capnp.TextList(p.List()), err
-}
-
-func (s Executor_spawn_Params) HasEnv() bool {
-	return capnp.Struct(s).HasPtr(2)
-}
-
-func (s Executor_spawn_Params) SetEnv(v capnp.TextList) error {
-	return capnp.Struct(s).SetPtr(2, v.ToPtr())
-}
-
-// NewEnv sets the env field to a newly
-// allocated capnp.TextList, preferring placement in s's segment.
-func (s Executor_spawn_Params) NewEnv(n int32) (capnp.TextList, error) {
-	l, err := capnp.NewTextList(capnp.Struct(s).Segment(), n)
-	if err != nil {
-		return capnp.TextList{}, err
-	}
-	err = capnp.Struct(s).SetPtr(2, l.ToPtr())
-	return l, err
-}
-func (s Executor_spawn_Params) Dir() (string, error) {
-	p, err := capnp.Struct(s).Ptr(3)
-	return p.Text(), err
-}
-
-func (s Executor_spawn_Params) HasDir() bool {
-	return capnp.Struct(s).HasPtr(3)
-}
-
-func (s Executor_spawn_Params) DirBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(3)
-	return p.TextBytes(), err
-}
-
-func (s Executor_spawn_Params) SetDir(v string) error {
-	return capnp.Struct(s).SetText(3, v)
-}
-
-func (s Executor_spawn_Params) ExtraCaps() (Executor_CapDescriptor_List, error) {
-	p, err := capnp.Struct(s).Ptr(4)
-	return Executor_CapDescriptor_List(p.List()), err
-}
-
-func (s Executor_spawn_Params) HasExtraCaps() bool {
-	return capnp.Struct(s).HasPtr(4)
-}
-
-func (s Executor_spawn_Params) SetExtraCaps(v Executor_CapDescriptor_List) error {
-	return capnp.Struct(s).SetPtr(4, v.ToPtr())
-}
-
-// NewExtraCaps sets the ExtraCaps field to a newly
-// allocated Executor_CapDescriptor_List, preferring placement in s's segment.
-func (s Executor_spawn_Params) NewExtraCaps(n int32) (Executor_CapDescriptor_List, error) {
-	l, err := NewExecutor_CapDescriptor_List(capnp.Struct(s).Segment(), n)
-	if err != nil {
-		return Executor_CapDescriptor_List{}, err
-	}
-	err = capnp.Struct(s).SetPtr(4, l.ToPtr())
-	return l, err
+	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
+	return ss, err
 }
 
 // Executor_spawn_Params_List is a list of Executor_spawn_Params.
@@ -1372,7 +1478,7 @@ type Executor_spawn_Params_List = capnp.StructList[Executor_spawn_Params]
 
 // NewExecutor_spawn_Params creates a new list of Executor_spawn_Params.
 func NewExecutor_spawn_Params_List(s *capnp.Segment, sz int32) (Executor_spawn_Params_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 5}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
 	return capnp.StructList[Executor_spawn_Params](l), err
 }
 
@@ -1382,6 +1488,13 @@ type Executor_spawn_Params_Future struct{ *capnp.Future }
 func (f Executor_spawn_Params_Future) Struct() (Executor_spawn_Params, error) {
 	p, err := f.Future.Ptr()
 	return Executor_spawn_Params(p.Struct()), err
+}
+func (p Executor_spawn_Params_Future) IPFS() IPFS {
+	return IPFS(p.Future.Field(0, nil).Client())
+}
+
+func (p Executor_spawn_Params_Future) Command() Executor_Command_Future {
+	return Executor_Command_Future{Future: p.Future.Field(1, nil)}
 }
 
 type Executor_spawn_Results capnp.Struct
@@ -3846,17 +3959,39 @@ func NewEntryType_List(s *capnp.Segment, sz int32) (EntryType_List, error) {
 }
 
 type NodeInfo capnp.Struct
+type NodeInfo_nodeType NodeInfo
+type NodeInfo_nodeType_Which uint16
+
+const (
+	NodeInfo_nodeType_Which_file      NodeInfo_nodeType_Which = 0
+	NodeInfo_nodeType_Which_directory NodeInfo_nodeType_Which = 1
+	NodeInfo_nodeType_Which_symlink   NodeInfo_nodeType_Which = 2
+)
+
+func (w NodeInfo_nodeType_Which) String() string {
+	const s = "filedirectorysymlink"
+	switch w {
+	case NodeInfo_nodeType_Which_file:
+		return s[0:4]
+	case NodeInfo_nodeType_Which_directory:
+		return s[4:13]
+	case NodeInfo_nodeType_Which_symlink:
+		return s[13:20]
+
+	}
+	return "NodeInfo_nodeType_Which(" + strconv.FormatUint(uint64(w), 10) + ")"
+}
 
 // NodeInfo_TypeID is the unique identifier for the type NodeInfo.
 const NodeInfo_TypeID = 0xa83fd4abe6553705
 
 func NewNodeInfo(s *capnp.Segment) (NodeInfo, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2})
 	return NodeInfo(st), err
 }
 
 func NewRootNodeInfo(s *capnp.Segment) (NodeInfo, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2})
 	return NodeInfo(st), err
 }
 
@@ -3926,46 +4061,116 @@ func (s NodeInfo) SetCumulativeSize(v uint64) {
 	capnp.Struct(s).SetUint64(8, v)
 }
 
-func (s NodeInfo) Type() (string, error) {
-	p, err := capnp.Struct(s).Ptr(1)
-	return p.Text(), err
+func (s NodeInfo) NodeType() NodeInfo_nodeType { return NodeInfo_nodeType(s) }
+
+func (s NodeInfo_nodeType) Which() NodeInfo_nodeType_Which {
+	return NodeInfo_nodeType_Which(capnp.Struct(s).Uint16(16))
+}
+func (s NodeInfo_nodeType) IsValid() bool {
+	return capnp.Struct(s).IsValid()
 }
 
-func (s NodeInfo) HasType() bool {
+func (s NodeInfo_nodeType) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s NodeInfo_nodeType) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s NodeInfo_nodeType) File() (FileInfo, error) {
+	if capnp.Struct(s).Uint16(16) != 0 {
+		panic("Which() != file")
+	}
+	p, err := capnp.Struct(s).Ptr(1)
+	return FileInfo(p.Struct()), err
+}
+
+func (s NodeInfo_nodeType) HasFile() bool {
+	if capnp.Struct(s).Uint16(16) != 0 {
+		return false
+	}
 	return capnp.Struct(s).HasPtr(1)
 }
 
-func (s NodeInfo) TypeBytes() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(1)
-	return p.TextBytes(), err
+func (s NodeInfo_nodeType) SetFile(v FileInfo) error {
+	capnp.Struct(s).SetUint16(16, 0)
+	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
 }
 
-func (s NodeInfo) SetType(v string) error {
-	return capnp.Struct(s).SetText(1, v)
-}
-
-func (s NodeInfo) Links() (Link_List, error) {
-	p, err := capnp.Struct(s).Ptr(2)
-	return Link_List(p.List()), err
-}
-
-func (s NodeInfo) HasLinks() bool {
-	return capnp.Struct(s).HasPtr(2)
-}
-
-func (s NodeInfo) SetLinks(v Link_List) error {
-	return capnp.Struct(s).SetPtr(2, v.ToPtr())
-}
-
-// NewLinks sets the links field to a newly
-// allocated Link_List, preferring placement in s's segment.
-func (s NodeInfo) NewLinks(n int32) (Link_List, error) {
-	l, err := NewLink_List(capnp.Struct(s).Segment(), n)
+// NewFile sets the file field to a newly
+// allocated FileInfo struct, preferring placement in s's segment.
+func (s NodeInfo_nodeType) NewFile() (FileInfo, error) {
+	capnp.Struct(s).SetUint16(16, 0)
+	ss, err := NewFileInfo(capnp.Struct(s).Segment())
 	if err != nil {
-		return Link_List{}, err
+		return FileInfo{}, err
 	}
-	err = capnp.Struct(s).SetPtr(2, l.ToPtr())
-	return l, err
+	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
+	return ss, err
+}
+
+func (s NodeInfo_nodeType) Directory() (DirectoryInfo, error) {
+	if capnp.Struct(s).Uint16(16) != 1 {
+		panic("Which() != directory")
+	}
+	p, err := capnp.Struct(s).Ptr(1)
+	return DirectoryInfo(p.Struct()), err
+}
+
+func (s NodeInfo_nodeType) HasDirectory() bool {
+	if capnp.Struct(s).Uint16(16) != 1 {
+		return false
+	}
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s NodeInfo_nodeType) SetDirectory(v DirectoryInfo) error {
+	capnp.Struct(s).SetUint16(16, 1)
+	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
+}
+
+// NewDirectory sets the directory field to a newly
+// allocated DirectoryInfo struct, preferring placement in s's segment.
+func (s NodeInfo_nodeType) NewDirectory() (DirectoryInfo, error) {
+	capnp.Struct(s).SetUint16(16, 1)
+	ss, err := NewDirectoryInfo(capnp.Struct(s).Segment())
+	if err != nil {
+		return DirectoryInfo{}, err
+	}
+	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
+	return ss, err
+}
+
+func (s NodeInfo_nodeType) Symlink() (SymlinkInfo, error) {
+	if capnp.Struct(s).Uint16(16) != 2 {
+		panic("Which() != symlink")
+	}
+	p, err := capnp.Struct(s).Ptr(1)
+	return SymlinkInfo(p.Struct()), err
+}
+
+func (s NodeInfo_nodeType) HasSymlink() bool {
+	if capnp.Struct(s).Uint16(16) != 2 {
+		return false
+	}
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s NodeInfo_nodeType) SetSymlink(v SymlinkInfo) error {
+	capnp.Struct(s).SetUint16(16, 2)
+	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
+}
+
+// NewSymlink sets the symlink field to a newly
+// allocated SymlinkInfo struct, preferring placement in s's segment.
+func (s NodeInfo_nodeType) NewSymlink() (SymlinkInfo, error) {
+	capnp.Struct(s).SetUint16(16, 2)
+	ss, err := NewSymlinkInfo(capnp.Struct(s).Segment())
+	if err != nil {
+		return SymlinkInfo{}, err
+	}
+	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
+	return ss, err
 }
 
 // NodeInfo_List is a list of NodeInfo.
@@ -3973,7 +4178,7 @@ type NodeInfo_List = capnp.StructList[NodeInfo]
 
 // NewNodeInfo creates a new list of NodeInfo.
 func NewNodeInfo_List(s *capnp.Segment, sz int32) (NodeInfo_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2}, sz)
 	return capnp.StructList[NodeInfo](l), err
 }
 
@@ -3983,6 +4188,261 @@ type NodeInfo_Future struct{ *capnp.Future }
 func (f NodeInfo_Future) Struct() (NodeInfo, error) {
 	p, err := f.Future.Ptr()
 	return NodeInfo(p.Struct()), err
+}
+func (p NodeInfo_Future) NodeType() NodeInfo_nodeType_Future {
+	return NodeInfo_nodeType_Future{p.Future}
+}
+
+// NodeInfo_nodeType_Future is a wrapper for a NodeInfo_nodeType promised by a client call.
+type NodeInfo_nodeType_Future struct{ *capnp.Future }
+
+func (f NodeInfo_nodeType_Future) Struct() (NodeInfo_nodeType, error) {
+	p, err := f.Future.Ptr()
+	return NodeInfo_nodeType(p.Struct()), err
+}
+func (p NodeInfo_nodeType_Future) File() FileInfo_Future {
+	return FileInfo_Future{Future: p.Future.Field(1, nil)}
+}
+func (p NodeInfo_nodeType_Future) Directory() DirectoryInfo_Future {
+	return DirectoryInfo_Future{Future: p.Future.Field(1, nil)}
+}
+func (p NodeInfo_nodeType_Future) Symlink() SymlinkInfo_Future {
+	return SymlinkInfo_Future{Future: p.Future.Field(1, nil)}
+}
+
+type FileInfo capnp.Struct
+
+// FileInfo_TypeID is the unique identifier for the type FileInfo.
+const FileInfo_TypeID = 0xbdb40fba20088e0b
+
+func NewFileInfo(s *capnp.Segment) (FileInfo, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return FileInfo(st), err
+}
+
+func NewRootFileInfo(s *capnp.Segment) (FileInfo, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return FileInfo(st), err
+}
+
+func ReadRootFileInfo(msg *capnp.Message) (FileInfo, error) {
+	root, err := msg.Root()
+	return FileInfo(root.Struct()), err
+}
+
+func (s FileInfo) String() string {
+	str, _ := text.Marshal(0xbdb40fba20088e0b, capnp.Struct(s))
+	return str
+}
+
+func (s FileInfo) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (FileInfo) DecodeFromPtr(p capnp.Ptr) FileInfo {
+	return FileInfo(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s FileInfo) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s FileInfo) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s FileInfo) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s FileInfo) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+
+// FileInfo_List is a list of FileInfo.
+type FileInfo_List = capnp.StructList[FileInfo]
+
+// NewFileInfo creates a new list of FileInfo.
+func NewFileInfo_List(s *capnp.Segment, sz int32) (FileInfo_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[FileInfo](l), err
+}
+
+// FileInfo_Future is a wrapper for a FileInfo promised by a client call.
+type FileInfo_Future struct{ *capnp.Future }
+
+func (f FileInfo_Future) Struct() (FileInfo, error) {
+	p, err := f.Future.Ptr()
+	return FileInfo(p.Struct()), err
+}
+
+type DirectoryInfo capnp.Struct
+
+// DirectoryInfo_TypeID is the unique identifier for the type DirectoryInfo.
+const DirectoryInfo_TypeID = 0xf5b75bdef3ecb023
+
+func NewDirectoryInfo(s *capnp.Segment) (DirectoryInfo, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return DirectoryInfo(st), err
+}
+
+func NewRootDirectoryInfo(s *capnp.Segment) (DirectoryInfo, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return DirectoryInfo(st), err
+}
+
+func ReadRootDirectoryInfo(msg *capnp.Message) (DirectoryInfo, error) {
+	root, err := msg.Root()
+	return DirectoryInfo(root.Struct()), err
+}
+
+func (s DirectoryInfo) String() string {
+	str, _ := text.Marshal(0xf5b75bdef3ecb023, capnp.Struct(s))
+	return str
+}
+
+func (s DirectoryInfo) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (DirectoryInfo) DecodeFromPtr(p capnp.Ptr) DirectoryInfo {
+	return DirectoryInfo(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s DirectoryInfo) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s DirectoryInfo) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s DirectoryInfo) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s DirectoryInfo) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s DirectoryInfo) Links() (Link_List, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return Link_List(p.List()), err
+}
+
+func (s DirectoryInfo) HasLinks() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s DirectoryInfo) SetLinks(v Link_List) error {
+	return capnp.Struct(s).SetPtr(0, v.ToPtr())
+}
+
+// NewLinks sets the links field to a newly
+// allocated Link_List, preferring placement in s's segment.
+func (s DirectoryInfo) NewLinks(n int32) (Link_List, error) {
+	l, err := NewLink_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Link_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
+	return l, err
+}
+
+// DirectoryInfo_List is a list of DirectoryInfo.
+type DirectoryInfo_List = capnp.StructList[DirectoryInfo]
+
+// NewDirectoryInfo creates a new list of DirectoryInfo.
+func NewDirectoryInfo_List(s *capnp.Segment, sz int32) (DirectoryInfo_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[DirectoryInfo](l), err
+}
+
+// DirectoryInfo_Future is a wrapper for a DirectoryInfo promised by a client call.
+type DirectoryInfo_Future struct{ *capnp.Future }
+
+func (f DirectoryInfo_Future) Struct() (DirectoryInfo, error) {
+	p, err := f.Future.Ptr()
+	return DirectoryInfo(p.Struct()), err
+}
+
+type SymlinkInfo capnp.Struct
+
+// SymlinkInfo_TypeID is the unique identifier for the type SymlinkInfo.
+const SymlinkInfo_TypeID = 0x81890149690e6995
+
+func NewSymlinkInfo(s *capnp.Segment) (SymlinkInfo, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return SymlinkInfo(st), err
+}
+
+func NewRootSymlinkInfo(s *capnp.Segment) (SymlinkInfo, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return SymlinkInfo(st), err
+}
+
+func ReadRootSymlinkInfo(msg *capnp.Message) (SymlinkInfo, error) {
+	root, err := msg.Root()
+	return SymlinkInfo(root.Struct()), err
+}
+
+func (s SymlinkInfo) String() string {
+	str, _ := text.Marshal(0x81890149690e6995, capnp.Struct(s))
+	return str
+}
+
+func (s SymlinkInfo) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (SymlinkInfo) DecodeFromPtr(p capnp.Ptr) SymlinkInfo {
+	return SymlinkInfo(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s SymlinkInfo) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s SymlinkInfo) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s SymlinkInfo) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s SymlinkInfo) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s SymlinkInfo) Target() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s SymlinkInfo) HasTarget() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s SymlinkInfo) TargetBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s SymlinkInfo) SetTarget(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+// SymlinkInfo_List is a list of SymlinkInfo.
+type SymlinkInfo_List = capnp.StructList[SymlinkInfo]
+
+// NewSymlinkInfo creates a new list of SymlinkInfo.
+func NewSymlinkInfo_List(s *capnp.Segment, sz int32) (SymlinkInfo_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[SymlinkInfo](l), err
+}
+
+// SymlinkInfo_Future is a wrapper for a SymlinkInfo promised by a client call.
+type SymlinkInfo_Future struct{ *capnp.Future }
+
+func (f SymlinkInfo_Future) Struct() (SymlinkInfo, error) {
+	p, err := f.Future.Ptr()
+	return SymlinkInfo(p.Struct()), err
 }
 
 type Link capnp.Struct
@@ -4222,158 +4682,177 @@ func (f PeerInfo_Future) Struct() (PeerInfo, error) {
 	return PeerInfo(p.Struct()), err
 }
 
-const schema_da965b22da734daf = "x\xda\xb4X}p\x14\xf5\xf9\x7f\x9e\xdd\x0b{\xf7\xbb" +
-	"\\\xf6\xf66QA\xf8e\x1a\xe2`2&\xa3F@" +
-	"\xd2a\xeeJ\x08\x14!\x90\xe5E\x8b\x0au\xbd[d" +
-	"\xe5\xb2w\xee\xee\x01q@\xaa\x04\x14\x07\x19\x8a\xe2H" +
-	"+-\x9dAA$Ha\x1c\x0a\xad-N\x8b2Z" +
-	"\xab\xb6HG-\xb5Z\xc0\x16'\x16(\xe9\xa8U\xb7" +
-	"\xf3\xec\xdd\xbeds\x81:m\xff\xbb\xd9\xe7{\x9f\xef" +
-	"\xf3\xf2y\xde\xbe\xd7\x1a\xc3R\xa1\xebbcx`\xa4" +
-	"\xbd\x15\xc3\xac\x9e\x11\xa1\xcb\xd7\xdf\xd0\xf3\x00\x08\x09\x04" +
-	"\xa8@\x0e@\xec\xe6\xce\x03\x8a+\xb9$\xa0\xf5\xd1\xcb" +
-	"/\xcd9f\x8e\\\x0dR\x02\xd1\xbay\xd3\xc7\xe2\xb3" +
-	";?Z\x0d\xed\xc81\x00\xe2V\xee\x8c\xf8\x0cG\xff" +
-	"y\x8a[\x06>\xb9\x10c\xad\xe7:\x8cw\xean{" +
-	"\xfc\x1d\x00\x14Oq\x9b\xc4>\xeer\x00\xf1Sn\xaa" +
-	"\xf8\xb50\x07`=\xdcqK\xcf\xc1\x89g{@\x88" +
-	"1\x03\x0eG\xc2\x87D\x81\x8e\x88\xb1\xf0,@\xeb\xf7" +
-	"\x893\x87\xf8\xde\xa5\xeb\xfd:^\x15\xfe\x0cPl\x08" +
-	"\x93\x8ecFO\xad9\xfc\xe6\xda\x0d>y\xcb\xb40" +
-	"\x83\x80b\x87}\xe0\x8d\xb3s\x0f\xe4\xd7\xb6l\xf4\x03" +
-	"\xdco\x03\xac\xb1\xe5\xa9W'\xec\x98\xb0!\xb9\x05\xa4" +
-	"\x1aD\x80\x10\x01<\x15n$\x80^\xfb\xc0\xc8\xe7\x17" +
-	"\xf5\xfd\xf6\x9a\x19\xdb@\xb8\xcc\xbd\xe1\xb5p\x1d\x1dx" +
-	"\xcb>`\xe9\xbb\xaf\x9d\xdc\x90\xdb\x06B\x0c=[*" +
-	"X\xba\xa9?\xbcO\xfc\xc26\xe7\xd3\xf0s\x80\xd6\x83" +
-	"?\xbdm\x81\xfcq\xd3\x0e\xdb\xa5\xa5\xdb\x0eFlu" +
-	"_\x88\x10X\xc5\xf8y\xa7\x9f=\x96\xdc\x09R\x0c\x99" +
-	" \xda\x89\xc8>\xf1T\x84\xfe\xf3~\xa4\x16\x01\xad\xd1" +
-	"\xd6?\x98\xe4\x95\xef\xed\xf2\x1bW\x11\xfd\x80\xfc\x18%" +
-	"\xb4\x93/\xbf0\xba\xb0gW\xaf_\xde\x10=\x03(" +
-	"6\xd9\xf2\xdc\x92\xa8zCz\x8f_\xde\xd2\x11\xfd?" +
-	"Rg\x9e}\xe0\xaemm#\xdb\xb7\x9c>P<@" +
-	"\xea\x8a\x85\xe8\x07\x10\xb2\xee\xfe\xd5\xa4\xbf\xfc\xf1\xdd\xbe" +
-	"\x03 ]\x86h\xb5\xb5\xaf\x9e\xa2-\xfc\xdb\xafK\xdc" +
-	"h\x99\x1f\x1d\x81\xa2\x1a\xa5\xe3J\x94\xc8\x11\xdd_\xd5" +
-	"p\xe3w\xb8\x9f\x94\x9cXa{9:\x02\x01[z" +
-	"\xa3\xb6)\xe9\x99\xdb\xf7\x9c|\xeb\xd1C~U\xcfU" +
-	"\x92\xaa\xfd\x95\xa4\xc9\xf0\xbe\xce\xb5\xd7\xb4~y\xc4\xef" +
-	"\xb9\x9aX\x82T\x1d\x15\xa3\x03O~\xff\xb1\x99S\xc6" +
-	"\xcdy\xc9\x0f01F\x00\xdf\xb0\xe5\x8f\x1e\xd1\x16v" +
-	"|k\xe4\xab~\xf9=1\"B\xc1\x96\x8f3\x9f^" +
-	"Q\xf1x\xeb\x00\xf9\xe6\x18e\xc3\x16[\xee\xda\x18\xe4" +
-	"\xf7\xc1\xd8>\xf1\xc5\xd8\x18\x8aOl\xaaXQE\xfc" +
-	"^x\xe3\xe1\x7f\xe6{n:\xe6\x07\xeb\xb3\x959G" +
-	"`_\xec\x1f{\xeb\xd6k\x0e\x1f\xf7I\x85*\xba\xaa" +
-	"\xa6\x8a\xae\xfa\xff\xe3'\x7f\xf8\xfa\xe7\x7f~\x1b\xa4\xd1" +
-	"\x88\x9e\xabk\x90C\x80\x96\xb1U\xadd\xf5\xc4*r" +
-	"\xec\x93\x9fs\xd7_q\xf4\xe8\xbb\xbe\x00m\xa9\xfa\x0c" +
-	"B\xd6\x09\xfd\xbd\x163\xf7\xca\x1f@\x1a\x85\xbeT." +
-	"a\xac\xac\xb2\x83\xbc\xc6\xc6\xa8\xd3V<|G\xe3\xf9" +
-	"?\xf9\x95}\xbf\x8a<s\xcaV\xe7\xf5\xfb\x8eo\x18" +
-	"ws\xe4T\x90\x93\x0c\x1d\xac\xe1\xbf'\x8e\xe2\xe9\xd7" +
-	"p\xfeC@k\xfa\x89\xfeW\xea~\xf9\xbb\xd3t\x18" +
-	"\x83\x87\xfb\xf8Mb\xbf}\xf8\x1cO\xe9p\xe6p\xe5" +
-	"\xcfv\xfc\xfc\x89\x0f}\xda\xaf\x8b\x9f\x87\x90\xd5?\xba" +
-	"f\xfa\xf9\xe7\x0f\xf8\x05]\xb6`\xfa\xa8\xaf\x8fa\xbe" +
-	"}\xdf\xd9AQ\x90\xe2\x9b\xc4\xf9qb\xc5\xbc\xf8\x83" +
-	"\x8cxJ\xa00\xb4>\xfd\x83%\xb3~S\xf9w\xa2" +
-	"\x9d\x17@[\x97\x96\xd7\x84:\x14O\xd01\xf1m\x81" +
-	"\xdc\xf0@\xe5\xde\xdbO\xce\x1d\x7f\x01\x84\x1a7\x19\xc6" +
-	"&\xecD\x9f\x98 ?\x84^\xfc\xc5\xe1\xf1\x17\xd4\x0b" +
-	"~?-HPPe[\xde\xdf?\x81k\xed\x1f\xfe" +
-	"\xc9 \xdd\xd6$v\x89\x8f$l\xeb\x12S\xc5\x1f\xd3" +
-	"/k\xc1-ol_7\xfe\xcaO||\x16\xb7$" +
-	"\x88\x03[\x13Ih\xb2\x8cn\xc3T\xba\x9a\xd3\x8c\x9c" +
-	"\xd7\xf2\xad\xd3:\xa7\xcci6L\xd9\xac\xef\xac\x95u" +
-	"\xb9\xcb\x90Bl\x08 \x84\x00B\xac\x0e@\x0a\xb3(" +
-	"U3\xc8\xa5\xd5\x0cV\x02\x83\x95\x80\x01\x886%\x9b" +
-	"m\xee\x90\xbb\xefT\xday]\xcf\xe9\x9d\x88R\x98\x0d" +
-	"UZ\x96\x8d\xd20\x02@\xaagQ\xba\x96\xc1\x18~" +
-	"i!z\x14\x12\x9a\xea\x80asK`\x18\xa7\xe8\xba" +
-	"\x8b\x8b\x0e.f\xa5\x90\x9fd\x02\xdej\x15o\xd2u" +
-	"`s\xba\x14b+\x00\xdc\xa0\xa2\x93\x8a\x82\xd0\x08\x8c" +
-	"P\xc1\xf1\xcbd\xd5La'b\x00\xbb]3\x93z" +
-	"\xf7\xdc\xee\xbcB\xdaV\"\x03 \x8cj\x04@\x14j" +
-	"f\x03 #\x08\x93\x00\xf8EjV\xb12\xaa\xae\xa4" +
-	"\xcd\x9c\x0e\xd8\xbd\xca\xe8\xee\xca\xaa\xda\x92rN,h" +
-	"yU\xabOv~e/\xb2\x1eF^Qt\xa3~" +
-	"\xb6b\x14\xb2\xa6\x01~\x90\x9b\x00\xa4J\x16\xa5\xab\x19" +
-	"\xb4\xe8\xd4\x0c\xd50\x01\x00\xab\x00;Y\xc4\xb8\xd7," +
-	"\x00\xe9\xe3\x90a\x9e\x9d,\xa2\xfb\xc1\x1b=\x0dyU" +
-	"[\x94\xc3\xb8\xd7.\x001>H\xd9\xb6\x9cf\xe4\xb2" +
-	"Js^W53\xab\x91\xc6|\x104\xe1\x81\xa2\x86" +
-	"a`0<\x08\xa7}\xb9\x92.\x989\xbd\xd9\xc8\xcb" +
-	"\xcbl\x98\x02w\x11\xdd\xd2J6\x8bq\xafn\x05t" +
-	"+\x86\xb6SQj\xf5i\xda\xa2\x9c\x1dY\x17\xa8\x9d" +
-	"h\x98bQ\x9a\xc1\xa0\x80XM\xb9!L\x9b\x0d " +
-	"}\x93E)\xc3\xa0\xc00\xd56\x0fd\xfax\x07\x8b" +
-	"\xd2\x0a\x06Y_\xbc\xe4LFW\x0cC\x014\x1c\xb7" +
-	"\x93\x88\x9c\x9d\xd7sf.\x9d\xcb\x96\x11\x95\x89r\x91" +
-	")\xe5\xa2<\xc93v\x95QH\xa7\x15\xc3@\x04\x06" +
-	"q\x90\x953s\x99Z\xc5\xb1\xb2\xdaEXId[" +
-	"\xce\xa2\xd4\xc3\xa0c\xe4\xfd\xe4\xc2\x15,J\x0f\x91\x91" +
-	"X4r\xcd\xbd\x00R\x0f\x8b\xd2F\x06\x05\x16\xab\x91" +
-	"\x05\x10\x1e\xa1\x93\x0f\xb1(=\xc6\xa0\x10b\xaa1\x04" +
-	" |\xf7z\x00i=\x8b\xd2\xce\x81\xfc\xe5\x0d\xf5^" +
-	"\x05#\xc0`\x84\xbal\xa1\xab\x90\x95M\x15\x92K\x95" +
-	"9>\x01ov\xe7\x15\xe7/\xb5\x94;\x86\xc7Y\xb7" +
-	"\xa4\x0f\xcd\xd9\xacQ\xdf)\xeb\\ \xa5\xfc\xa4\xc8\xcb" +
-	"\xe6\xe2!*\x93\x8d\x90\xa6\xda&\xf3\xffAV\xa6s" +
-	"\x9a\xa6\xa4\x09\x85@\x00\x86\xd2\x84\x08r1M\xd4\x8c" +
-	"c\xcbPi0+o\xaa9M\xce\xb6)l6\x1b" +
-	"\xac\xa3\x8d\x83\xea\xa8\xdb\xce\xed:ZL\x0f\xc1\x9b\x97" +
-	"\xa9\x9a\x01\x0e\xa8\xace\xd3\x8e\xecb\xbb\x0c?\x8d\x1a" +
-	"=\x1a\x09\x83x\xf4\x84/Y6\x93\x1f7\xb2(\xed" +
-	"&\x1e\xb1E\x1e=C\x1f\xb7\xb3(\xed%\x1e\x85\x8a" +
-	"<\xea\xa5\xb4\xda\xcd\xa2t4\x104^\xd6\xef\x0a\xa6" +
-	"\x0d\xa7hK\x83\x9f2\xaa\xe7\xdd\xf6\xe5\xa6.\xb7\xc9" +
-	"y_\xc2\xc5\xbd\xa6<4\x9d(\xf1\xfe;d(\xa6" +
-	"/\x1a_5}\x07r\xbb\\\xe1tP\xea\x19\\\xa5" +
-	"h\xa6\xae*>\x1b\xdd\x91\xa9\xac\x8dv+\xa6\x9eW" +
-	"\xb6\xcc\xb7z\xea%\xf5\xa2\xfaq\xaf\xb7\x06\x8ai " +
-	"\x83f+\xb5\x17m\x1bw\xe62\xdd\x18\x03\x06c\x83" +
-	"JU\xfbr\xa5\xd6\xa6\x9b\x14F\xf4MN\x11\xdd\xab" +
-	"\xe4B\xe4n\xabM\xceOV\x8c\xb4\x0e\xb5j\xde\xcc" +
-	"\xe9\x96\x93\x0c\xc0\x93Y\xa5V\xef\xcc\xfb\xe8lO\x82" +
-	"p\xbd\xdd\xeakm.\x0f\xec\xf5>\x1b\xe4L\xa6\\" +
-	"\xe0\xfd&ddS\x1edB\x00\xa2\x9c\x1b\xfe=\xf2" +
-	"\x94\xc9\xf1d6\xdb\xac\xe8:%y\xbc\x94c\x0d\xad" +
-	"^\x92c\xa9T7\x91\x92W\xb3(\xdd\xc0`\x92z" +
-	"x\xc1p\xdaiy\xb73\xc1\x81\xa24\x94\x04\x9b\xb8" +
-	"7\xb7\xd1\xd8F\xaa\xd8\x96\xfc\xef\x94Q5\xe3\xa2\xf3" +
-	"G=\xf5x53d\x0fug7V\xef\xa6\xea\x18" +
-	"w!d\x82\xb8\x9dEi\xb1\xd7\xf7\x94\xc6R\x1f\xcf" +
-	"\xfa\xfa\x9eJ\x1f3,Jy_\xdf\xeb\xa2\x10.f" +
-	"Q2\x19\xe45\xb9\xcbmX\xc5\xee\xc5{\xaf\x0a\x80" +
-	"\xc8\x07Z_\xd9\x98\x175\x9d\xa1j\xb8$0\x864" +
-	"zc\x88;\x85\xd0\xb7\xc9,J\x9d>E;\xeaJ" +
-	"\xa3\xc9\xdc\xa0N\x97\xbc<\xe8\xf2\xd2d?d\xad\x08" +
-	"\xca\xd1\xf9?\xce!\xe5\xaf\xb6\x13\xcfY<q?\x14" +
-	"WL\xf1:\xac\x03F\xbc\x0a9\xf4\xde\x03\xd0Yv" +
-	"\xc5\xe1\xb64\x86\x1c2\xeek\x02:\xab\xb4\x888\x02" +
-	"\x18\xa1\x9fC\xd6},B\xe7AE\xf8+\x0d\xef'" +
-	"8\x0c\xb9\xbb;:K\x8d\xf0f\x1d0\xc2\x11\x0e+" +
-	"\xdc\x07\x1ct\x9e>\x84\x83T\x09z9\x1c\xe6\xae\x7f" +
-	"\xe8l\xa0\xc2\x8f\x08s3\x87\x9c\xfb\xf2\x80\xce\xd6%" +
-	"\xac#]Vr\x18v\x9f-\xd0y\x14\x10\xee\x99\x04" +
-	"\x8c\xa0p\x18q\x17bt^\x86\x84\xf9t_\x07\xc7" +
-	"\xc9\x99L\x0a\xb9\xb4l\xa6\x90\xcd\x1a)\xe4)/R" +
-	"\xc8\xe5U-\x85\xb5\xf6\xb4\x97B\x9eB\x91\xa2\x812" +
-	"\x85\xabJM$\x85\xb5v\x82\x0e\xacZ\x81z\xe1\x94" +
-	"E5\xcf\x99\xeerUb\x93\x7f&p\xfbtS\xab" +
-	"\x97\xa2\x03\x98\x93LgUE31\x11b\x011q" +
-	"\xc9\xa9\xbe\xcc\xe0\xe5o!\xb9\x82\x99/\x98\x97\x18x" +
-	"\xca58g\x97\xb9\xa2\xb4\xcb\xd0\x18K\xbb\xcc\xc0%" +
-	"f\xf0d\xdf\x96\xd3xR\x90|P\xec\x06\xcef\x8d" +
-	"\xcec\x1b\xadm\xd4\x0dV\x95l\x18\xb2\x1f\x14'\xf0" +
-	"\xc1\xc5\xfc\"-\xfc_\x01\x00\x00\xff\xff\x87\x18[_"
+const schema_da965b22da734daf = "x\xda\xb4X}\x90\xd4\xf4\xf9\x7f\x9ed\xd7\xec\xe2\xed" +
+	"fs\xd9\x13A\xce\xfb\xcdq\x8e\xde\x8d\xdc\xa8\xa7\"" +
+	"\xf7\x1bgW\x8e\x83\xa2\x1c^x\xf1\x1dk\xdc\x0d\x18" +
+	"\xd9M\x96$\xab\x9c\x83R\x94\xea\xe0X\xc6bq\xd4" +
+	"\xeaT\xa7N\x15\x15_\xb0\x96BkK\xa7\xbeU\xeb" +
+	"(-\xe2\xa8E\xab\xa2V,V\xa9\xe7\x88\x15\xd3y" +
+	"\xb2\x9b\xe4{\xb9\xe5\xd0v\xfa\xdfN\x9e\xef~\xbe\xcf" +
+	"\xfb\xf3\xf9>'\x1c-\xe4c'\xa6\xde\xca\x00\xa7<" +
+	"\x15?\xcc]\xaf\xa7\xf5\xd9\xb8f\x15H)t\x1f\x19" +
+	"\xb0_o\xbf\xf0\xd6\xd7!\x8e\x02\x80\xbc0\xf1\xbc\xac" +
+	"&\xe8\xd7\xa2D\x0e\xd0]=16\xfe\xa6\x93W_" +
+	"\x0bR3B\xfd\xcc\xd5\x89}\x80\xf2*O\xfe\xd1\xb3" +
+	"\xcf\xcc\xdf\xe1L\xba\x0e\x94fD\xf7\x9cu\x1f\xcb\x0f" +
+	"\xde\xff\xd1u\xd0\x8f\x02\x07 \xdf\x93\xd8#o\xf4\xd0" +
+	"6$\xae\x04F.\xa5\xf8\xf0f@\xf9\xc3\xc4:\xf9" +
+	"\xd3\xc4x\x00\xf9@b\x96|LR\x00po\x1c8" +
+	"w\xf5\x96\xd3?Y\x0dR\x8a\x1bq8\x95\xdc*\xb7" +
+	"\xd0\x11YJ\x9e\x0d\xe8\xbe\xda\xbcg\xab\xb8\xf1\x8a\x9b" +
+	"X\x1d;\x93_\x02\xcaS\x92\xa4\xe3\xb1\x93g\xb5l" +
+	"\xdb~\xfdZF\xde3\x90\xe4\x10PV\xbc\x03/\x7f" +
+	"\xb2`s\xe5\xfa\x9e\x9bY\x80\xef{\x00k<y\xfe" +
+	"\x85i\xf7M[\x9b\xbb\x1d\x94\x16D\x80\x18\x01lH" +
+	"v\x11\xc0c\xde\x81IO,\xde\xfb\xa7\xe3\xe7\xdc\x0d" +
+	"\xd2\x11\xc1\x0d\xdb\x93\xedt\xe05\xef\x80k=t\xc2" +
+	"\x8cN\xf3\xee\x88\xcby\xbai\x7fr\x93\x8c\xe3\xe8\xd7" +
+	"\x81\xe4#\x80\xee\x0b\xdb\xe6\xed|u\xc9\xf8\x9f\x12\x98" +
+	"\xdb\xd7\x7f\xddL\xe3\xe2\x7f\xfc\x11\xe2q:\xf1\xe4\xb8" +
+	"}\xf2\x1f\xc6\x8d\x07\xe8ye\\\x1b\x02\xba7\xfc\xea" +
+	"\xc2E\xea\xc7S\xee\xf3\xfc_WmB\x93g[k" +
+	"\x13\xdd\x1c\x9f\xba\xf0\xfd\x07w\xe4\xee\x07%\x85\x8c\xcf" +
+	"\xe3\x1c\xc1\x9d\xde\xb4I\xeeo\xa2_g4}\x00\xe8" +
+	"Nv?\xe7rG\xbd\xf5\x00\xeb\x08L\xbd\x03(\xc7" +
+	"S\x04\xb6\xfb\xd9''W\x1f~`#+?&\xb5" +
+	"\x07P\xee\xf4\xe4\xe6\xd2\xc3\xf5\x93\x0b\x0f\xb3\xf2\x9e\xd9" +
+	"\xa9q\x9e\xa7\xbd\x03K\xee\xee\x9b\xd4\x7f\xfb\xfb\x9bk" +
+	"\x07H[yY\xea\x1d\x88\xb9\x97?5\xfdoo\xbe" +
+	"\xb1w3(G cu-\x8fz\x16\xa6&\xa2\xac" +
+	"\xa5\xe8\xb8\x9a\xa2D:\xfc\xf1t\xe7i\xdf\x13~Y" +
+	"w8\x19\xd3sOj\"]\xb4\xc1;P\x98{\xef" +
+	"\xc3\xbb_\xb9e+\xabi<M\x9a&\xd3\xa4\xc8\xe1" +
+	"k\x13\xff\xb7U\xfc\xf9\x93#\x03\xe2)\xd4\x99\xde$" +
+	"\x9f\x98\x16\x80w'\xec\x1d\xbc\xfe\xf8\xde\xaf\x9ff\x9d" +
+	"\x9bJ7\xd3--\x1e\xca\x9d?\xfe\xd1\xdc\x99\xa7\xce" +
+	"\x7f\x86\xbd\xe5\x14\xef\x96i\x9e\xfc\x96\xa7\x8d\x8b\x07\xce" +
+	"\x9b\xf4\x02+\xd7\xd3\x94XeO~\xaa\xf3\xb3\x15\xf1" +
+	"[{G\xc8\x7f\x90\xa6\xea\xfa\xa1'\x0f\xfc\x10\xad\x97" +
+	"\xc7\xd2\x9b\xe4-\xe9c\x01\xe4\xed\xe9Y\xf2\xfe4\xd5" +
+	"\xcb\xe7\xdd\x17\xddq\x89|\xfb\x8b \x1d\xcd$Q\xcd" +
+	"7o\xa7/Ey\x98\x8e\xc9\x9f\xa6\xc9?\x17\x9f\xb6" +
+	"\xed_\x95\xd5g\xee`o\x1e\x10IsE\xcc\x01\x1e" +
+	"x\xfc\x94\x0b\xee:~\xdbNF\xbaL$\xbd\xaa$" +
+	"u\x8f\xde\xb9\xfb'/}\xf5\xeek\xa0LF\x0cc" +
+	"\xd7\x82\x02\x02\xf4\xac\x17{\xc9Ew\x89t\xd1\x9d_" +
+	"\x09'\x1d\xf9\xdcso0\x11\xdf/~\x091w\x97" +
+	"\xf5V\x8fc>\xff\x17PZ\x91\xe9#u\x8c]\xa2" +
+	"\x975\xefy\x18\xed\xc6\x8a\x1b/\xe9\xda\xf7WV\xd9" +
+	"32\xe4\xc6\xfe\x0c\xa9\xf3\x8bw\xb7\xec\x1dX\xb2\xe3" +
+	"mJ\x1e>\xcc\xf8\x85\x9c\x80<&\xe4\xaawt(" +
+	"C\xc5\xf5\xd25;\xd7\x9ezN\xf2=*\x07.Z" +
+	"\x0e-\xd2\x1dr\xabD\xbf&HT\x0eg\xed\x1a~" +
+	"\xbe\xfd\xf7\x7f~\x9f\x0ec\xf4\xf0^i\x9d<\xec\x1d" +
+	"\xfeT\"\xe4=\xdb\x9a~}\xdfon\xfb\x801t" +
+	"M\xf3>\x88\xb9\xc3\x93[\xce\xda\xf7\xc4fVP\xf6" +
+	"\x04g\xb5\xfe\xff\xb1\xdcw\xaf\xf9dTt\x95\xe6u" +
+	"\xf2\xf9\xcd\x14\xb7\x85\xcd7p\xf2{2\x85\xf7\xda\xa6" +
+	"G/\xda\xbd`\xeag \xb5\x04\xb5\xf5\xa2\xec\xf5\x98" +
+	"Wd\xf2B\xecw\xbf\xdd6\xf53\xfd3\xd6K\xc3" +
+	"2\x85t\xbf'\x9f\xfc\xe8\xdf\xff\xf9\xe6\x85\x9b\x87\x1b" +
+	"\xb5\xfd\xd6\xec\xebrg\xd6+\xe7,\x9d\x1d\x1e\x9e&" +
+	"\xf4\x0eO\xf8b\x94j\x0b\xb3\x0f\xc8\x8b\xbc\x83\xe7g" +
+	"g\xc9\xab\xe8\x97\xbb\xe8\xdc\x97\xef]3\xf5\xa8/\x98" +
+	"2\x91\xf5,eK9\x9b\x83)\xae=d;Z\xb9" +
+	"\xbb\xc0\xa9\x15\xa3\xd2;\x7f\xa8\\\xd2\x8d\xa5\xb3\x8d\xc5" +
+	"&\xc0 \xa2\x12\xe3c\x001\x04\x90R\xbd\x00J\x82" +
+	"G%\xcba\xceQ\xad%\x9a\x83M\xc0a\x13`\x04" +
+	"d\xf6\xe0\xcc\xf9\xdd\xb6\xa3:\x1d\x83m\xaa\xa5\x96m" +
+	"\x16\xa5=D\x11\x0az\xf1 \x10}Z\xa9\xd4=\xa0" +
+	"\x0e]\xaa\xf5\x8b\x96eZ\xa4J\x82\x8f5\xb9\xae\x87" +
+	"\xd29\x11@\xe9\xe0Q9\x81\xc3\x14~\xed\"\x86\x19" +
+	"+Mi\x07\x8e7\x97\xc2a\x82fY\x01.\xfa\xb8" +
+	"XRblNKx\x81[\xbb\xc9\xb2\x807-%" +
+	"\xc6\xc7\x01\x82\xc4@\xbfMHR\x17pR\\\x10\xaf" +
+	"Tu'\x8f\x83\x88\x11\xec~\xc3\xc9YC\x0b\x86*" +
+	"\x1ai\xdb\x84\x1c\x80\xd4\xda\x05\x80(\xb5\xcc\x03@N" +
+	"\x92\xa6\x03\x88\x8b\xf5\x92\xe6\x16uK+8\xa6\x058" +
+	"\xb4\xd2\xae\xf9\xbc\x91\x13\xabFE7:r\x83\xdf\xda" +
+	"\x8b|\x88Q\xd14\xcb\xee\x98\xa7\xd9\xd5\x92c\x03\x0b" +
+	"r&\x80\xd2\xc4\xa3r\x1c\x87.\x9d\x9a\xa3\xdb\x0e\x00" +
+	"`\x1ap\x90G\xcc\x84\x83\x11\x90>\x1e4\xcc\xf3r" +
+	"5t\x16\xbc+\xd4P\xd4\x8d\xc5&f\xc2\xda\x07\xc4" +
+	"\xcc(e\xfbL\xc36KZw\xc5\xd2\x0d\xa7d\x90" +
+	"\xc6b\x14\xb49\x04E\x03\x13\xc0ab\x14N\xffr" +
+	"\xadPuL\xab\xdb\xae\xa8Wz0Ua\x0c\xdd\x0a" +
+	"Z\xa9\x84\x99\xb0MFt\xab\x85vP\xd3\xda,*" +
+	"\x0a/\xb2\x01P?\xa5a\x9eGe\x0e\x87\x12b\x96" +
+	"\x0aL\x9a=\x0f@\xf9\x0e\x8fJ\x91C\x89\xe3\xb2^" +
+	"\x1e\xa8\xf4\xf1\x12\x1e\x95\x15\x1c\xf2L\xbc\xd4b\xd1\xd2" +
+	"l[\x03\xb4}\xb7\x93\x88\x9c]\xb1L\xc7,\x98\xa5" +
+	"\x06\xa2\x91q\x08\x0c\xee3\xdb\xcae\xd5(z\xf9\x1d" +
+	"\x0e\x1c\xb4\xdc>\xb52C\xb3\x0b\x16\xb4\xe9\x15\xc7\xb4" +
+	"\x94l`\xc2\xd5\xe4\x8b\xe5<*\xab\x19\x13V\xd1\xc7" +
+	"\x15<*\xb71&\xac\xa7\x9c\xbb\x99G\xe5!\x0e%" +
+	"\x9e\xcf\"\x0f m\xa0\x8f\xf7\xf2\xa8<\xca\xa1\x14\x8b" +
+	"e1\x06 m$c\x1f\xe2Qy\x8eC\xb1\xa2:" +
+	"\x97\xf9\xe6\x8a\xaa\xb5$j\x8c\xa0\x19WD?\x15u" +
+	"+\xf0\x90\xb6\xdc\xb1\xd4>\xb5\xc2\xb8!\x13\x1a\x17I" +
+	"L>Z:\x8d\xd2~z\x18\xfd\x95v\xb5P\xd0l" +
+	"\x1b\x118\xc4Qa\x9fk\x16\xdb4?\xec\x99\x00A" +
+	"%\xa3/\xe2Q\xb9\x8cC\xdfeZW=\xc0%r" +
+	"\x19\xd6\\\xa6_\x05\xa0\\\xc6\xa3\xe2p\x88<2\xb3" +
+	"PZv&pl\xe5\x8a\xb6~\x95\x86I\xe00I" +
+	"\x04\xa9Z\xae\x96TG\x87\xdc\x15\xda|V`\x98E" +
+	"\x8d:\x0c\x004\xaa\xc6\x92\xdd1\xa8ZB\xa4Y\xb0" +
+	"\xe9\xce\x86\xa3\x11B\x81\xba\xb6*\xfe\x17\xfd\xa6`\x1a" +
+	"\x86V \x14\x02\x018\x98&\x94\xfaci\xa2\x17}" +
+	"[\x0eV\xe0gW\x1c\xdd4\xd4R\x9f\xc6\x97J\xd1" +
+	"\x09\xd15jB\x04\xbc\xc8\x9b\x10\xb5\xc2\x97\xc2W\x0f" +
+	"\xf5iJGff4l(d\x17_\xb6\xe9\xb2\xba" +
+	"Y\xec]A\x0dM\xa14;\x8eG\xe5d\x0eE2" +
+	"\x08\xa5\x90S\xd4\xeeZY0\xbdz\xc5L\xc8\x08#" +
+	"\xed\x87\xf1\x07\xa5\xf3\x7f\x10\x99Z&\xcf\xd4KA&" +
+	"\x8f\x15\xb4Z\xbd\xa0\xfdm\xebed\x0e6j\xdd>" +
+	"J\x07\x87+5\xc3\xb1t\x8d\xa9\xe7\x80\xf85\x1c4" +
+	"\x1e\x19\xa0\xa9\xdbp\xd0\xb0\xb4\xc4\xaa\xa9\x9f\x09\xa7\xfb" +
+	"\xc1\xfdI\x99>Ok\x1bsp]j\x16\x870\x05" +
+	"\x1c\xa6Fy\xb4\x7f\xb9\xd6\xe6\xa5\x85\x92@\xf6Y\x98" +
+	"\x9c\x1e\xce\x12)~\xf9\xca\xbeZ\x8c]?YA$" +
+	"s\xea$\xc3\x7f)\xa1\xffF\x95\xa4\x93<\x92\xd1\xe6" +
+	"\xe5\xdaH\x96\x11\x8bv{\x0f\xb8\xdb\xef\xedzEp" +
+	"\x02\xa24ff\xf62\x99i\xa8e\xcd\xcf\x99\\\xa1" +
+	"\xa4k\x86\x83\xcd1\x1e\x10\x9b\x1b\xbbM-\x16\x1b\xa5" +
+	"!\xeb\xb5\xa2\xea\xa8\xa3\xbc\x16\x81h\xe4\xf9o\xd6d" +
+	"\x1a\x94\x7f\xaeT\xea\xd6,\x8b\x0c\xcf\xd4\x8d\xec\xec\x0d" +
+	"-\xc7z;\x9e\xd2\x15\x1a\x9e#\xe2R\xb5}\x0e\xd1" +
+	"8\xd2\\\x94E\xd5\x99X\x94\xb9\x84d\x95\xb8*\xa9" +
+	"\xe2Y\xf2\xbfSF7\xec1IW\x07\x11\x1b\xbdx" +
+	"\x08\xe20\xd7,z=\xa1\xdb0s\xb5\xb1B\xdcf" +
+	"\x92\xebbm\xb8\xf7w\x85\xf4\xa6\x95zhm\xbc\x07" +
+	"\x04g\x01\x87\xad\xdc\x01\xfa\x1c\x07\x90\x14\xaa\xf09<" +
+	"*\xe7q\xe8\x91\\\xcc\x84\x0f\xf9z\x192\xb4\x173" +
+	"\xe1\x9b\xa7&\xf5\x890f\xc2%XC6\xd6o8" +
+	"\xbc5\x14\x99\xc9]\xdft&\xd3\xc7\"\x8fJ\x85h" +
+	"L\xdd\xd2r{8\xa8G\x94\x84\xe8\x0cU4\x14\xc3" +
+	"u\x17 \x8a\x91i=F\xdb\x9d\xa3\x1b\xb84\xc2\x19" +
+	"\x19\xa7\x06\x94\x91\xbe\xcd\xe0Q\x19d\x14\x1dh\x0f\xdd" +
+	"<R\xa7C^\x1eM\x95\xfa3\xec\xa0m5*G" +
+	"\xff\xff8\x9f\x94?\xce\xebU\xfeR\x02\x1f\x87\xda\xfa" +
+	"A>\x11\xdb\x81\x93\x8fA\x01\xc3\xe5\x13\xfa[\x13y" +
+	"\x82'M\xa1\x80\\\xb0\xbaB\x7f'##N\x04N" +
+	"\x1a\x16\x90\x0f\xb6\x98\xe8o\xfa\xa4\x0f\xe9\xa5\xb5K\xc0" +
+	"X\xb0)B\xff\x19+mo\x07NzZ\xc0x\xb0" +
+	"YD\x7f\xcd&m\xa1\xe6\xb9Q\xc0\xc3\x82\xf7>\xfa" +
+	"\xdb\x09\xe9\x1e\xc2\\/\xa0\x10\xac\xb9\xd0\x7f\x93Kk" +
+	"H\x97\xab\x05L\x04;2\xf4\xb7K\xd2\xb2\xe9\xc0I" +
+	"\x9a\x80\xc9`Y\x82\xfe\xcaR:\x9f\xee\x1b\x10\x04\xb5" +
+	"X\xcc\xa3PP\x9d<\xf2%;\x8f\"\xd5s\x1e\x85" +
+	"\x8an\xe4\xb1\xcdc\xa2y\x14)\x14yb\xffy\x9a" +
+	"\xfc\xde\xbc\xcdc\x9b\xd7XF6\xfa\xc6\xef\xa1\x06\xc4" +
+	"\x8e\x1d}f\xd5\xa9T\x9dC\x10\xaaF\x83\xd9\x7f\x05" +
+	"\x1eY\x7f\x05\xd6\xde\xfe\x10y\xfe\x8d\x1e\xa23\xea\xb5" +
+	"<4\xdb\xe0k\x0c\x99\x01=)lDmT\xd3\xcc" +
+	"\xac\x0f\xf66\x91Y\x8f\xbe\xd5\"\x99]\xc3\x8b3\xab" +
+	"\x15\xf4\x17\xbd\xf4\x8c\xa6\x19\xb9\xb2\xee\x99\x91\xce\x8b0" +
+	"\xa6Fsf\x0cB\xf3\xef\x00\x00\x00\xff\xff\x9cK#" +
+	"."
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_da965b22da734daf,
 		Nodes: []uint64{
+			0x81890149690e6995,
 			0x8284348c17041a84,
 			0x831c74d453c6c7eb,
 			0x83eba8ab13ee9256,
@@ -4384,6 +4863,7 @@ func RegisterSchema(reg *schemas.Registry) {
 			0x993f8e39a739cb40,
 			0xa04c2cd2ed66b51c,
 			0xa06f294430ac72ff,
+			0xa31767d7d652c0cb,
 			0xa72dee615d5bbb87,
 			0xa83fd4abe6553705,
 			0xaadf1b3f02f6ff23,
@@ -4393,25 +4873,28 @@ func RegisterSchema(reg *schemas.Registry) {
 			0xb7eddbdee842c46a,
 			0xb8078038290eb30b,
 			0xba93d5e4aea44e63,
+			0xbdb40fba20088e0b,
 			0xc5fe3a2c8650ed19,
 			0xc65336464e949b9c,
 			0xcb1c584d5e6ec593,
 			0xcb3a96057ca67436,
 			0xccef5e6e46834543,
+			0xcd9913609a5c2ef6,
 			0xd44a8470fbc0385e,
 			0xd6c02c9d5a3500b3,
 			0xd9e3fccf9fe4d61e,
 			0xdbc8c8183207fc9c,
 			0xdcca6f7433df72dd,
 			0xe0f22a608a7c6e22,
+			0xe1d4674dedb9e3b6,
 			0xe50956368ed67ecf,
 			0xe6d3c322caf5dd4b,
 			0xe798bea7bc0cc0ea,
 			0xe7b7b5f24b1523f5,
 			0xf07e5f02273b1d4b,
-			0xf30cce4f6b9ea63a,
 			0xf43754e45cb00c82,
 			0xf469f437c0bfc104,
+			0xf5b75bdef3ecb023,
 			0xf819f53a0739f5f5,
 			0xf81b3789a4d0575d,
 		},
