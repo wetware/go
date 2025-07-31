@@ -420,7 +420,10 @@ func (m *MockIPFSServer) Stat(ctx context.Context, call system.IPFS_stat) error 
 	info.SetCid("QmTest123")
 	info.SetSize(100)
 	info.SetCumulativeSize(100)
-	info.SetType("file")
+	_, err = info.NodeType().NewFile()
+	if err != nil {
+		return err
+	}
 	return results.SetInfo(info)
 }
 

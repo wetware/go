@@ -14,6 +14,136 @@ import (
 	"github.com/wetware/go/system"
 )
 
+// IPFSObject wraps an IPFS capability and provides method access
+type IPFSObject struct {
+	ipfs system.IPFS
+}
+
+// NewIPFSObject creates a new IPFSObject from an IPFS capability
+func NewIPFSObject(ipfs system.IPFS) *IPFSObject {
+	return &IPFSObject{ipfs: ipfs}
+}
+
+// Invoke implements core.Invokable to support direct calls like (ipfs "stat" path)
+func (i *IPFSObject) Invoke(args ...core.Any) (core.Any, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("ipfs requires at least 1 argument: method name, got %d", len(args))
+	}
+
+	// First argument should be the method name
+	var methodName string
+	switch arg := args[0].(type) {
+	case string:
+		methodName = arg
+	case builtin.String:
+		methodName = string(arg)
+	case builtin.Keyword:
+		methodName = string(arg)
+	default:
+		return nil, fmt.Errorf("ipfs first argument must be string or keyword (method name), got %T", args[0])
+	}
+
+	// Call the appropriate method based on the name
+	switch methodName {
+	case "cat":
+		return IPFSCat(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "add":
+		return IPFSAdd(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "ls":
+		return IPFSLs(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "stat":
+		return IPFSStat(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "pin":
+		return IPFSPin(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "unpin":
+		return IPFSUnpin(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "pins":
+		return IPFSPins(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "id":
+		return IPFSId(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "connect":
+		return IPFSConnect(append([]core.Any{i.ipfs}, args[1:]...)...)
+	case "peers":
+		return IPFSPeers(append([]core.Any{i.ipfs}, args[1:]...)...)
+	default:
+		return nil, fmt.Errorf("unknown IPFS method: %s", methodName)
+	}
+}
+
+// Get implements core.Getter to support dot-method calls
+func (i *IPFSObject) Get(key core.Any) (core.Any, error) {
+	// Convert key to string
+	var methodName string
+	switch k := key.(type) {
+	case builtin.String:
+		methodName = string(k)
+	case string:
+		methodName = k
+	case builtin.Keyword:
+		methodName = string(k)
+	default:
+		return nil, fmt.Errorf("method name must be string or keyword, got %T", key)
+	}
+
+	// Return the appropriate method based on the name
+	switch methodName {
+	case "cat":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			// Prepend the IPFS capability to the arguments
+			return IPFSCat(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "add":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSAdd(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "ls":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSLs(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "stat":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSStat(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "pin":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSPin(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "unpin":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSUnpin(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "pins":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSPins(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "id":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSId(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "connect":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSConnect(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	case "peers":
+		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
+			return IPFSPeers(append([]core.Any{i.ipfs}, args...)...)
+		}}, nil
+	default:
+		return nil, fmt.Errorf("unknown IPFS method: %s", methodName)
+	}
+}
+
+// IPFSInvokable wraps an IPFS function to make it compatible with slurp's core.Invokable interface
+type IPFSInvokable struct {
+	fn func(args ...core.Any) (core.Any, error)
+}
+
+// Invoke implements core.Invokable for IPFSInvokable
+func (i *IPFSInvokable) Invoke(args ...core.Any) (core.Any, error) {
+	// The IPFS capability should be passed as the first argument from the RPC call
+	return i.fn(args...)
+}
+
 // IPFSCat implements a standalone cat function for the shell
 // Buffer wraps a *bytes.Buffer for use in the shell
 type Buffer struct {
@@ -45,36 +175,51 @@ func (b *Buffer) AsHex() string {
 	return "0x" + hex.EncodeToString(b.Mem)
 }
 
-type IPFSCat struct {
-	IPFS system.IPFS
-}
-
+// IPFSCat implements a standalone cat function for the shell
 // Invoke implements core.Invokable for IPFSCat
-func (ic IPFSCat) Invoke(args ...core.Any) (core.Any, error) {
-	// Identity law: when called with no arguments, return self
-	if len(args) == 0 {
-		return ic, nil
+func IPFSCat(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("cat requires at least 2 arguments: IPFS capability and path, got %d", len(args))
 	}
 
-	if len(args) != 1 {
-		return nil, fmt.Errorf("cat requires exactly 1 argument, got %d", len(args))
-	}
-
-	// Extract the path from the argument
-	unixPath, ok := args[0].(*UnixPath)
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
 	if !ok {
-		return nil, fmt.Errorf("cat argument must be UnixPath, got %T", args[0])
+		return nil, fmt.Errorf("cat first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the path
+	var cid string
+	switch arg := args[1].(type) {
+	case string:
+		// If it's a full path like "/ipfs/QmHash...", extract just the CID
+		if strings.HasPrefix(arg, "/ipfs/") {
+			cid = strings.TrimPrefix(arg, "/ipfs/")
+		} else {
+			cid = arg
+		}
+	case builtin.String:
+		argStr := string(arg)
+		if strings.HasPrefix(argStr, "/ipfs/") {
+			cid = strings.TrimPrefix(argStr, "/ipfs/")
+		} else {
+			cid = argStr
+		}
+	case *UnixPath:
+		// Extract CID from the path segments (e.g., ["ipfs", "QmHash..."] -> "QmHash...")
+		segments := arg.Path.Segments()
+		if len(segments) < 2 {
+			return nil, fmt.Errorf("invalid IPFS path: insufficient segments")
+		}
+		cid = segments[1] // Get the CID part
+	default:
+		return nil, fmt.Errorf("cat second argument must be string or UnixPath, got %T", args[1])
 	}
 
 	// Call the Cat method
 	ctx := context.Background()
-	future, release := ic.IPFS.Cat(ctx, func(params system.IPFS_cat_Params) error {
-		// Extract CID from the path segments (e.g., ["ipfs", "QmHash..."] -> "QmHash...")
-		segments := unixPath.Path.Segments()
-		if len(segments) < 2 {
-			return fmt.Errorf("invalid IPFS path: insufficient segments")
-		}
-		return params.SetCid(segments[1])
+	future, release := ipfs.Cat(ctx, func(params system.IPFS_cat_Params) error {
+		return params.SetCid(cid)
 	})
 	defer release()
 
@@ -96,24 +241,26 @@ func (ic IPFSCat) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSAdd adds data to IPFS
-type IPFSAdd struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSAdd
-func (ia IPFSAdd) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("add requires exactly 1 argument, got %d", len(args))
+func IPFSAdd(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("add requires at least 2 arguments: IPFS capability and data, got %d", len(args))
 	}
 
-	// Extract the data from the argument
-	buf, ok := args[0].(*Buffer)
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
 	if !ok {
-		return nil, fmt.Errorf("add argument must be Buffer, got %T", args[0])
+		return nil, fmt.Errorf("add first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the data
+	buf, ok := args[1].(*Buffer)
+	if !ok {
+		return nil, fmt.Errorf("add second argument must be Buffer, got %T", args[1])
 	}
 
 	ctx := context.Background()
-	future, release := ia.IPFS.Add(ctx, func(params system.IPFS_add_Params) error {
+	future, release := ipfs.Add(ctx, func(params system.IPFS_add_Params) error {
 		return params.SetData(buf.Mem)
 	})
 	defer release()
@@ -132,19 +279,21 @@ func (ia IPFSAdd) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSLs lists contents of a directory or object
-type IPFSLs struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSLs
-func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("ls requires exactly 1 argument, got %d", len(args))
+func IPFSLs(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("ls requires at least 2 arguments: IPFS capability and path, got %d", len(args))
 	}
 
-	// Extract the path from the argument
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("ls first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the path
 	var pathStr string
-	switch arg := args[0].(type) {
+	switch arg := args[1].(type) {
 	case string:
 		pathStr = arg
 	case builtin.String:
@@ -157,12 +306,12 @@ func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
 		}
 		pathStr = segments[1] // Get the CID part
 	default:
-		return nil, fmt.Errorf("ls argument must be string or UnixPath, got %T", args[0])
+		return nil, fmt.Errorf("ls second argument must be string or UnixPath, got %T", args[1])
 	}
 
 	// Call the Ls method
 	ctx := context.Background()
-	future, release := il.IPFS.Ls(ctx, func(params system.IPFS_ls_Params) error {
+	future, release := ipfs.Ls(ctx, func(params system.IPFS_ls_Params) error {
 		return params.SetPath(pathStr)
 	})
 	defer release()
@@ -206,31 +355,48 @@ func (il *IPFSLs) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSStat gets information about a CID
-type IPFSStat struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSStat
-func (is *IPFSStat) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("stat requires exactly 1 argument, got %d", len(args))
+func IPFSStat(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("stat requires at least 2 arguments: IPFS capability and cid, got %d", len(args))
 	}
 
-	// Extract the CID from the argument
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("stat first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the CID
 	var cid string
-	switch arg := args[0].(type) {
+	switch arg := args[1].(type) {
 	case string:
-		cid = arg
+		// If it's a full path like "/ipfs/QmHash...", extract just the CID
+		if strings.HasPrefix(arg, "/ipfs/") {
+			cid = strings.TrimPrefix(arg, "/ipfs/")
+		} else {
+			cid = arg
+		}
 	case builtin.String:
-		cid = string(arg)
+		argStr := string(arg)
+		if strings.HasPrefix(argStr, "/ipfs/") {
+			cid = strings.TrimPrefix(argStr, "/ipfs/")
+		} else {
+			cid = argStr
+		}
 	case *UnixPath:
-		cid = arg.String()
+		// Extract CID from the path segments (e.g., ["ipfs", "QmHash..."] -> "QmHash...")
+		segments := arg.Path.Segments()
+		if len(segments) < 2 {
+			return nil, fmt.Errorf("invalid IPFS path: insufficient segments")
+		}
+		cid = segments[1] // Get the CID part
 	default:
-		return nil, fmt.Errorf("stat argument must be string or UnixPath, got %T", args[0])
+		return nil, fmt.Errorf("stat second argument must be string or UnixPath, got %T", args[1])
 	}
 
 	ctx := context.Background()
-	future, release := is.IPFS.Stat(ctx, func(params system.IPFS_stat_Params) error {
+	future, release := ipfs.Stat(ctx, func(params system.IPFS_stat_Params) error {
 		return params.SetCid(cid)
 	})
 	defer release()
@@ -246,26 +412,31 @@ func (is *IPFSStat) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	// Convert info to a string representation for shell usability
-	infoCid, _ := info.Cid()
-	infoType, _ := info.Type()
-	infoStr := fmt.Sprintf("CID: %s, Size: %d, Type: %s", infoCid, info.Size(), infoType)
+	infoCid, err := info.Cid()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cid: %w", err)
+	}
+
+	infoStr := fmt.Sprintf("CID: %s, Size: %d, Type: %s", infoCid, info.Size(), info.NodeType().Which())
 	return builtin.String(infoStr), nil
 }
 
 // IPFSPin pins a CID
-type IPFSPin struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSPin
-func (ip *IPFSPin) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return builtin.Bool(false), fmt.Errorf("pin requires exactly 1 argument, got %d", len(args))
+func IPFSPin(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return builtin.Bool(false), fmt.Errorf("pin requires at least 2 arguments: IPFS capability and cid, got %d", len(args))
 	}
 
-	// Extract the CID from the argument
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return builtin.Bool(false), fmt.Errorf("pin first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the CID
 	var cid string
-	switch arg := args[0].(type) {
+	switch arg := args[1].(type) {
 	case string:
 		cid = arg
 	case builtin.String:
@@ -273,11 +444,11 @@ func (ip *IPFSPin) Invoke(args ...core.Any) (core.Any, error) {
 	case *UnixPath:
 		cid = arg.String()
 	default:
-		return builtin.Bool(false), fmt.Errorf("pin argument must be string or UnixPath, got %T", args[0])
+		return builtin.Bool(false), fmt.Errorf("pin second argument must be string or UnixPath, got %T", args[1])
 	}
 
 	ctx := context.Background()
-	future, release := ip.IPFS.Pin(ctx, func(params system.IPFS_pin_Params) error {
+	future, release := ipfs.Pin(ctx, func(params system.IPFS_pin_Params) error {
 		return params.SetCid(cid)
 	})
 	defer release()
@@ -291,19 +462,21 @@ func (ip *IPFSPin) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSUnpin unpins a CID
-type IPFSUnpin struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSUnpin
-func (iu *IPFSUnpin) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return builtin.Bool(false), fmt.Errorf("unpin requires exactly 1 argument, got %d", len(args))
+func IPFSUnpin(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return builtin.Bool(false), fmt.Errorf("unpin requires at least 2 arguments: IPFS capability and cid, got %d", len(args))
 	}
 
-	// Extract the CID from the argument
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return builtin.Bool(false), fmt.Errorf("unpin first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the CID
 	var cid string
-	switch arg := args[0].(type) {
+	switch arg := args[1].(type) {
 	case string:
 		cid = arg
 	case builtin.String:
@@ -311,11 +484,11 @@ func (iu *IPFSUnpin) Invoke(args ...core.Any) (core.Any, error) {
 	case *UnixPath:
 		cid = arg.String()
 	default:
-		return builtin.Bool(false), fmt.Errorf("unpin argument must be string or UnixPath, got %T", args[0])
+		return builtin.Bool(false), fmt.Errorf("unpin second argument must be string or UnixPath, got %T", args[1])
 	}
 
 	ctx := context.Background()
-	future, release := iu.IPFS.Unpin(ctx, func(params system.IPFS_unpin_Params) error {
+	future, release := ipfs.Unpin(ctx, func(params system.IPFS_unpin_Params) error {
 		return params.SetCid(cid)
 	})
 	defer release()
@@ -329,18 +502,20 @@ func (iu *IPFSUnpin) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSPins lists pinned CIDs
-type IPFSPins struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSPins
-func (ips *IPFSPins) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 0 {
-		return nil, fmt.Errorf("pins requires no arguments, got %d", len(args))
+func IPFSPins(args ...core.Any) (core.Any, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("pins requires at least 1 argument: IPFS capability, got %d", len(args))
+	}
+
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("pins first argument must be IPFS capability, got %T", args[0])
 	}
 
 	ctx := context.Background()
-	future, release := ips.IPFS.Pins(ctx, func(params system.IPFS_pins_Params) error {
+	future, release := ipfs.Pins(ctx, func(params system.IPFS_pins_Params) error {
 		return nil
 	})
 	defer release()
@@ -375,18 +550,20 @@ func (ips *IPFSPins) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSId gets peer information
-type IPFSId struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSId
-func (ii *IPFSId) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 0 {
-		return nil, fmt.Errorf("id requires no arguments, got %d", len(args))
+func IPFSId(args ...core.Any) (core.Any, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("id requires at least 1 argument: IPFS capability, got %d", len(args))
+	}
+
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("id first argument must be IPFS capability, got %T", args[0])
 	}
 
 	ctx := context.Background()
-	future, release := ii.IPFS.Id(ctx, func(params system.IPFS_id_Params) error {
+	future, release := ipfs.Id(ctx, func(params system.IPFS_id_Params) error {
 		return nil
 	})
 	defer release()
@@ -412,29 +589,31 @@ func (ii *IPFSId) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSConnect connects to a peer
-type IPFSConnect struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSConnect
-func (ic *IPFSConnect) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("connect requires exactly 1 argument, got %d", len(args))
+func IPFSConnect(args ...core.Any) (core.Any, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("connect requires at least 2 arguments: IPFS capability and address, got %d", len(args))
 	}
 
-	// Extract the address from the argument
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("connect first argument must be IPFS capability, got %T", args[0])
+	}
+
+	// Second argument should be the address
 	var addr string
-	switch arg := args[0].(type) {
+	switch arg := args[1].(type) {
 	case string:
 		addr = arg
 	case builtin.String:
 		addr = string(arg)
 	default:
-		return nil, fmt.Errorf("connect argument must be string, got %T", args[0])
+		return nil, fmt.Errorf("connect second argument must be string, got %T", args[1])
 	}
 
 	ctx := context.Background()
-	future, release := ic.IPFS.Connect(ctx, func(params system.IPFS_connect_Params) error {
+	future, release := ipfs.Connect(ctx, func(params system.IPFS_connect_Params) error {
 		return params.SetAddr(addr)
 	})
 	defer release()
@@ -448,18 +627,20 @@ func (ic *IPFSConnect) Invoke(args ...core.Any) (core.Any, error) {
 }
 
 // IPFSPeers lists connected peers
-type IPFSPeers struct {
-	IPFS system.IPFS
-}
-
 // Invoke implements core.Invokable for IPFSPeers
-func (ip *IPFSPeers) Invoke(args ...core.Any) (core.Any, error) {
-	if len(args) != 0 {
-		return nil, fmt.Errorf("peers requires no arguments, got %d", len(args))
+func IPFSPeers(args ...core.Any) (core.Any, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("peers requires at least 1 argument: IPFS capability, got %d", len(args))
+	}
+
+	// First argument should be the IPFS capability
+	ipfs, ok := args[0].(system.IPFS)
+	if !ok {
+		return nil, fmt.Errorf("peers first argument must be IPFS capability, got %T", args[0])
 	}
 
 	ctx := context.Background()
-	future, release := ip.IPFS.Peers(ctx, func(params system.IPFS_peers_Params) error {
+	future, release := ipfs.Peers(ctx, func(params system.IPFS_peers_Params) error {
 		return nil
 	})
 	defer release()
@@ -567,7 +748,12 @@ func (g Go) Invoke(args ...core.Any) (core.Any, error) {
 
 	// Spawn the process using the executor
 	ctx := context.Background()
-	future, release := g.Executor.Spawn(ctx, func(params system.Executor_spawn_Params) error {
+	future, release := g.Executor.Spawn(ctx, func(call system.Executor_spawn_Params) error {
+		params, err := call.NewCommand()
+		if err != nil {
+			return fmt.Errorf("failed to create command: %w", err)
+		}
+
 		// Set the executable path
 		if err := params.SetPath(execPath.String()); err != nil {
 			return fmt.Errorf("failed to set path: %w", err)
@@ -666,4 +852,124 @@ func serializeBody(body core.Any) (string, error) {
 	}
 
 	return bodyStr, nil
+}
+
+// DotNotationAnalyzer implements a custom analyzer that handles dot notation
+type DotNotationAnalyzer struct {
+	base core.Analyzer
+}
+
+// NewDotNotationAnalyzer creates a new analyzer that handles dot notation
+func NewDotNotationAnalyzer(base core.Analyzer) *DotNotationAnalyzer {
+	if base == nil {
+		base = &builtin.Analyzer{}
+	}
+
+	return &DotNotationAnalyzer{base: base}
+}
+
+// Analyze implements core.Analyzer and handles dot notation expressions.
+//
+// This function performs syntactic analysis of forms and converts dot notation
+// expressions into standard function calls. It works by:
+//
+// 1. Detecting when a list's first element is a symbol containing a dot (e.g., "ipfs.stat")
+// 2. Splitting the symbol into object and method parts (e.g., "ipfs" and "stat")
+// 3. Converting the expression from (ipfs.stat arg1 arg2) to (ipfs "stat" arg1 arg2)
+// 4. Delegating the transformed expression to the base analyzer
+//
+// Examples of transformations:
+//
+//	(ipfs.stat path)     → (ipfs "stat" path)
+//	(ipfs.cat cid)       → (ipfs "cat" cid)
+//	(ipfs.id)            → (ipfs "id")
+//	(obj.method a b c)   → (obj "method" a b c)
+//
+// The function preserves all arguments after the dot notation symbol and
+// maintains the original evaluation order. If the form is not a dot notation
+// expression, it delegates directly to the base analyzer without modification.
+func (dna *DotNotationAnalyzer) Analyze(env core.Env, form core.Any) (core.Expr, error) {
+	// Step 1: Check if the form is a sequence (list) that might contain dot notation
+	// We only process sequences since dot notation only makes sense in function calls
+	if seq, ok := form.(core.Seq); ok {
+		// Get the count of elements in the sequence
+		cnt, err := seq.Count()
+		if err != nil {
+			return nil, fmt.Errorf("failed to count sequence elements: %w", err)
+		}
+
+		// Only process non-empty sequences (empty lists can't have dot notation)
+		if cnt > 0 {
+			// Step 2: Extract the first element to check if it's a dot notation symbol
+			first, err := seq.First()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get first sequence element: %w", err)
+			}
+
+			// Step 3: Check if the first element is a symbol that contains a dot
+			// Dot notation only applies to symbols like "ipfs.stat", "obj.method", etc.
+			if sym, ok := first.(builtin.Symbol); ok {
+				symStr := string(sym)
+
+				// Look for the dot character that indicates method notation
+				if strings.Contains(symStr, ".") {
+					// Step 4: Split the symbol into object and method parts
+					// We use SplitN with limit 2 to handle only the first dot
+					// This allows for future extensions like "ipfs.stat.detail" if needed
+					parts := strings.SplitN(symStr, ".", 2)
+					if len(parts) == 2 {
+						// Extract the object name (e.g., "ipfs") and method name (e.g., "stat")
+						object := builtin.Symbol(parts[0]) // The object to call the method on
+						method := builtin.String(parts[1]) // The method name as a string
+
+						// Step 5: Collect all arguments for the transformed function call
+						// Start with the object and method name
+						var args []core.Any
+						args = append(args, object, method)
+
+						// Step 6: Iterate through the remaining arguments in the original sequence
+						// We need to preserve all arguments that came after the dot notation symbol
+						current := seq
+						for i := 1; i < int(cnt); i++ {
+							// Get the next element in the sequence
+							next, err := current.Next()
+							if err != nil {
+								return nil, fmt.Errorf("failed to get next sequence element at position %d: %w", i, err)
+							}
+							if next == nil {
+								// End of sequence reached
+								break
+							}
+
+							// Extract the actual argument value from the sequence
+							arg, err := next.First()
+							if err != nil {
+								return nil, fmt.Errorf("failed to get argument at position %d: %w", i, err)
+							}
+
+							// Add the argument to our transformed function call
+							args = append(args, arg)
+
+							// Move to the next element in the sequence
+							current = next
+						}
+
+						// Step 7: Create a new list representing the transformed function call
+						// This converts (ipfs.stat path) into (ipfs "stat" path)
+						newForm := builtin.NewList(args...)
+
+						// Step 8: Delegate the transformed expression to the base analyzer
+						// The base analyzer will handle the actual evaluation of the function call
+						return dna.base.Analyze(env, newForm)
+					}
+					// If splitting didn't produce exactly 2 parts, it's not valid dot notation
+					// Fall through to base analyzer which will likely produce an error
+				}
+			}
+		}
+	}
+
+	// Step 9: If the form is not a dot notation expression, delegate to base analyzer
+	// This handles all other forms (regular function calls, literals, etc.) normally
+	return dna.base.Analyze(env, form)
 }
