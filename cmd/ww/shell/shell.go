@@ -135,9 +135,9 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	}
 
 	env := core.New(lang.GlobalEnvConfig{
-		Console:  sess.Console().AddRef(),
-		IPFS:     sess.Ipfs().AddRef(),
-		Executor: sess.Exec().AddRef(),
+		Console:  sess.Console(),
+		IPFS:     sess.Ipfs(),
+		Executor: sess.Exec(),
 	}.New())
 
 	interpreter := slurp.New(
