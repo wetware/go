@@ -13,7 +13,6 @@ import (
 	"github.com/wetware/go/auth"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/lang"
-	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -139,33 +138,11 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		home = os.TempDir()
 	}
 
-	// Initialize environment with basic functions
-	globals := make(map[string]core.Any)
-
-	// Conditionally add console capability
-	if sess.HasConsole() {
-		console := sess.Console()
-		defer console.Release()
-		globals["println"] = lang.ConsolePrintln{Console: console}
-	}
-
-	// Conditionally add IPFS capabilities
-	if sess.HasIpfs() {
-		ipfs := sess.Ipfs()
-		defer ipfs.Release()
-
-		// Add the IPFS object to the environment to support dot-method calls
-		globals["ipfs"] = lang.NewIPFSObject(system.IPFS(ipfs))
-	}
-
-	// Conditionally add process execution capability
-	if sess.HasExec() {
-		exec := sess.Exec()
-		defer exec.Release()
-		globals["go"] = lang.Go{Executor: exec}
-	}
-
-	env := core.New(globals)
+	env := core.New(lang.GlobalEnvConfig{
+		Console:  sess.Console().AddRef(),
+		IPFS:     sess.Ipfs().AddRef(),
+		Executor: sess.Exec().AddRef(),
+	}.New())
 
 	interpreter := slurp.New(
 		slurp.WithEnv(env),
