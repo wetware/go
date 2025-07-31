@@ -187,7 +187,7 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 			ipfs := sess.Ipfs()
 			rd = readerFactory(ipfs)(strings.NewReader(input))
 		} else {
-			rd = lang.NewReaderWithHexSupport(strings.NewReader(input))
+			rd = NewReaderWithHexSupport(strings.NewReader(input))
 		}
 
 		// Read and evaluate
