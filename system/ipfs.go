@@ -12,6 +12,7 @@ import (
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/wetware/go/anchor"
 )
 
 var _ IPFS_Server = (*IPFSConfig)(nil)
@@ -456,4 +457,35 @@ func (s IPFSConfig) Peers(ctx context.Context, call IPFS_peers) error {
 	}
 
 	return results.SetPeerList(peerList)
+}
+
+func (s IPFSConfig) ResolveNode(ctx context.Context, call IPFS_resolveNode) error {
+	args := call.Args()
+
+	pathStr, err := args.Path()
+	if err != nil {
+		return err
+	}
+
+	p, err := path.NewPath(pathStr)
+	if err != nil {
+		return err
+	}
+
+	node, err := s.API.ResolveNode(ctx, p)
+	if err != nil {
+		return err
+	}
+
+	res, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	if err := res.SetCid(node.Cid().String()); err != nil {
+		return err
+	}
+
+	n := anchor.Node_ServerToClient(anchor.DefaultNode{Node: node})
+	return res.SetNode(n)
 }

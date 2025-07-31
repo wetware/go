@@ -65,7 +65,8 @@ interface Executor {
 ###
 
 interface IPFS {
-# IPFS interface for remote operations over libp2p
+  # IPFS interface for remote operations over libp2p
+
   add @0 (data :Data) -> (cid :Text);
   # Add data to IPFS
   
@@ -95,6 +96,8 @@ interface IPFS {
   
   peers @9 () -> (peerList :List(PeerInfo));
   # List connected peers
+
+  resolveNode @10 (path :Text) -> (cid :Text, node :import "/anchor/anchor.capnp".Node);
 }
 
 struct Entry {
