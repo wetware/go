@@ -100,10 +100,11 @@ func DefaultEnvironment() map[string]core.Any {
 		// Note: println is not included in default environment - only added when console capability is available
 
 		// Environment introspection
-		"env":       &BuiltinInvokable{fn: BuiltinEnv},
-		"namespace": &BuiltinInvokable{fn: BuiltinNamespace},
-		"keys":      &BuiltinInvokable{fn: BuiltinKeys},
-		"doc":       &BuiltinInvokable{fn: BuiltinDoc},
+		"env":        &BuiltinInvokable{fn: BuiltinEnv},
+		"shell-info": &BuiltinInvokable{fn: BuiltinShellInfo},
+		"namespace":  &BuiltinInvokable{fn: BuiltinNamespace},
+		"keys":       &BuiltinInvokable{fn: BuiltinKeys},
+		"doc":        &BuiltinInvokable{fn: BuiltinDoc},
 	}
 }
 
@@ -473,20 +474,36 @@ func BuiltinPrintln(args ...core.Any) (core.Any, error) {
 	return builtin.String(fmt.Sprintf("%v", args[0])), nil
 }
 
-// BuiltinEnv returns information about the current environment
+// BuiltinEnv returns the current environment/namespace symbols
 func BuiltinEnv(args ...core.Any) (core.Any, error) {
 	if len(args) != 0 {
 		return nil, fmt.Errorf("env takes no arguments, got %d", len(args))
 	}
 
-	// Return a map with environment information
-	envInfo := Map{
+	// Get the current environment and return it as-is
+	env := DefaultEnvironment()
+	envMap := make(Map)
+	for key, value := range env {
+		envMap[builtin.Keyword(key)] = value
+	}
+
+	return envMap, nil
+}
+
+// BuiltinShellInfo returns information about the shell itself
+func BuiltinShellInfo(args ...core.Any) (core.Any, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("shell-info takes no arguments, got %d", len(args))
+	}
+
+	// Return a map with shell information
+	shellInfo := Map{
 		builtin.Keyword("name"):    builtin.String("Wetware Shell"),
 		builtin.Keyword("version"): builtin.String("0.1.0"),
 		builtin.Keyword("type"):    builtin.String("lisp"),
 	}
 
-	return envInfo, nil
+	return shellInfo, nil
 }
 
 // BuiltinNamespace returns the current environment as a map-like object
@@ -558,7 +575,8 @@ Available functions:
   (str x)         - Convert x to string
   (println x)     - Print x to console
   
-  (env)           - Get environment information
+  (env)           - Get current namespace symbols
+  (shell-info)    - Get shell information
   (help)          - Show this help
   (help fn)       - Show help for function fn
 
@@ -597,24 +615,25 @@ func BuiltinHelp(args ...core.Any) (core.Any, error) {
 
 		// Return help for specific function
 		helpMap := map[string]string{
-			"cons":    "(cons x xs) - Add x to the front of list xs",
-			"conj":    "(conj coll x) - Add x to collection coll",
-			"list":    "(list x y z) - Create a list with elements x, y, z",
-			"first":   "(first xs) - Get the first element of sequence xs",
-			"rest":    "(rest xs) - Get all but the first element of sequence xs",
-			"count":   "(count xs) - Get the number of elements in sequence xs",
-			"=":       "(= x y) - Test if x equals y",
-			"+":       "(+ x y z) - Sum of numbers",
-			"-":       "(- x y) - Difference of numbers",
-			"*":       "(* x y z) - Product of numbers",
-			"/":       "(/ x y) - Quotient of numbers",
-			">":       "(> x y) - Test if x is greater than y",
-			"<":       "(< x y) - Test if x is less than y",
-			"type":    "(type x) - Get the type of x",
-			"str":     "(str x) - Convert x to string",
-			"println": "(println x) - Print x to console",
-			"env":     "(env) - Get environment information",
-			"help":    "(help) or (help fn) - Show help information",
+			"cons":       "(cons x xs) - Add x to the front of list xs",
+			"conj":       "(conj coll x) - Add x to collection coll",
+			"list":       "(list x y z) - Create a list with elements x, y, z",
+			"first":      "(first xs) - Get the first element of sequence xs",
+			"rest":       "(rest xs) - Get all but the first element of sequence xs",
+			"count":      "(count xs) - Get the number of elements in sequence xs",
+			"=":          "(= x y) - Test if x equals y",
+			"+":          "(+ x y z) - Sum of numbers",
+			"-":          "(- x y) - Difference of numbers",
+			"*":          "(* x y z) - Product of numbers",
+			"/":          "(/ x y) - Quotient of numbers",
+			">":          "(> x y) - Test if x is greater than y",
+			"<":          "(< x y) - Test if x is less than y",
+			"type":       "(type x) - Get the type of x",
+			"str":        "(str x) - Convert x to string",
+			"println":    "(println x) - Print x to console",
+			"env":        "(env) - Get current namespace symbols",
+			"shell-info": "(shell-info) - Get shell information",
+			"help":       "(help) or (help fn) - Show help information",
 		}
 
 		if help, exists := helpMap[string(funcName)]; exists {
@@ -640,25 +659,26 @@ func BuiltinDoc(args ...core.Any) (core.Any, error) {
 
 	// Return documentation for specific function
 	docMap := map[string]string{
-		"cons":    "Adds an element to the front of a list. Returns a new list with the element prepended.",
-		"conj":    "Adds elements to a collection. Works with lists, vectors, and other collection types.",
-		"list":    "Creates a new list containing the given elements.",
-		"first":   "Returns the first element of a sequence. Returns nil for empty sequences.",
-		"rest":    "Returns all elements of a sequence except the first. Returns an empty sequence for single-element sequences.",
-		"count":   "Returns the number of elements in a sequence.",
-		"=":       "Tests equality between two values. Returns true if the values are equal, false otherwise.",
-		"+":       "Adds numbers together. Returns the sum of all arguments.",
-		"-":       "Subtracts numbers. With one argument, returns the negative. With two arguments, returns the difference.",
-		"*":       "Multiplies numbers together. Returns the product of all arguments.",
-		"/":       "Divides numbers. Returns the quotient of the first argument divided by the second.",
-		">":       "Tests if the first number is greater than the second. Returns true or false.",
-		"<":       "Tests if the first number is less than the second. Returns true or false.",
-		"type":    "Returns the type name of the argument as a string.",
-		"str":     "Converts the argument to a string representation.",
-		"println": "Prints the argument to the console and returns the number of bytes written.",
-		"env":     "Returns information about the current environment as a map.",
-		"help":    "Provides help information. Call with no arguments for general help, or with a function name for specific help.",
-		"doc":     "Provides detailed documentation for functions.",
+		"cons":       "Adds an element to the front of a list. Returns a new list with the element prepended.",
+		"conj":       "Adds elements to a collection. Works with lists, vectors, and other collection types.",
+		"list":       "Creates a new list containing the given elements.",
+		"first":      "Returns the first element of a sequence. Returns nil for empty sequences.",
+		"rest":       "Returns all elements of a sequence except the first. Returns an empty sequence for single-element sequences.",
+		"count":      "Returns the number of elements in a sequence.",
+		"=":          "Tests equality between two values. Returns true if the values are equal, false otherwise.",
+		"+":          "Adds numbers together. Returns the sum of all arguments.",
+		"-":          "Subtracts numbers. With one argument, returns the negative. With two arguments, returns the difference.",
+		"*":          "Multiplies numbers together. Returns the product of all arguments.",
+		"/":          "Divides numbers. Returns the quotient of the first argument divided by the second.",
+		">":          "Tests if the first number is greater than the second. Returns true or false.",
+		"<":          "Tests if the first number is less than the second. Returns true or false.",
+		"type":       "Returns the type name of the argument as a string.",
+		"str":        "Converts the argument to a string representation.",
+		"println":    "Prints the argument to the console and returns the number of bytes written.",
+		"env":        "Returns the current namespace symbols as a map with keyword keys.",
+		"shell-info": "Returns information about the shell itself (name, version, type).",
+		"help":       "Provides help information. Call with no arguments for general help, or with a function name for specific help.",
+		"doc":        "Provides detailed documentation for functions.",
 	}
 
 	if doc, exists := docMap[string(funcName)]; exists {
