@@ -7,6 +7,7 @@ import (
 
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
@@ -724,6 +725,552 @@ func TestDotNotationAnalyzerIntegration(t *testing.T) {
 	// Note: We can't actually evaluate it without a proper environment,
 	// but we can verify it's a valid expression
 	require.NotNil(t, expr, "Expression should be valid")
+}
+
+// TestNewIPLDLinkedList tests the NewIPLDLinkedList function
+func TestNewIPLDLinkedList(t *testing.T) {
+	// Create a mock IPFS capability
+	mockIPFS := system.IPFS{}
+
+	// Test with some values
+	values := []core.Any{
+		builtin.String("first"),
+		builtin.String("second"),
+		builtin.String("third"),
+	}
+
+	// Create the IPLD linked list
+	list, err := lang.NewIPLDLinkedList(mockIPFS, values...)
+	require.NoError(t, err)
+	require.NotNil(t, list)
+
+	// Verify the list properties
+	assert.Equal(t, 3, list.GetIPLDElementCount())
+	assert.NotEmpty(t, list.GetIPLDHeadCID())
+
+	// Verify the builtin linked list compatibility
+	count, err := list.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+	first, err := list.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.String("first"), first)
+}
+
+// TestNewIPLDLinkedListEmpty tests creating an empty IPLD linked list
+func TestNewIPLDLinkedListEmpty(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Test with no values
+	list, err := lang.NewIPLDLinkedList(mockIPFS)
+	require.NoError(t, err)
+	require.NotNil(t, list)
+
+	// Verify empty list properties
+	assert.Equal(t, 0, list.GetIPLDElementCount())
+	assert.Empty(t, list.GetIPLDHeadCID())
+
+	// Test First() on empty list
+	_, err = list.First()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty list")
+
+	// Test Count() on empty list
+	count, err := list.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// Test SExpr() on empty list
+	sexpr, err := list.SExpr()
+	require.NoError(t, err)
+	assert.Equal(t, "()", sexpr)
+}
+
+// TestIPLDLinkedListMethods tests the various methods of IPLDLinkedList
+func TestIPLDLinkedListMethods(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Test with single value
+	list, err := lang.NewIPLDLinkedList(mockIPFS, builtin.String("single"))
+	require.NoError(t, err)
+
+	// Test GetIPLDHeadCID
+	headCID := list.GetIPLDHeadCID()
+	assert.NotEmpty(t, headCID)
+
+	// Test GetIPLDElementCount
+	count := list.GetIPLDElementCount()
+	assert.Equal(t, 1, count)
+
+	// Test First
+	first, err := list.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.String("single"), first)
+
+	// Test Next (should return nil for single element)
+	next, err := list.Next()
+	require.NoError(t, err)
+	assert.Nil(t, next)
+
+	// Test Count
+	countResult, err := list.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 1, countResult)
+
+	// Test SExpr
+	sexpr, err := list.SExpr()
+	require.NoError(t, err)
+	assert.Equal(t, "(\"single\")", sexpr)
+}
+
+// TestIPLDLinkedListConj tests the Conj method
+func TestIPLDLinkedListConj(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Create initial list
+	list, err := lang.NewIPLDLinkedList(mockIPFS, builtin.String("original"))
+	require.NoError(t, err)
+
+	// Test Conj with additional items
+	newList, err := list.Conj(builtin.String("added1"), builtin.String("added2"))
+	require.NoError(t, err)
+	require.NotNil(t, newList)
+
+	// Verify the new list has the correct structure
+	// The Conj method prepends the current value to the new items
+	// So we expect: ["original", "added1", "added2"]
+	count, err := newList.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	first, err := newList.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.String("original"), first)
+}
+
+// TestIPLDLinkedListConjEmpty tests Conj on empty list
+func TestIPLDLinkedListConjEmpty(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Create empty list
+	list, err := lang.NewIPLDLinkedList(mockIPFS)
+	require.NoError(t, err)
+
+	// Test Conj on empty list
+	newList, err := list.Conj(builtin.String("item1"), builtin.String("item2"))
+	require.NoError(t, err)
+	require.NotNil(t, newList)
+
+	// Since the original list was empty, Conj should create a list with just the new items
+	count, err := newList.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 2, count) // ["item1", "item2"]
+
+	// The first element should be the first new item
+	first, err := newList.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.String("item1"), first)
+}
+
+// TestBuiltinArithmetic tests the arithmetic builtin functions
+func TestBuiltinArithmetic(t *testing.T) {
+	t.Parallel()
+	// Test BuiltinSub (subtraction)
+	subResult, err := lang.BuiltinSub(builtin.Int64(10), builtin.Int64(3))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Int64(7), subResult)
+
+	// Test BuiltinMul (multiplication)
+	mulResult, err := lang.BuiltinMul(builtin.Int64(4), builtin.Int64(5))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Int64(20), mulResult)
+
+	// Test BuiltinDiv (division)
+	divResult, err := lang.BuiltinDiv(builtin.Int64(15), builtin.Int64(3))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Int64(5), divResult)
+
+	// Test division by zero
+	_, err = lang.BuiltinDiv(builtin.Int64(10), builtin.Int64(0))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "division by zero")
+}
+
+// TestBuiltinComparison tests the comparison builtin functions
+func TestBuiltinComparison(t *testing.T) {
+	t.Parallel()
+	// Test BuiltinGt (greater than)
+	gtResult, err := lang.BuiltinGt(builtin.Int64(10), builtin.Int64(5))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(true), gtResult)
+
+	gtResult, err = lang.BuiltinGt(builtin.Int64(5), builtin.Int64(10))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(false), gtResult)
+
+	// Test BuiltinLt (less than)
+	ltResult, err := lang.BuiltinLt(builtin.Int64(3), builtin.Int64(7))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(true), ltResult)
+
+	ltResult, err = lang.BuiltinLt(builtin.Int64(7), builtin.Int64(3))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(false), ltResult)
+
+	// Test BuiltinGte (greater than or equal)
+	gteResult, err := lang.BuiltinGte(builtin.Int64(10), builtin.Int64(10))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(true), gteResult)
+
+	gteResult, err = lang.BuiltinGte(builtin.Int64(5), builtin.Int64(10))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(false), gteResult)
+
+	// Test BuiltinLte (less than or equal)
+	lteResult, err := lang.BuiltinLte(builtin.Int64(5), builtin.Int64(5))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(true), lteResult)
+
+	lteResult, err = lang.BuiltinLte(builtin.Int64(10), builtin.Int64(5))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Bool(false), lteResult)
+}
+
+// TestBuiltinPrintln tests the BuiltinPrintln function
+func TestBuiltinPrintln(t *testing.T) {
+	t.Parallel()
+	// Test BuiltinPrintln (this is a placeholder that just returns the string representation)
+	result, err := lang.BuiltinPrintln(builtin.String("Hello, World!"))
+	require.NoError(t, err)
+	assert.Equal(t, builtin.String("\"Hello, World!\""), result)
+}
+
+// TestBuiltinShellInfo tests the BuiltinShellInfo function
+func TestBuiltinShellInfo(t *testing.T) {
+	t.Parallel()
+	// Test BuiltinShellInfo
+	result, err := lang.BuiltinShellInfo()
+	require.NoError(t, err)
+
+	// Should return a Map with shell information
+	info, ok := result.(lang.Map)
+	require.True(t, ok)
+
+	// Check that it has the expected keys
+	name, ok := info.Get(builtin.Keyword("name"))
+	require.True(t, ok)
+	assert.Equal(t, builtin.String("Wetware Shell"), name)
+
+	version, ok := info.Get(builtin.Keyword("version"))
+	require.True(t, ok)
+	assert.Equal(t, builtin.String("0.1.0"), version)
+}
+
+// TestBuiltinNamespace tests the BuiltinNamespace function
+func TestBuiltinNamespace(t *testing.T) {
+	t.Parallel()
+	// Test BuiltinNamespace
+	result, err := lang.BuiltinNamespace()
+	require.NoError(t, err)
+
+	// Should return a Map with namespace information
+	namespace, ok := result.(lang.Map)
+	require.True(t, ok)
+
+	// Check that it has some keys (the default environment)
+	keys, err := lang.BuiltinKeys(namespace)
+	require.NoError(t, err)
+
+	keyList, ok := keys.(core.Seq)
+	require.True(t, ok)
+
+	count, err := keyList.Count()
+	require.NoError(t, err)
+	assert.Greater(t, count, 0) // Should have some keys
+}
+
+// TestBuiltinKeys tests the BuiltinKeys function
+func TestBuiltinKeys(t *testing.T) {
+	t.Parallel()
+	// Create a test map
+	testMap := lang.Map{
+		builtin.Keyword("key1"): builtin.String("value1"),
+		builtin.Keyword("key2"): builtin.Int64(42),
+	}
+
+	// Test BuiltinKeys
+	result, err := lang.BuiltinKeys(testMap)
+	require.NoError(t, err)
+
+	// Should return a list of keys
+	keys, ok := result.(core.Seq)
+	require.True(t, ok)
+
+	count, err := keys.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 2, count) // Should have exactly 2 keys
+}
+
+// TestPathFunctions tests the path-related functions
+func TestPathFunctions(t *testing.T) {
+	t.Parallel()
+	// Test NewUnixPath with valid path (using a real CID)
+	path, err := lang.NewUnixPath("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
+	require.NoError(t, err)
+	assert.Equal(t, "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa", path.String())
+
+	// Test ToBuiltinString
+	builtinStr := path.ToBuiltinString()
+	assert.Equal(t, builtin.String("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa"), builtinStr)
+}
+
+// TestPathValidation tests the path validation function
+func TestPathValidation(t *testing.T) {
+	t.Parallel()
+	// Test valid paths
+	validPath, err := lang.NewUnixPath("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
+	require.NoError(t, err)
+	assert.Equal(t, "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa", validPath.String())
+
+	// Test invalid paths
+	_, err = lang.NewUnixPath("/invalid/path")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Unix path")
+
+	_, err = lang.NewUnixPath("no-slash")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Unix path")
+
+	_, err = lang.NewUnixPath("")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid Unix path")
+}
+
+// TestMapFunctions tests the map-related functions
+func TestMapFunctions(t *testing.T) {
+	t.Parallel()
+	// Create a test map
+	testMap := lang.Map{
+		builtin.Keyword("key1"): builtin.String("value1"),
+		builtin.Keyword("key2"): builtin.Int64(42),
+		builtin.Keyword("key3"): builtin.Bool(true),
+	}
+
+	// Test Get
+	value, ok := testMap.Get(builtin.Keyword("key1"))
+	require.True(t, ok)
+	assert.Equal(t, builtin.String("value1"), value)
+
+	// Test Get with non-existent key
+	_, ok = testMap.Get(builtin.Keyword("nonexistent"))
+	require.False(t, ok)
+
+	// Test With (adding a new key-value pair)
+	newMap := testMap.With(builtin.Keyword("newKey"), builtin.String("newValue"))
+
+	// Verify the new map has the new key
+	value, ok = newMap.Get(builtin.Keyword("newKey"))
+	require.True(t, ok)
+	assert.Equal(t, builtin.String("newValue"), value)
+
+	// Verify the original map is unchanged
+	_, ok = testMap.Get(builtin.Keyword("newKey"))
+	require.False(t, ok)
+
+	// Test Without (removing a key)
+	removedMap := testMap.Without(builtin.Keyword("key1"))
+
+	// Verify the key is removed
+	_, ok = removedMap.Get(builtin.Keyword("key1"))
+	require.False(t, ok)
+
+	// Verify other keys are still there
+	value, ok = removedMap.Get(builtin.Keyword("key2"))
+	require.True(t, ok)
+	assert.Equal(t, builtin.Int64(42), value)
+
+	// Test Len
+	length := testMap.Len()
+	assert.Equal(t, 3, length)
+
+	// Test SExpr
+	sexpr, err := testMap.SExpr()
+	require.NoError(t, err)
+	assert.Contains(t, sexpr, "key1")
+	assert.Contains(t, sexpr, "value1")
+	assert.Contains(t, sexpr, "key2")
+	assert.Contains(t, sexpr, "42")
+}
+
+// TestIPLDConsCell tests the IPLD cons cell functionality
+func TestIPLDConsCell(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Test creating a cons cell with car and cdr
+	car := builtin.String("test-value")
+	cell, err := lang.NewIPLDConsCell(mockIPFS, car, nil)
+	require.NoError(t, err)
+	require.NotNil(t, cell)
+
+	// Verify the cons cell properties
+	assert.Equal(t, car, cell.Car)
+	assert.NotNil(t, cell.Cdr)
+	assert.NotEmpty(t, cell.Cdr.String())
+
+	// Test creating a cons cell with a cdr
+	cdr := cell.Cdr
+	cell2, err := lang.NewIPLDConsCell(mockIPFS, builtin.String("second-value"), cdr)
+	require.NoError(t, err)
+	require.NotNil(t, cell2)
+
+	// Verify the second cons cell
+	assert.Equal(t, builtin.String("second-value"), cell2.Car)
+	assert.NotNil(t, cell2.Cdr)
+	assert.NotEqual(t, cdr.String(), cell2.Cdr.String()) // Should be different CIDs
+}
+
+// TestIPLDConsCellChain tests building a chain of cons cells
+func TestIPLDConsCellChain(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Build a chain of cons cells: (cons "c" (cons "b" (cons "a" nil)))
+	var currentCell *lang.IPLDConsCell
+
+	// Start with the last cell (a -> nil)
+	cellA, err := lang.NewIPLDConsCell(mockIPFS, builtin.String("a"), nil)
+	require.NoError(t, err)
+	currentCell = cellA
+
+	// Add cell b -> a
+	cellB, err := lang.NewIPLDConsCell(mockIPFS, builtin.String("b"), currentCell.Cdr)
+	require.NoError(t, err)
+	currentCell = cellB
+
+	// Add cell c -> b
+	cellC, err := lang.NewIPLDConsCell(mockIPFS, builtin.String("c"), currentCell.Cdr)
+	require.NoError(t, err)
+
+	// Verify the chain
+	assert.Equal(t, builtin.String("c"), cellC.Car)
+	assert.NotNil(t, cellC.Cdr)
+	assert.Equal(t, builtin.String("b"), cellB.Car)
+	assert.NotNil(t, cellB.Cdr)
+	assert.Equal(t, builtin.String("a"), cellA.Car)
+	assert.NotNil(t, cellA.Cdr)
+}
+
+// TestLispFormEvaluation tests evaluating simple Lisp forms using our IPLD linked list
+func TestLispFormEvaluation(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Test 1: Simple function call form: (+ 1 2)
+	// Build the form: (cons "+" (cons 1 (cons 2 nil)))
+	form, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("+"),
+		builtin.Int64(1),
+		builtin.Int64(2))
+	require.NoError(t, err)
+
+	// Extract the function name (first element)
+	function, err := form.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("+"), function)
+
+	// Test 2: List construction form: (cons "a" (list "b" "c"))
+	// For now, we'll test with simple forms that don't nest IPLDLinkedList objects
+	// since IPLD doesn't know how to marshal them directly
+
+	// Build a simple form: (cons "a" "b")
+	consForm, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("cons"),
+		builtin.String("a"),
+		builtin.String("b"))
+	require.NoError(t, err)
+
+	// Extract the function name
+	consFunction, err := consForm.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("cons"), consFunction)
+
+	// Test 3: Simple function call: (first (list 1 2 3))
+	// Build the form: (first (list 1 2 3))
+	// For now, we'll test with simple forms that don't nest IPLDLinkedList objects
+
+	// Build a simple form: (first "some-list")
+	firstForm, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("first"),
+		builtin.String("some-list"))
+	require.NoError(t, err)
+
+	// Extract the function name
+	firstFunction, err := firstForm.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("first"), firstFunction)
+
+	// Test 4: Conditional form: (if condition "positive" "negative")
+	// Build a simple conditional form: (if "condition" "positive" "negative")
+	conditionalForm, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("if"),
+		builtin.String("condition"),
+		builtin.String("positive"),
+		builtin.String("negative"))
+	require.NoError(t, err)
+
+	// Extract the function name
+	conditionalFunction, err := conditionalForm.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("if"), conditionalFunction)
+
+	// Test 5: Lambda form: (lambda params body)
+	// Build a simple lambda form: (lambda "params" "body")
+	lambdaForm, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("lambda"),
+		builtin.String("params"),
+		builtin.String("body"))
+	require.NoError(t, err)
+
+	// Extract the function name
+	lambdaFunction, err := lambdaForm.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("lambda"), lambdaFunction)
+}
+
+// TestLispFormTraversal tests traversing and extracting parts of Lisp forms
+func TestLispFormTraversal(t *testing.T) {
+	t.Parallel()
+	mockIPFS := system.IPFS{}
+
+	// Build a simple form: (define factorial "lambda-body")
+	// This demonstrates how we can extract parts of a Lisp form
+
+	define, err := lang.NewIPLDLinkedList(mockIPFS,
+		builtin.Symbol("define"),
+		builtin.Symbol("factorial"),
+		builtin.String("lambda-body"))
+	require.NoError(t, err)
+
+	// Test form traversal
+	// Extract the function name (first element)
+	function, err := define.First()
+	require.NoError(t, err)
+	assert.Equal(t, builtin.Symbol("define"), function)
+
+	// Count the arguments
+	count, err := define.Count()
+	require.NoError(t, err)
+	assert.Equal(t, 3, count) // define, factorial, lambda-body
+
+	// Test that we can extract the symbol name
+	// In a real evaluator, we'd traverse the form to get the second element
+	// For now, we just verify the structure is correct
+	assert.NotNil(t, define)
 }
 
 // Helper functions for creating test data
