@@ -2,7 +2,7 @@ package shell
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/spy16/slurp/core"
@@ -23,12 +23,14 @@ const (
 	colorDim     = "\033[2m"
 )
 
-type printer struct{}
+type printer struct {
+	Writer io.Writer
+}
 
-func (printer) Print(val any) error {
+func (p printer) Print(val any) error {
 	if err, ok := val.(error); ok {
 		// Enhanced error formatting with colors
-		fmt.Fprintf(os.Stdout, "%s%s%s\n", colorRed, err.Error(), colorReset)
+		fmt.Fprintf(p.Writer, "%s%s%s\n", colorRed, err.Error(), colorReset)
 		return nil
 	}
 
@@ -38,25 +40,25 @@ func (printer) Print(val any) error {
 	case *lang.Buffer:
 		// Enhanced buffer display with hex preview
 		if len(v.Mem) > 0 {
-			fmt.Fprintf(os.Stdout, "%sBuffer (%d bytes):%s\n", colorBold, len(v.Mem), colorReset)
-			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorCyan, v.String(), colorReset)
+			fmt.Fprintf(p.Writer, "%sBuffer (%d bytes):%s\n", colorBold, len(v.Mem), colorReset)
+			fmt.Fprintf(p.Writer, "%s%s%s\n", colorCyan, v.String(), colorReset)
 			if len(v.Mem) <= 64 {
-				fmt.Fprintf(os.Stdout, "%sHex: %s%s\n", colorDim, v.AsHex(), colorReset)
+				fmt.Fprintf(p.Writer, "%sHex: %s%s\n", colorDim, v.AsHex(), colorReset)
 			}
 		} else {
-			fmt.Fprintf(os.Stdout, "%sEmpty buffer%s\n", colorYellow, colorReset)
+			fmt.Fprintf(p.Writer, "%sEmpty buffer%s\n", colorYellow, colorReset)
 		}
 
 	case lang.Map:
 		// Pretty print maps with indentation
-		printMap(v, 0, true)
+		p.printMap(v, 0, true)
 
 	case string:
 		// Enhanced string output with syntax highlighting for IPFS paths
 		if strings.HasPrefix(v, "/ipfs/") || strings.HasPrefix(v, "/ipld/") {
-			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorBlue, v, colorReset)
+			fmt.Fprintf(p.Writer, "%s%s%s\n", colorBlue, v, colorReset)
 		} else {
-			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorGreen, v, colorReset)
+			fmt.Fprintf(p.Writer, "%s%s%s\n", colorGreen, v, colorReset)
 		}
 
 	case core.SExpressable:
@@ -65,23 +67,23 @@ func (printer) Print(val any) error {
 			return err
 		}
 		// Enhanced s-expression formatting
-		fmt.Fprintf(os.Stdout, "%s%s%s\n", colorDim, form, colorReset)
+		fmt.Fprintf(p.Writer, "%s%s%s\n", colorDim, form, colorReset)
 
 	case core.Any:
 		// For core.Any types, try to convert to string
 		if str, ok := v.(string); ok {
-			fmt.Fprintf(os.Stdout, "%s%s%s\n", colorGreen, str, colorReset)
+			fmt.Fprintf(p.Writer, "%s%s%s\n", colorGreen, str, colorReset)
 		} else {
-			fmt.Fprintf(os.Stdout, "%s%+v%s\n", colorYellow, v, colorReset)
+			fmt.Fprintf(p.Writer, "%s%+v%s\n", colorYellow, v, colorReset)
 		}
 	default:
-		fmt.Fprintf(os.Stdout, "%s%+v%s\n", colorYellow, v, colorReset)
+		fmt.Fprintf(p.Writer, "%s%+v%s\n", colorYellow, v, colorReset)
 	}
 	return nil
 }
 
 // printMap recursively prints a map with proper indentation and colors
-func printMap(m lang.Map, indent int, useColors bool) {
+func (p printer) printMap(m lang.Map, indent int, useColors bool) {
 	indentStr := strings.Repeat("  ", indent)
 
 	for key, value := range m {
@@ -89,21 +91,21 @@ func printMap(m lang.Map, indent int, useColors bool) {
 
 		// Print key with color
 		if useColors {
-			fmt.Fprintf(os.Stdout, "%s%s%s%s: ", indentStr, colorCyan, keyStr, colorReset)
+			fmt.Fprintf(p.Writer, "%s%s%s%s: ", indentStr, colorCyan, keyStr, colorReset)
 		} else {
-			fmt.Fprintf(os.Stdout, "%s%s: ", indentStr, keyStr)
+			fmt.Fprintf(p.Writer, "%s%s: ", indentStr, keyStr)
 		}
 
 		// Handle nested maps recursively
 		if nestedMap, ok := value.(lang.Map); ok {
-			fmt.Fprintf(os.Stdout, "\n")
-			printMap(nestedMap, indent+1, useColors)
+			fmt.Fprintf(p.Writer, "\n")
+			p.printMap(nestedMap, indent+1, useColors)
 		} else {
 			// Print value with appropriate color
 			if useColors {
-				fmt.Fprintf(os.Stdout, "%s%v%s\n", colorGreen, value, colorReset)
+				fmt.Fprintf(p.Writer, "%s%v%s\n", colorGreen, value, colorReset)
 			} else {
-				fmt.Fprintf(os.Stdout, "%v\n", value)
+				fmt.Fprintf(p.Writer, "%v\n", value)
 			}
 		}
 	}
