@@ -696,6 +696,34 @@ type GlobalEnvConfig struct {
 	Executor system.Executor
 }
 
+// ConsoleObject provides a console object with methods
+type ConsoleObject struct {
+	Console system.Console
+}
+
+// Invoke implements core.Invokable for ConsoleObject
+func (co ConsoleObject) Invoke(args ...core.Any) (core.Any, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("console object requires at least one argument (method name)")
+	}
+
+	// First argument should be the method name
+	methodName, ok := args[0].(builtin.String)
+	if !ok {
+		return nil, fmt.Errorf("first argument must be method name (string), got %T", args[0])
+	}
+
+	switch string(methodName) {
+	case "println":
+		if len(args) != 2 {
+			return nil, fmt.Errorf("console.println requires exactly 1 argument, got %d", len(args)-1)
+		}
+		return ConsolePrintln{Console: co.Console}.Invoke(args[1])
+	default:
+		return nil, fmt.Errorf("console object has no method '%s'", methodName)
+	}
+}
+
 // New creates a new environment map with the configured capabilities
 func (cfg GlobalEnvConfig) New() map[string]core.Any {
 	env := DefaultEnvironment()
@@ -703,6 +731,7 @@ func (cfg GlobalEnvConfig) New() map[string]core.Any {
 	// Add console capability if available
 	if cfg.HasConsole() {
 		env["println"] = ConsolePrintln{Console: cfg.Console}
+		env["console"] = ConsoleObject{Console: cfg.Console}
 	}
 
 	// Add IPFS capability if available

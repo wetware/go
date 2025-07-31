@@ -188,7 +188,8 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 			r := strings.NewReader(input)
 			rd = readerFactory(ipfs).NewReader(r)
 		} else {
-			rd = NewReaderWithHexSupport(strings.NewReader(input))
+			// Use standard slurp reader for better dot notation support
+			rd = reader.New(strings.NewReader(input))
 		}
 
 		// Read and evaluate
