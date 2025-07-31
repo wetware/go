@@ -252,11 +252,8 @@ func TestListReader(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			// Check if result is a list
-			list, ok := result.(*builtin.LinkedList)
-			if !ok {
-				require.Fail(t, "ListReader() returned %T, want builtin.List", result)
-			}
+			require.IsType(t, (*lang.IPLDLinkedList)(nil), result)
+			list := result.(*lang.IPLDLinkedList)
 
 			count, err := list.Count()
 			require.NoError(t, err)
