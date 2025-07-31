@@ -263,22 +263,38 @@ func ListReader(ipfs system.IPFS) reader.Macro {
 	return func(rd *reader.Reader, init rune) (core.Any, error) {
 		const listEnd = ')'
 
-		forms := make([]core.Any, 0, 32) // pre-allocate to improve performance on small lists
-		if err := rd.Container(listEnd, "list", func(val core.Any) error {
-			forms = append(forms, val)
+		// Collect all values in a slice
+		var values []core.Any
+		if err := rd.Container(listEnd, "list", func(val core.Any) (err error) {
+			values = append(values, val)
 			return nil
 		}); err != nil {
 			return nil, err
 		}
 
-		// For now, we'll just return a regular list like the default reader
-		// In the future, this could be enhanced to handle IPFS-specific list operations
-		// such as:
-		// - Auto-resolving IPFS paths in lists
-		// - Special handling for IPFS commands
-		// - Batch operations on IPFS objects
+		// Create an immutable/persistent linked list using builtin.LinkedList
+		// In a more sophisticated implementation, this would serialize the values to IPFS DAG
+		// and create a proper linked list structure with minimal data linking to head and next nodes
+		if len(values) == 0 {
+			// Empty list - create IPLD list for consistency
+			ipldList, err := lang.NewIPLDLinkedList(ipfs)
+			if err != nil {
+				// Fallback to builtin.LinkedList if IPLD creation fails
+				return builtin.NewList(), nil
+			}
+			return ipldList, nil
+		}
 
-		return builtin.NewList(forms...), nil
+		// Create a proper IPLD-based immutable/persistent linked list
+		// This creates a DAG structure where each node is stored separately in IPFS
+		// with minimal data linking to head and next nodes
+		ipldList, err := lang.NewIPLDLinkedList(ipfs, values...)
+		if err != nil {
+			// Fallback to builtin.LinkedList if IPLD creation fails
+			return builtin.NewList(values...), nil
+		}
+
+		return ipldList, nil
 	}
 }
 
