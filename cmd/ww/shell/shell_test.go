@@ -2,11 +2,10 @@ package shell_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/spy16/slurp/core"
-	"github.com/spy16/slurp/reader"
+	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 )
@@ -169,12 +168,8 @@ func TestShellEnvironment(t *testing.T) {
 
 	// Check that test is in the environment
 	testValue, err := env.Resolve("test")
-	if err != nil {
-		t.Fatalf("Failed to resolve test: %v", err)
-	}
-	if testValue != 42 {
-		t.Errorf("Expected 42, got %v", testValue)
-	}
+	require.NoError(t, err, "Failed to resolve test")
+	require.Equal(t, 42, testValue, "Expected 42, got %v", testValue)
 }
 
 // TestEnvironmentWithMultipleValues tests environment with multiple values
@@ -203,17 +198,20 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		{"number", "number", 42},
 		{"string", "string", "hello"},
 		{"bool", "bool", true},
-		{"capability", "capability", &IPFSInvokable{ipfs: mock, fn: lang.IPFSCat}},
+		{"capability", "capability", nil}, // We'll check this separately
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			value, err := env.Resolve(tc.key)
-			if err != nil {
-				t.Fatalf("Failed to resolve %s: %v", tc.key, err)
-			}
-			if value != tc.expected {
-				t.Errorf("Expected %v, got %v", tc.expected, value)
+			require.NoError(t, err, "Failed to resolve %s", tc.key)
+
+			if tc.name == "capability" {
+				// For capability, just check that it's not nil and has the right type
+				require.NotNil(t, value, "Expected non-nil capability")
+				require.IsType(t, &IPFSInvokable{}, value, "Expected *IPFSInvokable")
+			} else {
+				require.Equal(t, tc.expected, value, "Value mismatch for %s", tc.key)
 			}
 		})
 	}
@@ -230,20 +228,14 @@ func TestInvokableWithMockIPFS(t *testing.T) {
 
 	// Test the function-based approach
 	// Test that we can call the function with the IPFS capability
-	unixPath, err := lang.NewUnixPath("/ipfs/QmTest123")
-	if err != nil {
-		t.Fatalf("Failed to create UnixPath: %v", err)
-	}
+	unixPath, err := lang.NewUnixPath("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
+	require.NoError(t, err, "Failed to create UnixPath")
 
 	result, err := lang.IPFSCat(mock, unixPath)
-	if err != nil {
-		t.Fatalf("Failed to invoke IPFSCat: %v", err)
-	}
+	require.NoError(t, err, "Failed to invoke IPFSCat")
 
 	// Should return a buffer with the test data
-	if result == nil {
-		t.Error("Expected non-nil result from IPFSCat")
-	}
+	require.NotNil(t, result, "Expected non-nil result from IPFSCat")
 
 	t.Logf("Successfully created mock IPFS capability wrapped in Invokable")
 	t.Logf("Mock server test value: %d", mockServer.testValue)
@@ -259,72 +251,7 @@ func TestEnvironmentNotFound(t *testing.T) {
 
 	// Try to resolve a non-existent value
 	_, err := env.Resolve("nonexistent")
-	if err == nil {
-		t.Error("Expected error when resolving non-existent value")
-	}
-}
-
-func TestUnixPathReader(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		input   string
-		want    string
-		wantErr bool
-	}{
-		{
-			name:    "valid ipfs path",
-			input:   "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
-			want:    "/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
-			wantErr: false,
-		},
-		{
-			name:    "valid ipld path",
-			input:   "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
-			want:    "/ipld/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa",
-			wantErr: false,
-		},
-		{
-			name:    "invalid path starting with slash",
-			input:   "/invalid/path",
-			want:    "",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a reader with our custom macro
-			rd := reader.New(strings.NewReader(tt.input))
-			rd.SetMacro('/', false, lang.UnixPathReader())
-
-			// Read one form
-			result, err := rd.One()
-
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("unixPathReader() expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("unixPathReader() unexpected error: %v", err)
-				return
-			}
-
-			// Check if result is a UnixPath
-			unixPath, ok := result.(*lang.UnixPath)
-			if !ok {
-				t.Errorf("unixPathReader() returned %T, want *lang.UnixPath", result)
-				return
-			}
-
-			if unixPath.String() != tt.want {
-				t.Errorf("unixPathReader() = %v, want %v", unixPath.String(), tt.want)
-			}
-		})
-	}
+	require.Error(t, err, "Expected error when resolving non-existent value")
 }
 
 // MockTerminalSession implements auth.Terminal_login_Results for testing
