@@ -158,6 +158,16 @@ func (m *MockIPFSServer) Peers(ctx context.Context, call system.IPFS_peers) erro
 	return results.SetPeerList(peerList)
 }
 
+// ResolveNode implements system.IPFS_Server.ResolveNode
+func (m *MockIPFSServer) ResolveNode(ctx context.Context, call system.IPFS_resolveNode) error {
+	// Mock implementation - return test CID
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+	return results.SetCid("QmTestResolved")
+}
+
 // TestShellEnvironment tests that the environment is set up correctly
 func TestShellEnvironment(t *testing.T) {
 	t.Parallel()
