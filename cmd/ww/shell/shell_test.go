@@ -2,16 +2,26 @@ package shell_test
 
 import (
 	"context"
-	"testing"
-
 	"strings"
+	"testing"
 
 	"github.com/spy16/slurp/core"
 	"github.com/spy16/slurp/reader"
-	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 )
+
+// IPFSInvokable wraps an IPFS function to make it compatible with slurp's core.Invokable interface
+type IPFSInvokable struct {
+	ipfs system.IPFS
+	fn   func(args ...core.Any) (core.Any, error)
+}
+
+// Invoke implements core.Invokable for IPFSInvokable
+func (i *IPFSInvokable) Invoke(args ...core.Any) (core.Any, error) {
+	// Prepend the IPFS capability to the arguments
+	return i.fn(append([]core.Any{i.ipfs}, args...)...)
+}
 
 // MockIPFSServer implements system.IPFS_Server for testing
 type MockIPFSServer struct {
@@ -66,7 +76,10 @@ func (m *MockIPFSServer) Stat(ctx context.Context, call system.IPFS_stat) error 
 	info.SetCid("QmTest123")
 	info.SetSize(100)
 	info.SetCumulativeSize(100)
-	info.SetType("file")
+	_, err = info.NodeType().NewFile()
+	if err != nil {
+		return err
+	}
 	return results.SetInfo(info)
 }
 
@@ -178,19 +191,19 @@ func TestEnvironmentWithMultipleValues(t *testing.T) {
 		"number":     42,
 		"string":     "hello",
 		"bool":       true,
-		"capability": lang.IPFSCat{IPFS: mock},
+		"capability": &IPFSInvokable{ipfs: mock, fn: lang.IPFSCat},
 	})
 
 	// Test resolving each value
 	testCases := []struct {
 		name     string
 		key      string
-		expected interface{}
+		expected any
 	}{
 		{"number", "number", 42},
 		{"string", "string", "hello"},
 		{"bool", "bool", true},
-		{"capability", "capability", lang.IPFSCat{IPFS: mock}},
+		{"capability", "capability", &IPFSInvokable{ipfs: mock, fn: lang.IPFSCat}},
 	}
 
 	for _, tc := range testCases {
@@ -215,22 +228,22 @@ func TestInvokableWithMockIPFS(t *testing.T) {
 	// Create a client from the server
 	mock := system.IPFS_ServerToClient(mockServer)
 
-	// Create the invokable wrapper
-	sess := lang.IPFSCat{IPFS: mock}
-
-	// Test that we can access the client
-	if sess.IPFS != mock {
-		t.Errorf("Expected client to be the mock, got %v", sess.IPFS)
-	}
-
-	// Test that we can return the session itself when no arguments are provided
-	result, err := sess.Invoke()
+	// Test the function-based approach
+	// Test that we can call the function with the IPFS capability
+	unixPath, err := lang.NewUnixPath("/ipfs/QmTest123")
 	if err != nil {
-		t.Fatalf("Failed to invoke with no arguments: %v", err)
+		t.Fatalf("Failed to create UnixPath: %v", err)
 	}
 
-	// Should return the session itself
-	require.Equal(t, sess, result, "identity law not verified:  `(session)` should return `session`")
+	result, err := lang.IPFSCat(mock, unixPath)
+	if err != nil {
+		t.Fatalf("Failed to invoke IPFSCat: %v", err)
+	}
+
+	// Should return a buffer with the test data
+	if result == nil {
+		t.Error("Expected non-nil result from IPFSCat")
+	}
 
 	t.Logf("Successfully created mock IPFS capability wrapped in Invokable")
 	t.Logf("Mock server test value: %d", mockServer.testValue)
@@ -429,16 +442,16 @@ func TestCapabilityWithholding(t *testing.T) {
 			// Conditionally add IPFS capabilities
 			if sess.HasIpfs() {
 				ipfs := sess.Ipfs()
-				globals["cat"] = lang.IPFSCat{IPFS: ipfs}
-				globals["add"] = lang.IPFSAdd{IPFS: ipfs}
-				globals["ls"] = &lang.IPFSLs{IPFS: ipfs}
-				globals["stat"] = &lang.IPFSStat{IPFS: ipfs}
-				globals["pin"] = &lang.IPFSPin{IPFS: ipfs}
-				globals["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
-				globals["pins"] = &lang.IPFSPins{IPFS: ipfs}
-				globals["id"] = &lang.IPFSId{IPFS: ipfs}
-				globals["connect"] = &lang.IPFSConnect{IPFS: ipfs}
-				globals["peers"] = &lang.IPFSPeers{IPFS: ipfs}
+				globals["cat"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSCat}
+				globals["add"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSAdd}
+				globals["ls"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSLs}
+				globals["stat"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSStat}
+				globals["pin"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSPin}
+				globals["unpin"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSUnpin}
+				globals["pins"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSPins}
+				globals["id"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSId}
+				globals["connect"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSConnect}
+				globals["peers"] = &IPFSInvokable{ipfs: ipfs, fn: lang.IPFSPeers}
 			}
 
 			// Conditionally add process execution capability

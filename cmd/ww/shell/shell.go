@@ -13,6 +13,7 @@ import (
 	"github.com/wetware/go/auth"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/lang"
+	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
 
@@ -153,16 +154,8 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 		ipfs := sess.Ipfs()
 		defer ipfs.Release()
 
-		globals["cat"] = lang.IPFSCat{IPFS: ipfs}
-		globals["add"] = lang.IPFSAdd{IPFS: ipfs}
-		globals["ls"] = &lang.IPFSLs{IPFS: ipfs}
-		globals["stat"] = &lang.IPFSStat{IPFS: ipfs}
-		globals["pin"] = &lang.IPFSPin{IPFS: ipfs}
-		globals["unpin"] = &lang.IPFSUnpin{IPFS: ipfs}
-		globals["pins"] = &lang.IPFSPins{IPFS: ipfs}
-		globals["id"] = &lang.IPFSId{IPFS: ipfs}
-		globals["connect"] = &lang.IPFSConnect{IPFS: ipfs}
-		globals["peers"] = &lang.IPFSPeers{IPFS: ipfs}
+		// Add the IPFS object to the environment to support dot-method calls
+		globals["ipfs"] = lang.NewIPFSObject(system.IPFS(ipfs))
 	}
 
 	// Conditionally add process execution capability
@@ -176,7 +169,7 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 
 	interpreter := slurp.New(
 		slurp.WithEnv(env),
-		slurp.WithAnalyzer(nil))
+		slurp.WithAnalyzer(lang.NewDotNotationAnalyzer(nil)))
 
 	// Create readline input
 	rlInput, err := NewReadlineInput(home)

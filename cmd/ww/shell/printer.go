@@ -25,7 +25,7 @@ const (
 
 type printer struct{}
 
-func (printer) Print(val interface{}) error {
+func (printer) Print(val any) error {
 	if err, ok := val.(error); ok {
 		// Enhanced error formatting with colors
 		fmt.Fprintf(os.Stdout, "%s%s%s\n", colorRed, err.Error(), colorReset)

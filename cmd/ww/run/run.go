@@ -97,7 +97,7 @@ func Main(c *cli.Context) error {
 	ipfs := system.IPFSConfig{API: maybeIPFS(c)}.New()
 	defer ipfs.Release()
 
-	exec := system.ExecConfig{Enabled: maybeExec(c), IPFS: ipfs}.New()
+	exec := system.ExecConfig{Enabled: maybeExec(c)}.New()
 	defer exec.Release()
 
 	console := system.ConsoleConfig{Writer: maybeConsoleWriter(c)}.New()
