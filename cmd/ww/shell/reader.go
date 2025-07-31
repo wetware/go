@@ -16,6 +16,20 @@ import (
 	"github.com/wetware/go/system"
 )
 
+// readerFactory creates a custom reader factory for the shell
+func readerFactory(ipfs system.IPFS) repl.ReaderFactoryFunc {
+	return func(r io.Reader) *reader.Reader {
+		// Create a reader with hex support
+		rd := NewReaderWithHexSupport(r)
+
+		rd.SetMacro('/', false, UnixPathReader())
+		rd.SetMacro('(', false, ListReader(ipfs))
+		rd.SetMacro('{', false, MapReader())
+
+		return rd
+	}
+}
+
 // NewReaderWithHexSupport creates a new reader with support for hex literals
 // This allows users to use hex literals like 0x746573742064617461
 func NewReaderWithHexSupport(r io.Reader) *reader.Reader {
@@ -268,19 +282,58 @@ func ListReader(ipfs system.IPFS) reader.Macro {
 	}
 }
 
-// readerFactory creates a custom reader factory for the shell
-func readerFactory(ipfs system.IPFS) repl.ReaderFactoryFunc {
-	return func(r io.Reader) *reader.Reader {
-		// Create a reader with hex support
-		rd := NewReaderWithHexSupport(r)
+// MapReader implements a reader macro for map literals using curly braces
+// This allows users to create maps like {:a 1 :b 2 :c 3}
+// The syntax is {key1 val1 key2 val2 ...} where keys should be keywords
+func MapReader() reader.Macro {
+	return func(rd *reader.Reader, init rune) (core.Any, error) {
+		const mapEnd = '}'
 
-		// Set up the Unix path reader macro for '/' character
-		rd.SetMacro('/', false, UnixPathReader())
-		// Set up the custom list reader macro for '(' character
-		rd.SetMacro('(', false, ListReader(ipfs))
-		// Set up the map reader macro for '{' character
-		rd.SetMacro('{', false, lang.MapReader())
+		// Read all forms within the map
+		forms := make([]core.Any, 0, 32)
+		if err := rd.Container(mapEnd, "map", func(val core.Any) error {
+			forms = append(forms, val)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
 
-		return rd
+		// Check that we have an even number of forms (key-value pairs)
+		if len(forms)%2 != 0 {
+			return nil, fmt.Errorf("map literal must have even number of forms (key-value pairs), got %d", len(forms))
+		}
+
+		// Create the map
+		m := make(lang.Map)
+		for i := 0; i < len(forms); i += 2 {
+			key := forms[i]
+			value := forms[i+1]
+
+			// Convert key to keyword if it's not already
+			var keyword builtin.Keyword
+			switch k := key.(type) {
+			case builtin.Keyword:
+				keyword = k
+			case builtin.String:
+				// Handle case where string might have trailing colon
+				str := strings.TrimSuffix(string(k), ":")
+				keyword = builtin.Keyword(str)
+			case builtin.Symbol:
+				// Handle case where symbol might have trailing colon
+				sym := strings.TrimSuffix(string(k), ":")
+				keyword = builtin.Keyword(sym)
+			default:
+				return nil, fmt.Errorf("map key must be keyword, string, or symbol, got %T", key)
+			}
+
+			// Check for duplicate keys
+			if _, exists := m[keyword]; exists {
+				return nil, fmt.Errorf("duplicate key in map: %v", keyword)
+			}
+
+			m[keyword] = value
+		}
+
+		return m, nil
 	}
 }
