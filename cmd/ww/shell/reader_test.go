@@ -252,11 +252,20 @@ func TestListReader(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			require.IsType(t, (*lang.IPLDLinkedList)(nil), result)
-			list := result.(*lang.IPLDLinkedList)
+			// The ListReader can return either IPLDLinkedList or builtin.LinkedList depending on complexity
+			// Check for both types
+			var count int
 
-			count, err := list.Count()
-			require.NoError(t, err)
+			if ipldList, ok := result.(*lang.IPLDLinkedList); ok {
+				count, err = ipldList.Count()
+				require.NoError(t, err)
+			} else if builtinList, ok := result.(*builtin.LinkedList); ok {
+				count, err = builtinList.Count()
+				require.NoError(t, err)
+			} else {
+				t.Fatalf("Expected *lang.IPLDLinkedList or *builtin.LinkedList, got %T", result)
+			}
+
 			require.Equal(t, tt.wantLen, count)
 
 			t.Logf("Successfully parsed list: %v", result)
