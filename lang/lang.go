@@ -259,9 +259,30 @@ func (pll *PersistentLinkedList) PersistToIPFS() (string, error) {
 		return "", fmt.Errorf("no IPFS capability available")
 	}
 
-	// For now, serialize the entire list as JSON and store it
-	// In a more sophisticated implementation, this would create a proper DAG structure
-	data, err := json.Marshal(pll.List)
+	// Serialize the list by converting it to a slice and marshaling that
+	var items []core.Any
+	current := pll.List
+	for {
+		if current == nil {
+			break
+		}
+		first, err := current.First()
+		if err != nil {
+			break
+		}
+		items = append(items, first)
+		next, err := current.Next()
+		if err != nil {
+			break
+		}
+		if nextList, ok := next.(*builtin.LinkedList); ok {
+			current = nextList
+		} else {
+			break
+		}
+	}
+
+	data, err := json.Marshal(items)
 	if err != nil {
 		return "", fmt.Errorf("failed to serialize list: %w", err)
 	}
@@ -310,111 +331,27 @@ func LoadFromIPFS(ipfs system.IPFS, cid string) (*PersistentLinkedList, error) {
 		return nil, fmt.Errorf("failed to get body: %w", err)
 	}
 
-	// For now, deserialize as JSON
-	// In a more sophisticated implementation, this would reconstruct the DAG structure
-	var list builtin.LinkedList
-	if err := json.Unmarshal(body, &list); err != nil {
+	// Deserialize the items and reconstruct the linked list
+	var items []core.Any
+	if err := json.Unmarshal(body, &items); err != nil {
 		return nil, fmt.Errorf("failed to deserialize list: %w", err)
 	}
 
-	return &PersistentLinkedList{
-		List:    &list,
-		IPFS:    ipfs,
-		RootCID: cid,
-	}, nil
-}
-
-// IPLDLinkedList represents a proper IPLD-based immutable/persistent linked list
-// It embeds builtin.LinkedList for compatibility while using IPFS for persistence
-// It creates a DAG structure where each node is stored separately in IPFS
-// with minimal data linking to head and next nodes
-type IPLDLinkedList struct {
-	*builtin.LinkedList
-	// Head CID of the first node in the list
-	HeadCID string
-	// Number of elements in the list
-	ElementCount int
-	// IPFS capability for accessing the DAG
-	IPFS system.IPFS
-}
-
-// IPLDListNode represents a single node in the IPLD linked list
-type IPLDListNode struct {
-	// The value stored in this node
-	Value core.Any `json:"value"`
-	// CID of the next node (empty string for the last node)
-	NextCID string `json:"next,omitempty"`
-}
-
-// NewIPLDLinkedList creates a new IPLD-based linked list from values
-func NewIPLDLinkedList(ipfs system.IPFS, values ...core.Any) (*IPLDLinkedList, error) {
-	// Create the underlying builtin.LinkedList for compatibility
-	builtinList := builtin.NewList(values...)
-	if linkedList, ok := builtinList.(*builtin.LinkedList); ok {
-		if len(values) == 0 {
-			return &IPLDLinkedList{
-				LinkedList: linkedList,
-				IPFS:       ipfs,
-			}, nil
-		}
-
-		// Build the IPLD DAG structure from back to front to create proper links
-		var headCID string
-		for i := len(values) - 1; i >= 0; i-- {
-			node := IPLDListNode{
-				Value:   values[i],
-				NextCID: headCID,
-			}
-
-			// Serialize the node to JSON
-			data, err := json.Marshal(node)
-			if err != nil {
-				return nil, fmt.Errorf("failed to serialize node: %w", err)
-			}
-
-			// Add the node to IPFS
-			ctx := context.Background()
-			future, release := ipfs.Add(ctx, func(params system.IPFS_add_Params) error {
-				return params.SetData(data)
-			})
-			defer release()
-
-			res, err := future.Struct()
-			if err != nil {
-				return nil, fmt.Errorf("failed to add node to IPFS: %w", err)
-			}
-
-			cid, err := res.Cid()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get node CID: %w", err)
-			}
-
-			headCID = cid
-		}
-
-		return &IPLDLinkedList{
-			LinkedList:   linkedList,
-			HeadCID:      headCID,
-			ElementCount: len(values),
-			IPFS:         ipfs,
+	// Reconstruct the linked list from the items
+	list := builtin.NewList(items...)
+	if linkedList, ok := list.(*builtin.LinkedList); ok {
+		return &PersistentLinkedList{
+			List:    linkedList,
+			IPFS:    ipfs,
+			RootCID: cid,
 		}, nil
 	}
 
-	// Fallback: create a new list
-	return &IPLDLinkedList{
-		LinkedList: builtin.NewList().(*builtin.LinkedList),
-		IPFS:       ipfs,
+	return &PersistentLinkedList{
+		List:    builtin.NewList().(*builtin.LinkedList),
+		IPFS:    ipfs,
+		RootCID: cid,
 	}, nil
-}
-
-// GetIPLDHeadCID returns the CID of the head node in the IPLD DAG
-func (ill *IPLDLinkedList) GetIPLDHeadCID() string {
-	return ill.HeadCID
-}
-
-// GetIPLDElementCount returns the number of elements in the IPLD list
-func (ill *IPLDLinkedList) GetIPLDElementCount() int {
-	return ill.ElementCount
 }
 
 // IPFSCat implements a standalone cat function for the shell
