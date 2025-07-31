@@ -16,15 +16,10 @@ import (
 
 // IPFSObject wraps an IPFS capability and provides method access
 type IPFSObject struct {
-	ipfs system.IPFS
+	IPFS system.IPFS
 }
 
-// NewIPFSObject creates a new IPFSObject from an IPFS capability
-func NewIPFSObject(ipfs system.IPFS) *IPFSObject {
-	return &IPFSObject{ipfs: ipfs}
-}
-
-// Invoke implements core.Invokable to support direct calls like (ipfs "stat" path)
+// Invoke implements core.Invokable to support direct calls like (IPFS "stat" path)
 func (i *IPFSObject) Invoke(args ...core.Any) (core.Any, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("ipfs requires at least 1 argument: method name, got %d", len(args))
@@ -46,25 +41,25 @@ func (i *IPFSObject) Invoke(args ...core.Any) (core.Any, error) {
 	// Call the appropriate method based on the name
 	switch methodName {
 	case "cat":
-		return IPFSCat(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSCat(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "add":
-		return IPFSAdd(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSAdd(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "ls":
-		return IPFSLs(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSLs(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "stat":
-		return IPFSStat(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSStat(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "pin":
-		return IPFSPin(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSPin(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "unpin":
-		return IPFSUnpin(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSUnpin(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "pins":
-		return IPFSPins(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSPins(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "id":
-		return IPFSId(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSId(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "connect":
-		return IPFSConnect(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSConnect(append([]core.Any{i.IPFS}, args[1:]...)...)
 	case "peers":
-		return IPFSPeers(append([]core.Any{i.ipfs}, args[1:]...)...)
+		return IPFSPeers(append([]core.Any{i.IPFS}, args[1:]...)...)
 	default:
 		return nil, fmt.Errorf("unknown IPFS method: %s", methodName)
 	}
@@ -90,43 +85,43 @@ func (i *IPFSObject) Get(key core.Any) (core.Any, error) {
 	case "cat":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
 			// Prepend the IPFS capability to the arguments
-			return IPFSCat(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSCat(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "add":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSAdd(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSAdd(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "ls":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSLs(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSLs(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "stat":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSStat(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSStat(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "pin":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSPin(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSPin(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "unpin":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSUnpin(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSUnpin(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "pins":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSPins(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSPins(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "id":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSId(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSId(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "connect":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSConnect(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSConnect(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	case "peers":
 		return &IPFSInvokable{fn: func(args ...core.Any) (core.Any, error) {
-			return IPFSPeers(append([]core.Any{i.ipfs}, args...)...)
+			return IPFSPeers(append([]core.Any{i.IPFS}, args...)...)
 		}}, nil
 	default:
 		return nil, fmt.Errorf("unknown IPFS method: %s", methodName)
