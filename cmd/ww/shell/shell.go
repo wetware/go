@@ -2,13 +2,16 @@ package shell
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/core"
-	"github.com/spy16/slurp/repl"
+	"github.com/spy16/slurp/reader"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/auth"
 	"github.com/wetware/go/cmd/internal/flags"
@@ -66,13 +69,6 @@ This provides a secure environment for testing and development.`,
 			// 	Usage:    "timeout for -dial",
 			// 	Value:    time.Second * 10,
 			// },
-			&cli.BoolFlag{
-				Name:     "quiet",
-				Category: "OUTPUT",
-				Aliases:  []string{"q"},
-				Usage:    "suppress banner message on interactive startup",
-				EnvVars:  []string{"WW_QUIET"},
-			},
 		}, flags.CapabilityFlags()...),
 		Action: func(c *cli.Context) error {
 			// If no subcommand is specified, run the main action
@@ -155,22 +151,63 @@ func cell(ctx context.Context, sess auth.Terminal_login_Results) error {
 	}
 	defer rlInput.Close()
 
-	// Create a REPL with readline input
-	replConfig := []repl.Option{
-		repl.WithBanner("Wetware Shell - Type 'quit' to exit"),
-		repl.WithPrompts("ww »", "   ›"),
-		repl.WithPrinter(printer{}),
-		repl.WithInput(rlInput, nil),
+	// Set the prompt on the readline instance
+	rlInput.Prompt("ww » ")
+
+	printer := printer{Writer: os.Stdout}
+
+	// Custom REPL loop that handles errors gracefully
+	for {
+		// Read input
+		input, err := rlInput.Readline()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// User pressed Ctrl+D, exit gracefully
+				fmt.Println()
+				break
+			}
+			// Other readline errors, continue
+			fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+			continue
+		}
+
+		// Check for quit command
+		if strings.TrimSpace(input) == "quit" {
+			break
+		}
+
+		// Skip empty input
+		if strings.TrimSpace(input) == "" {
+			continue
+		}
+
+		// Create a reader for the input
+		var rd *reader.Reader
+		if sess.HasIpfs() {
+			ipfs := sess.Ipfs()
+			rd = readerFactory(ipfs)(strings.NewReader(input))
+		} else {
+			rd = lang.NewReaderWithHexSupport(strings.NewReader(input))
+		}
+
+		// Read and evaluate
+		form, err := rd.One()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			continue
+		}
+
+		// Evaluate the form
+		result, err := interpreter.Eval(form)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			continue
+		}
+
+		if err := printer.Print(result); err != nil {
+			fmt.Fprintf(os.Stderr, "Error printing result: %v\n", err)
+		}
 	}
 
-	// Conditionally add IPFS reader factory if IPFS is available
-	if sess.HasIpfs() {
-		ipfs := sess.Ipfs()
-		replConfig = append(replConfig, repl.WithReaderFactory(readerFactory(ipfs)))
-	}
-
-	repl := repl.New(interpreter, replConfig...)
-
-	// Start the REPL loop
-	return repl.Loop(ctx)
+	return nil
 }
