@@ -306,11 +306,75 @@ type MockExecutor struct {
 func (m *MockExecutor) Spawn(ctx context.Context, call system.Executor_spawn) error {
 	m.spawnCalled = true
 
-	// // Get the parameters
-	// params := call.Args()
+	// Get the parameters
+	params := call.Args()
+
+	// Extract command
+	command, err := params.Command()
+	if err != nil {
+		return err
+	}
 
 	// Extract path
-	return errors.New("not implemented")
+	path, err := command.Path()
+	if err != nil {
+		return err
+	}
+	m.spawnPath = path
+
+	// Extract arguments
+	args, err := command.Args()
+	if err != nil {
+		return err
+	}
+	m.spawnArgs = make([]string, args.Len())
+	for i := 0; i < args.Len(); i++ {
+		arg, err := args.At(i)
+		if err != nil {
+			return err
+		}
+		m.spawnArgs[i] = arg
+	}
+
+	// Extract working directory
+	dir, err := command.Dir()
+	if err != nil {
+		return err
+	}
+	m.spawnDir = dir
+
+	// Extract environment variables
+	env, err := command.Env()
+	if err != nil {
+		return err
+	}
+	m.spawnEnv = make([]string, env.Len())
+	for i := 0; i < env.Len(); i++ {
+		envVar, err := env.At(i)
+		if err != nil {
+			return err
+		}
+		m.spawnEnv[i] = envVar
+	}
+
+	// Allocate results
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	if m.shouldSucceed {
+		// Create a successful result
+		cell := system.Cell_ServerToClient(&MockCell{})
+		optionalCell, err := results.NewCell()
+		if err != nil {
+			return err
+		}
+		return optionalCell.SetCell(cell)
+	} else {
+		// Return an error
+		return errors.New("mock executor spawn failed")
+	}
 }
 
 // MockCell implements system.Cell_Server for testing

@@ -101,6 +101,7 @@ func DefaultEnvironment() map[string]core.Any {
 
 		// Environment introspection
 		"env":        &BuiltinInvokable{fn: BuiltinEnv},
+		"help":       &BuiltinInvokable{fn: BuiltinHelp},
 		"shell-info": &BuiltinInvokable{fn: BuiltinShellInfo},
 		"namespace":  &BuiltinInvokable{fn: BuiltinNamespace},
 		"keys":       &BuiltinInvokable{fn: BuiltinKeys},

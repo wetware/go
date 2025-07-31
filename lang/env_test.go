@@ -346,8 +346,9 @@ func TestNewGlobalsFromSession(t *testing.T) {
 
 	// Test with console capability only
 	session.hasConsole = true
-	// Note: We don't need to set actual console capability for this test
-	// since we're only testing that the function is added to the environment
+	// Create a mock console for testing
+	mockConsole := &MockConsoleServer{}
+	session.console = system.Console_ServerToClient(mockConsole)
 
 	env = lang.GlobalEnvConfig{
 		Console:  session.Console(),
@@ -364,8 +365,11 @@ func TestNewGlobalsFromSession(t *testing.T) {
 	// Test with IPFS capability only
 	session.hasConsole = false
 	session.hasIpfs = true
-	// Note: We don't need to set actual IPFS capability for this test
-	// since we're only testing that the function is added to the environment
+	session.hasExec = false
+	// Reset console and create a mock IPFS for testing
+	session.console = system.Console{}
+	session.ipfs = system.IPFS_ServerToClient(&MockIPFSServer{})
+	session.exec = system.Executor{}
 
 	env = lang.GlobalEnvConfig{
 		Console:  session.Console(),
@@ -380,10 +384,13 @@ func TestNewGlobalsFromSession(t *testing.T) {
 	require.NotContains(t, env, "go")
 
 	// Test with exec capability only
+	session.hasConsole = false
 	session.hasIpfs = false
 	session.hasExec = true
-	// Note: We don't need to set actual executor capability for this test
-	// since we're only testing that the function is added to the environment
+	// Reset console and IPFS, create a mock executor for testing
+	session.console = system.Console{}
+	session.ipfs = system.IPFS{}
+	session.exec = system.Executor_ServerToClient(&MockExecutor{shouldSucceed: true})
 
 	env = lang.GlobalEnvConfig{
 		Console:  session.Console(),
@@ -401,6 +408,10 @@ func TestNewGlobalsFromSession(t *testing.T) {
 	session.hasConsole = true
 	session.hasIpfs = true
 	session.hasExec = true
+	// Set up all mock capabilities
+	session.console = system.Console_ServerToClient(&MockConsoleServer{})
+	session.ipfs = system.IPFS_ServerToClient(&MockIPFSServer{})
+	session.exec = system.Executor_ServerToClient(&MockExecutor{shouldSucceed: true})
 
 	env = lang.GlobalEnvConfig{
 		Console:  session.Console(),
