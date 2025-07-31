@@ -2,9 +2,11 @@ package lang_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/spy16/slurp/builtin"
+	"github.com/spy16/slurp/core"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
@@ -17,14 +19,11 @@ func TestIPFSCat(t *testing.T) {
 	mockServer := &MockIPFSServer{testValue: 42}
 	mock := system.IPFS_ServerToClient(mockServer)
 
-	// Create the IPFSCat function
-	catFunc := lang.IPFSCat{IPFS: mock}
-
 	// Test with UnixPath
 	unixPath, err := lang.NewUnixPath("/ipfs/QmYJKWYVWwJmJpK4N1vRNcZ9uVQYfLRXU9uK9kfiMWQuoa")
 	require.NoError(t, err, "Failed to create UnixPath")
 
-	result, err := catFunc.Invoke(unixPath)
+	result, err := lang.IPFSCat(mock, unixPath)
 	require.NoError(t, err, "Failed to invoke cat with UnixPath")
 
 	buffer, ok := result.(*lang.Buffer)
@@ -57,15 +56,12 @@ func TestIPFSAdd(t *testing.T) {
 	mockServer := &MockIPFSServer{testValue: 42}
 	mock := system.IPFS_ServerToClient(mockServer)
 
-	// Create the IPFSAdd function
-	addFunc := lang.IPFSAdd{IPFS: mock}
-
 	// Create a Buffer with test data
 	testData := []byte("test data for add")
 	buffer := &lang.Buffer{Mem: testData}
 
 	// Test with Buffer
-	result, err := addFunc.Invoke(buffer)
+	result, err := lang.IPFSAdd(mock, buffer)
 	require.NoError(t, err, "Failed to invoke add with Buffer")
 
 	cid, ok := result.(string)
@@ -206,7 +202,10 @@ func (m *MockIPFSServer) Stat(ctx context.Context, call system.IPFS_stat) error 
 	info.SetCid("QmTest123")
 	info.SetSize(100)
 	info.SetCumulativeSize(100)
-	info.SetType("file")
+	_, err = info.NodeType().NewFile()
+	if err != nil {
+		return err
+	}
 	return results.SetInfo(info)
 }
 
@@ -307,74 +306,11 @@ type MockExecutor struct {
 func (m *MockExecutor) Spawn(ctx context.Context, call system.Executor_spawn) error {
 	m.spawnCalled = true
 
-	// Get the parameters
-	params := call.Args()
+	// // Get the parameters
+	// params := call.Args()
 
 	// Extract path
-	path, err := params.Path()
-	if err == nil {
-		m.spawnPath = path
-	}
-
-	// Extract arguments
-	args, err := params.Args()
-	if err == nil {
-		m.spawnArgs = make([]string, args.Len())
-		for i := 0; i < args.Len(); i++ {
-			arg, err := args.At(i)
-			if err == nil {
-				m.spawnArgs[i] = arg
-			}
-		}
-	}
-
-	// Extract directory
-	dir, err := params.Dir()
-	if err == nil {
-		m.spawnDir = dir
-	}
-
-	// Extract environment
-	env, err := params.Env()
-	if err == nil {
-		m.spawnEnv = make([]string, env.Len())
-		for i := 0; i < env.Len(); i++ {
-			envVar, err := env.At(i)
-			if err == nil {
-				m.spawnEnv[i] = envVar
-			}
-		}
-	}
-
-	// Allocate results
-	results, err := call.AllocResults()
-	if err != nil {
-		return err
-	}
-
-	if m.shouldSucceed {
-		// Create a successful result with a mock cell
-		optionalCell, err := results.NewCell()
-		if err != nil {
-			return err
-		}
-		// Create a mock cell server and convert to client
-		mockCell := &MockCell{}
-		cellClient := system.Cell_ServerToClient(mockCell)
-		optionalCell.SetCell(cellClient)
-	} else {
-		// Create an error result
-		optionalCell, err := results.NewCell()
-		if err != nil {
-			return err
-		}
-		optionalCell.SetErr()
-		errStruct := optionalCell.Err()
-		errStruct.SetStatus(1)
-		errStruct.SetBody([]byte("mock error"))
-	}
-
-	return nil
+	return errors.New("not implemented")
 }
 
 // MockCell implements system.Cell_Server for testing
@@ -493,4 +429,266 @@ func (m *MockConsoleServer) Println(ctx context.Context, call system.Console_pri
 	results.SetN(m.bytesWritten)
 
 	return nil
+}
+
+// TestDotNotationAnalyzer tests the DotNotationAnalyzer functionality
+func TestDotNotationAnalyzer(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock base analyzer for testing
+	mockBase := &MockAnalyzer{
+		analyzedForms: make([]any, 0),
+	}
+
+	// Create the dot notation analyzer
+	analyzer := lang.NewDotNotationAnalyzer(mockBase)
+
+	// Test cases
+	testCases := []struct {
+		name        string
+		input       any
+		expected    any
+		expectError bool
+		description string
+	}{
+		{
+			name:        "Basic dot notation transformation",
+			input:       createTestList(builtin.Symbol("ipfs.stat"), "/ipfs/QmTest"),
+			expected:    createTestList(builtin.Symbol("ipfs"), builtin.String("stat"), "/ipfs/QmTest"),
+			expectError: false,
+			description: "Should transform (ipfs.stat path) to (ipfs \"stat\" path)",
+		},
+		{
+			name:        "Dot notation with multiple arguments",
+			input:       createTestList(builtin.Symbol("ipfs.cat"), "/ipfs/QmTest", "arg2", "arg3"),
+			expected:    createTestList(builtin.Symbol("ipfs"), builtin.String("cat"), "/ipfs/QmTest", "arg2", "arg3"),
+			expectError: false,
+			description: "Should preserve all arguments after transformation",
+		},
+		{
+			name:        "Dot notation with no arguments",
+			input:       createTestList(builtin.Symbol("ipfs.id")),
+			expected:    createTestList(builtin.Symbol("ipfs"), builtin.String("id")),
+			expectError: false,
+			description: "Should handle method calls with no arguments",
+		},
+		{
+			name:        "Complex object dot notation",
+			input:       createTestList(builtin.Symbol("myObject.myMethod"), "param1", 42, true),
+			expected:    createTestList(builtin.Symbol("myObject"), builtin.String("myMethod"), "param1", 42, true),
+			expectError: false,
+			description: "Should work with any object.method pattern",
+		},
+		{
+			name:        "Non-dot notation symbol",
+			input:       createTestList(builtin.Symbol("regularFunction"), "arg1", "arg2"),
+			expected:    createTestList(builtin.Symbol("regularFunction"), "arg1", "arg2"),
+			expectError: false,
+			description: "Should pass through non-dot notation unchanged",
+		},
+		{
+			name:        "Empty list",
+			input:       createTestList(),
+			expected:    createTestList(),
+			expectError: false,
+			description: "Should handle empty lists",
+		},
+		{
+			name:        "Non-symbol first element",
+			input:       createTestList(42, "not-a-symbol"),
+			expected:    createTestList(42, "not-a-symbol"),
+			expectError: false,
+			description: "Should pass through when first element is not a symbol",
+		},
+		{
+			name:        "Symbol without dot",
+			input:       createTestList(builtin.Symbol("noDotSymbol"), "arg1"),
+			expected:    createTestList(builtin.Symbol("noDotSymbol"), "arg1"),
+			expectError: false,
+			description: "Should pass through symbols without dots",
+		},
+		{
+			name:        "Multiple dots in symbol",
+			input:       createTestList(builtin.Symbol("obj.method.submethod"), "arg1"),
+			expected:    createTestList(builtin.Symbol("obj"), builtin.String("method.submethod"), "arg1"),
+			expectError: false,
+			description: "Should split only on first dot",
+		},
+		{
+			name:        "Non-list input",
+			input:       "not-a-list",
+			expected:    "not-a-list",
+			expectError: false,
+			description: "Should pass through non-list inputs unchanged",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset the mock analyzer
+			mockBase.analyzedForms = make([]any, 0)
+
+			// Call the analyzer
+			expr, err := analyzer.Analyze(nil, tc.input)
+
+			// Check error expectations
+			if tc.expectError {
+				require.Error(t, err, tc.description)
+				return
+			}
+			require.NoError(t, err, tc.description)
+
+			// Verify that the base analyzer was called with the expected form
+			require.Len(t, mockBase.analyzedForms, 1, "Base analyzer should be called exactly once")
+			require.Equal(t, tc.expected, mockBase.analyzedForms[0], tc.description)
+
+			// Verify the returned expression is not nil
+			require.NotNil(t, expr, "Analyzer should return a non-nil expression")
+		})
+	}
+}
+
+// TestDotNotationAnalyzerErrorHandling tests error handling in DotNotationAnalyzer
+func TestDotNotationAnalyzerErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock base analyzer that returns errors
+	mockBase := &MockAnalyzer{
+		shouldError: true,
+		errorMsg:    "base analyzer error",
+	}
+
+	analyzer := lang.NewDotNotationAnalyzer(mockBase)
+
+	// Test that errors from base analyzer are propagated
+	_, err := analyzer.Analyze(nil, createTestList(builtin.Symbol("ipfs.stat"), "arg1"))
+	require.Error(t, err, "Should propagate errors from base analyzer")
+	require.Contains(t, err.Error(), "base analyzer error", "Should preserve original error message")
+}
+
+// TestDotNotationAnalyzerNilBase tests behavior with nil base analyzer
+func TestDotNotationAnalyzerNilBase(t *testing.T) {
+	t.Parallel()
+
+	// Create analyzer with nil base (should use default builtin analyzer)
+	analyzer := lang.NewDotNotationAnalyzer(nil)
+
+	// Test that it still works with dot notation
+	expr, err := analyzer.Analyze(nil, createTestList(builtin.Symbol("ipfs.stat"), "/ipfs/QmTest"))
+	require.NoError(t, err, "Should work with nil base analyzer")
+	require.NotNil(t, expr, "Should return non-nil expression")
+}
+
+// TestDotNotationAnalyzerEdgeCases tests edge cases and boundary conditions
+func TestDotNotationAnalyzerEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	mockBase := &MockAnalyzer{analyzedForms: make([]any, 0)}
+	analyzer := lang.NewDotNotationAnalyzer(mockBase)
+
+	edgeCases := []struct {
+		name        string
+		input       any
+		description string
+	}{
+		{
+			name:        "Symbol starting with dot",
+			input:       createTestList(builtin.Symbol(".method"), "arg1"),
+			description: "Should handle symbols starting with dot",
+		},
+		{
+			name:        "Symbol ending with dot",
+			input:       createTestList(builtin.Symbol("object."), "arg1"),
+			description: "Should handle symbols ending with dot",
+		},
+		{
+			name:        "Symbol with only dot",
+			input:       createTestList(builtin.Symbol("."), "arg1"),
+			description: "Should handle symbol with only dot",
+		},
+		{
+			name:        "Multiple consecutive dots",
+			input:       createTestList(builtin.Symbol("obj..method"), "arg1"),
+			description: "Should handle multiple consecutive dots",
+		},
+		{
+			name:        "Nil input",
+			input:       nil,
+			description: "Should handle nil input gracefully",
+		},
+	}
+
+	for _, tc := range edgeCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockBase.analyzedForms = make([]any, 0)
+
+			// Should not panic and should delegate to base analyzer
+			expr, err := analyzer.Analyze(nil, tc.input)
+
+			// These edge cases should be handled by the base analyzer
+			// We just verify they don't cause panics
+			if err == nil {
+				require.NotNil(t, expr, tc.description)
+			}
+		})
+	}
+}
+
+// TestDotNotationAnalyzerIntegration tests integration with real builtin analyzer
+func TestDotNotationAnalyzerIntegration(t *testing.T) {
+	t.Parallel()
+
+	// Create analyzer with real builtin analyzer
+	analyzer := lang.NewDotNotationAnalyzer(&builtin.Analyzer{})
+
+	// Test that it can analyze dot notation expressions
+	expr, err := analyzer.Analyze(nil, createTestList(builtin.Symbol("ipfs.stat"), "/ipfs/QmTest"))
+	require.NoError(t, err, "Should work with real builtin analyzer")
+	require.NotNil(t, expr, "Should return non-nil expression")
+
+	// Test that the expression can be evaluated (basic smoke test)
+	// Note: We can't actually evaluate it without a proper environment,
+	// but we can verify it's a valid expression
+	require.NotNil(t, expr, "Expression should be valid")
+}
+
+// Helper functions for creating test data
+
+// createTestList creates a core.Seq for testing
+func createTestList(items ...any) core.Seq {
+	// Convert any to core.Any
+	coreItems := make([]core.Any, len(items))
+	for i, item := range items {
+		coreItems[i] = item
+	}
+	return builtin.NewList(coreItems...)
+}
+
+// MockAnalyzer implements core.Analyzer for testing
+type MockAnalyzer struct {
+	analyzedForms []any
+	shouldError   bool
+	errorMsg      string
+}
+
+// Analyze implements core.Analyzer
+func (ma *MockAnalyzer) Analyze(env core.Env, form core.Any) (core.Expr, error) {
+	ma.analyzedForms = append(ma.analyzedForms, form)
+
+	if ma.shouldError {
+		return nil, errors.New(ma.errorMsg)
+	}
+
+	// Return a simple constant expression
+	return &MockExpr{value: form}, nil
+}
+
+// MockExpr implements core.Expr for testing
+type MockExpr struct {
+	value any
+}
+
+// Eval implements core.Expr
+func (me *MockExpr) Eval(env core.Env) (core.Any, error) {
+	return me.value, nil
 }
