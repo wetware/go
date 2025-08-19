@@ -2,14 +2,10 @@ package run
 
 import (
 	"context"
-	"fmt"
 	"os"
 	os_exec "os/exec"
-	"path/filepath"
 
 	"capnproto.org/go/capnp/v3/rpc"
-	"github.com/ipfs/boxo/files"
-	"github.com/ipfs/boxo/path"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
@@ -75,7 +71,7 @@ func Main(c *cli.Context, dir string) error {
 	defer guest.Close()
 
 	// Check if first arg is an IPFS path and prepare name for CommandContext
-	name, err := resolveExecPath(ctx, dir, c.Args().First())
+	name, err := env.ResolveExecPath(ctx, dir, c.Args().First())
 	if err != nil {
 		return err
 	}
@@ -114,38 +110,4 @@ func Main(c *cli.Context, dir string) error {
 	defer env.Host.RemoveStreamHandler("/ww/0.1.0")
 
 	return cmd.Wait()
-}
-
-func resolveExecPath(ctx context.Context, dir string, name string) (string, error) {
-	if p, err := path.NewPath(name); err == nil {
-		// Get the file from IPFS
-		node, err := env.IPFS.Unixfs().Get(ctx, p)
-		if err != nil {
-			return "", fmt.Errorf("failed to get IPFS path: %w", err)
-		}
-
-		// Create target file path and update the 'name' variable.
-		name = filepath.Join(dir, filepath.Base(p.String()))
-
-		// Write the file to disk
-		if err := files.WriteTo(node, name); err != nil {
-			return "", fmt.Errorf("failed to write file: %w", err)
-		}
-
-		// Make executable
-		if err := os.Chmod(name, 0755); err != nil {
-			return "", fmt.Errorf("failed to make file executable: %w", err)
-		}
-	} else {
-		// Handle non-IPFS paths - resolve relative paths to absolute
-		if !filepath.IsAbs(name) {
-			absPath, err := filepath.Abs(name)
-			if err != nil {
-				return "", fmt.Errorf("failed to resolve path %s: %w", name, err)
-			}
-			name = absPath
-		}
-	}
-
-	return name, nil
 }

@@ -1,10 +1,14 @@
 package run
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/ipfs/boxo/files"
+	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -52,6 +56,43 @@ func (env *Env) Close() error {
 	}
 
 	return nil
+}
+
+// ResolveExecPath resolves an executable path, handling both IPFS paths and local filesystem paths.
+// For IPFS paths, it downloads the file to the specified directory and makes it executable.
+// For local paths, it resolves relative paths to absolute paths.
+func (env *Env) ResolveExecPath(ctx context.Context, dir string, name string) (string, error) {
+	if p, err := path.NewPath(name); err == nil {
+		// Get the file from IPFS
+		node, err := env.IPFS.Unixfs().Get(ctx, p)
+		if err != nil {
+			return "", fmt.Errorf("failed to get IPFS path: %w", err)
+		}
+
+		// Create target file path and update the 'name' variable.
+		name = filepath.Join(dir, filepath.Base(p.String()))
+
+		// Write the file to disk
+		if err := files.WriteTo(node, name); err != nil {
+			return "", fmt.Errorf("failed to write file: %w", err)
+		}
+
+		// Make executable
+		if err := os.Chmod(name, 0755); err != nil {
+			return "", fmt.Errorf("failed to make file executable: %w", err)
+		}
+	} else {
+		// Handle non-IPFS paths - resolve relative paths to absolute
+		if !filepath.IsAbs(name) {
+			absPath, err := filepath.Abs(name)
+			if err != nil {
+				return "", fmt.Errorf("failed to resolve path %s: %w", name, err)
+			}
+			name = absPath
+		}
+	}
+
+	return name, nil
 }
 
 type HostConfig struct {
