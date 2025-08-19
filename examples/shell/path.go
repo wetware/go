@@ -63,7 +63,6 @@ type DefaultReaderFactory struct{}
 
 func (f DefaultReaderFactory) NewReader(r io.Reader) *reader.Reader {
 	rd := reader.New(r)
-	// Add IPFS path ReaderMacro for '/' character
 	rd.SetMacro('/', false, IPFSPathReader)
 	return rd
 }
