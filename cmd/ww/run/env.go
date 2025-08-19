@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/wetware/go/util"
+	"go.uber.org/multierr"
 )
 
 func ExpandHome(path string) (string, error) {
@@ -28,7 +29,7 @@ func ExpandHome(path string) (string, error) {
 }
 
 type Env struct {
-	IPFS iface.CoreAPI
+	util.IPFSEnv
 	Host host.Host
 	Dir  string // Temporary directory for cell execution
 }
@@ -40,39 +41,39 @@ func (env *Env) Boot(addr string) (err error) {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	for _, bind := range []func() error{
-		func() (err error) {
-			env.IPFS, err = util.LoadIPFSFromName(addr)
-			return
-		},
-		func() (err error) {
-			env.Host, err = HostConfig{IPFS: env.IPFS}.New()
-			return
-		},
-	} {
-		if err = bind(); err != nil {
-			break
-		}
+	// Initialize IPFS client using embedded IPFSEnv
+	if err = env.IPFSEnv.Boot(addr); err != nil {
+		return err
 	}
 
-	return
+	// Initialize libp2p host
+	env.Host, err = HostConfig{IPFS: env.IPFS}.New()
+	return err
 }
 
 func (env *Env) Close() error {
+	var errors []error
+
+	// Close libp2p host independently
 	if env.Host != nil {
 		if err := env.Host.Close(); err != nil {
-			return err
+			errors = append(errors, fmt.Errorf("failed to close host: %w", err))
 		}
 	}
 
-	// Clean up temporary directory
+	// Clean up IPFS environment independently
+	if err := env.IPFSEnv.Close(); err != nil {
+		errors = append(errors, fmt.Errorf("failed to close IPFS environment: %w", err))
+	}
+
+	// Always clean up temporary directory, regardless of other errors
 	if env.Dir != "" {
 		if err := os.RemoveAll(env.Dir); err != nil {
-			return fmt.Errorf("failed to remove temp directory: %w", err)
+			errors = append(errors, fmt.Errorf("failed to remove temp directory: %w", err))
 		}
 	}
 
-	return nil
+	return multierr.Combine(errors...)
 }
 
 // ResolveExecPath resolves an executable path, handling both IPFS paths and local filesystem paths.
@@ -99,8 +100,14 @@ func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error
 
 // ResolveIPFSPath resolves an IPFS path using the import functionality
 func (env *Env) ResolveIPFSPath(ctx context.Context, ipfsPath path.Path) (string, error) {
+	// Get IPFS client
+	ipfs, err := env.GetIPFS()
+	if err != nil {
+		return "", err
+	}
+
 	// Get the node from IPFS
-	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
+	node, err := ipfs.Unixfs().Get(ctx, ipfsPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to get IPFS path: %w", err)
 	}
