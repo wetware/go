@@ -76,27 +76,13 @@ func (env *Env) Close() error {
 }
 
 // ResolveExecPath resolves an executable path, handling both IPFS paths and local filesystem paths.
-// For IPFS paths, it downloads the file to the environment's temporary directory and makes it executable.
-// For directories, it looks for a bin/ subdirectory following Go's OS/arch convention.
+// For IPFS paths, it uses the import functionality to download and make executable.
 // For local paths, it resolves relative paths to absolute paths.
 func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error) {
 	// Try to parse as IPFS path first
 	if p, err := path.NewPath(name); err == nil {
-		// Get the node from IPFS
-		node, err := env.IPFS.Unixfs().Get(ctx, p)
-		if err != nil {
-			return "", fmt.Errorf("failed to get IPFS path: %w", err)
-		}
-
-		// Handle different node types
-		switch node := node.(type) {
-		case files.Directory:
-			return env.ResolveIPFSDirectory(ctx, node, p.String())
-		case files.Node:
-			return env.ResolveIPFSFile(ctx, node, p.String())
-		default:
-			return "", fmt.Errorf("unexpected node type: %T", node)
-		}
+		// Use import functionality to resolve IPFS paths
+		return env.ResolveIPFSPath(ctx, p)
 	}
 
 	// Handle non-IPFS paths - resolve relative paths to absolute
@@ -109,6 +95,25 @@ func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error
 	}
 
 	return name, nil
+}
+
+// ResolveIPFSPath resolves an IPFS path using the import functionality
+func (env *Env) ResolveIPFSPath(ctx context.Context, ipfsPath path.Path) (string, error) {
+	// Get the node from IPFS
+	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get IPFS path: %w", err)
+	}
+
+	// Handle different node types
+	switch node := node.(type) {
+	case files.Directory:
+		return env.ResolveIPFSDirectory(ctx, node, ipfsPath.String())
+	case files.Node:
+		return env.ResolveIPFSFile(ctx, node, ipfsPath.String())
+	default:
+		return "", fmt.Errorf("unexpected node type: %T", node)
+	}
 }
 
 // ResolveIPFSFile handles IPFS file nodes, downloading them and making them executable

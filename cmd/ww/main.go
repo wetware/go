@@ -12,6 +12,7 @@ import (
 
 	"github.com/wetware/go/cmd/ww/export"
 	"github.com/wetware/go/cmd/ww/idgen"
+	importcmd "github.com/wetware/go/cmd/ww/import"
 	"github.com/wetware/go/cmd/ww/run"
 )
 
@@ -47,6 +48,7 @@ func main() {
 			idgen.Command(),
 			run.Command(),
 			export.Command(),
+			importcmd.Command(),
 		},
 	}
 
