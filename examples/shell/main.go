@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
-	"time"
 
-	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
 	"github.com/ipfs/boxo/path"
@@ -16,6 +13,7 @@ import (
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
+
 	"github.com/spy16/slurp/repl"
 	"github.com/wetware/go/system"
 )
@@ -61,11 +59,12 @@ func runREPL(ctx context.Context, i system.Importer) error {
 	}
 	defer rl.Close()
 
-	// Create the REPL with custom options
+	// Create the REPL with custom options using our custom reader factory
 	return repl.New(newInterpreter(i),
 		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
 		repl.WithPrompts("ww ", "  | "),
-		repl.WithPrinter(&printer{out: os.Stdout}),
+		repl.WithPrinter(printer{out: os.Stdout}),
+		repl.WithReaderFactory(DefaultReaderFactory{}),
 		repl.WithInput(lineReader{Driver: rl}, func(err error) error {
 			if err == nil || err == readline.ErrInterrupt {
 				return nil
@@ -97,7 +96,7 @@ func newInterpreter(i system.Importer) *slurp.Interpreter {
 
 				e, ok := v.(*record.Envelope)
 				if !ok {
-					return nil, fmt.Errorf("invalid envelope type: %T", v)
+					return nil, fmt.Errorf("expected envelope, got %T", v)
 				}
 
 				return &ImportExpr{Client: i, Envelope: e}, nil
@@ -154,7 +153,11 @@ func newInterpreter(i system.Importer) *slurp.Interpreter {
   (< a b)                - Less than
   (println expr)         - Print expression with newline
   (print expr)           - Print expression without newline
-  (import "module")      - Import a module (stubbed)`
+  (import "module")      - Import a module (stubbed)
+  
+  IPFS Path Syntax:
+  /ipfs/QmHash/...       - Direct IPFS path
+  /ipns/domain/...       - IPNS path`
 		}),
 		"println": slurp.Func("println", func(args ...core.Any) {
 			for _, arg := range args {
@@ -176,50 +179,12 @@ func newInterpreter(i system.Importer) *slurp.Interpreter {
 	return env
 }
 
-// ImportExpr implements core.Expr for import statements
-type ImportExpr struct {
-	Client   system.Importer
-	Envelope *record.Envelope
-	Timeout  time.Duration
-}
-
-func (e ImportExpr) NewEvalContext() (context.Context, context.CancelFunc) {
-	if e.Timeout < 0 {
-		return context.WithCancel(context.Background())
-	} else if e.Timeout == 0 {
-		e.Timeout = 10 * time.Second
-	}
-
-	return context.WithTimeout(context.Background(), e.Timeout)
-}
-
-func (e ImportExpr) Eval(env core.Env) (core.Any, error) {
-	ctx, cancel := e.NewEvalContext()
-	defer cancel()
-
-	f, release := e.Client.Import(ctx, e.SetEnvelope)
-	runtime.SetFinalizer(f.Future, func(*capnp.Future) {
-		release()
-	})
-
-	return f, nil
-}
-
-func (e ImportExpr) SetEnvelope(p system.Importer_import_Params) error {
-	b, err := e.Envelope.Marshal()
-	if err != nil {
-		return err
-	}
-
-	return p.SetEnvelope(b)
-}
-
 // printer implements the repl.Printer interface for better output formatting
 type printer struct {
 	out io.Writer
 }
 
-func (p *printer) Print(val interface{}) error {
+func (p printer) Print(val interface{}) error {
 	switch v := val.(type) {
 	case nil:
 		_, err := fmt.Fprintf(p.out, "nil\n")
