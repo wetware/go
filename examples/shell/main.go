@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
+	"github.com/ipfs/boxo/path"
+	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -49,7 +53,7 @@ func main() {
 	}
 }
 
-func runREPL[T ~capnp.ClientKind](ctx context.Context, t T) error {
+func runREPL(ctx context.Context, i system.Importer) error {
 	// Create readline instance
 	rl, err := readline.NewEx(&config)
 	if err != nil {
@@ -58,7 +62,7 @@ func runREPL[T ~capnp.ClientKind](ctx context.Context, t T) error {
 	defer rl.Close()
 
 	// Create the REPL with custom options
-	return repl.New(newInterpreter(t),
+	return repl.New(newInterpreter(i),
 		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
 		repl.WithPrompts("ww ", "  | "),
 		repl.WithPrinter(&printer{out: os.Stdout}),
@@ -71,15 +75,32 @@ func runREPL[T ~capnp.ClientKind](ctx context.Context, t T) error {
 	).Loop(ctx)
 }
 
+// Path represents an IPFS path and implements core.Any
+type Path struct {
+	path.Path
+}
+
+func (p Path) String() string {
+	return p.Path.String()
+}
+
 // newInterpreter creates a slurp environment with wetware-specific functions
-func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
+func newInterpreter(i system.Importer) *slurp.Interpreter {
 	// Create analyzer for special forms
 	analyzer := &builtin.Analyzer{
 		Specials: map[string]builtin.ParseSpecial{
 			"import": func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
-				// Special form: (import "module-name")
-				// For now, just return a placeholder message
-				return &ImportExpr[T]{Client: t, MethodArgs: args}, nil
+				v, err := args.First()
+				if err != nil {
+					return nil, err
+				}
+
+				e, ok := v.(*record.Envelope)
+				if !ok {
+					return nil, fmt.Errorf("invalid envelope type: %T", v)
+				}
+
+				return &ImportExpr{Client: i, Envelope: e}, nil
 			},
 		},
 	}
@@ -156,43 +177,41 @@ func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
 }
 
 // ImportExpr implements core.Expr for import statements
-type ImportExpr[T ~capnp.ClientKind] struct {
-	Client     T
-	MethodArgs core.Seq
+type ImportExpr struct {
+	Client   system.Importer
+	Envelope *record.Envelope
+	Timeout  time.Duration
 }
 
-func (e ImportExpr[T]) Eval(env core.Env) (core.Any, error) {
-	// Parse the import arguments to get the module name
-	// For now, we'll assume a simple string argument
-	// TODO: Handle more complex import syntax if needed
+func (e ImportExpr) NewEvalContext() (context.Context, context.CancelFunc) {
+	if e.Timeout < 0 {
+		return context.WithCancel(context.Background())
+	} else if e.Timeout == 0 {
+		e.Timeout = 10 * time.Second
+	}
 
-	// Convert the method args to a slice to access the first argument
-	argsSlice, err := core.ToSlice(e.MethodArgs)
+	return context.WithTimeout(context.Background(), e.Timeout)
+}
+
+func (e ImportExpr) Eval(env core.Env) (core.Any, error) {
+	ctx, cancel := e.NewEvalContext()
+	defer cancel()
+
+	f, release := e.Client.Import(ctx, e.SetEnvelope)
+	runtime.SetFinalizer(f.Future, func(*capnp.Future) {
+		release()
+	})
+
+	return f, nil
+}
+
+func (e ImportExpr) SetEnvelope(p system.Importer_import_Params) error {
+	b, err := e.Envelope.Marshal()
 	if err != nil {
-		return nil, fmt.Errorf("import: failed to parse arguments: %w", err)
+		return err
 	}
 
-	if len(argsSlice) == 0 {
-		return nil, fmt.Errorf("import: missing module name")
-	}
-
-	// Get the module name (first argument)
-	moduleName := argsSlice[0]
-
-	// Convert module name to string
-	var moduleNameStr string
-	switch v := moduleName.(type) {
-	case builtin.String:
-		moduleNameStr = string(v)
-	case builtin.Symbol:
-		moduleNameStr = string(v)
-	default:
-		return nil, fmt.Errorf("import: module name must be a string or symbol, got %T", moduleName)
-	}
-
-	// For now, return a message showing what we would import
-	// TODO: Actually call the system.Importer.Import method
-	return builtin.String(fmt.Sprintf("import: would import module '%s' using system capability", moduleNameStr)), nil
+	return p.SetEnvelope(b)
 }
 
 // printer implements the repl.Printer interface for better output formatting
@@ -219,6 +238,9 @@ func (p *printer) Print(val interface{}) error {
 		return err
 	case builtin.Nil:
 		_, err := fmt.Fprintf(p.out, "nil\n")
+		return err
+	case Path:
+		_, err := fmt.Fprintf(p.out, "Path: %s\n", v.String())
 		return err
 	default:
 		// For any other type, use Go's default formatting
