@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/ipfs/boxo/files"
-	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/util"
@@ -86,18 +85,7 @@ func Main(c *cli.Context) error {
 }
 
 type Env struct {
-	IPFS iface.CoreAPI
-}
-
-func (env *Env) Boot(addr string) error {
-	var err error
-	env.IPFS, err = util.LoadIPFSFromName(addr)
-	return err
-}
-
-func (env *Env) Close() error {
-	// No cleanup needed for IPFS client
-	return nil
+	util.IPFSEnv
 }
 
 // AddToIPFS adds a file or directory to IPFS recursively
@@ -123,13 +111,14 @@ func (env *Env) AddToIPFS(ctx context.Context, localPath string) (string, error)
 		}
 	}
 
-	// Check if IPFS client is available
-	if env.IPFS == nil {
-		return "", fmt.Errorf("IPFS client not initialized")
+	// Get IPFS client
+	ipfs, err := env.GetIPFS()
+	if err != nil {
+		return "", err
 	}
 
 	// Add the node to IPFS using Unixfs API
-	path, err := env.IPFS.Unixfs().Add(ctx, node)
+	path, err := ipfs.Unixfs().Add(ctx, node)
 	if err != nil {
 		return "", fmt.Errorf("failed to add to IPFS: %w", err)
 	}

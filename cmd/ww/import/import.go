@@ -8,7 +8,6 @@ import (
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/util"
@@ -98,29 +97,19 @@ func Main(c *cli.Context) error {
 }
 
 type Env struct {
-	IPFS iface.CoreAPI
-}
-
-func (env *Env) Boot(addr string) error {
-	var err error
-	env.IPFS, err = util.LoadIPFSFromName(addr)
-	return err
-}
-
-func (env *Env) Close() error {
-	// No cleanup needed for IPFS client
-	return nil
+	util.IPFSEnv
 }
 
 // ImportFromIPFS imports content from IPFS to the local filesystem
 func (env *Env) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, localPath string, makeExecutable bool) error {
-	// Check if IPFS client is available
-	if env.IPFS == nil {
-		return fmt.Errorf("IPFS client not initialized")
+	// Get IPFS client
+	ipfs, err := env.GetIPFS()
+	if err != nil {
+		return err
 	}
 
 	// Get the node from IPFS
-	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
+	node, err := ipfs.Unixfs().Get(ctx, ipfsPath)
 	if err != nil {
 		return fmt.Errorf("failed to get IPFS path: %w", err)
 	}
