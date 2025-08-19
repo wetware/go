@@ -16,6 +16,14 @@ import (
 	"github.com/wetware/go/system"
 )
 
+var config = readline.Config{
+	Prompt:          "ww ",
+	HistoryFile:     "/tmp/ww-shell.tmp",
+	AutoComplete:    getCompleter(),
+	InterruptPrompt: "^C",
+	EOFPrompt:       "exit",
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -35,27 +43,50 @@ func main() {
 	client := conn.Bootstrap(ctx)
 	defer client.Release()
 
-	// Create a custom environment with wetware-specific functions
-	env := newInterpreter(client)
-	// if err := env.Bind(globals); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "failed to bind globals: %v\n", err)
-	// 	os.Exit(1)
-	// }
-
-	// Create a production-grade REPL with readline support
-	r := createProductionREPL(env)
-
-	// Run the REPL until context is cancelled
-	if err := r.Loop(ctx); err != nil {
+	if err := runREPL(ctx, system.Importer(client)); err != nil {
 		fmt.Fprintf(os.Stderr, "repl error: %s\n", err)
 		os.Exit(1)
 	}
 }
 
+func runREPL[T ~capnp.ClientKind](ctx context.Context, t T) error {
+	// Create readline instance
+	rl, err := readline.NewEx(&config)
+	if err != nil {
+		return err
+	}
+	defer rl.Close()
+
+	// Create the REPL with custom options
+	return repl.New(newInterpreter(t),
+		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
+		repl.WithPrompts("ww ", "  | "),
+		repl.WithPrinter(&printer{out: os.Stdout}),
+		repl.WithInput(lineReader{Driver: rl}, func(err error) error {
+			if err == nil || err == readline.ErrInterrupt {
+				return nil
+			}
+			return err
+		}),
+	).Loop(ctx)
+}
+
 // newInterpreter creates a slurp environment with wetware-specific functions
-func newInterpreter(client capnp.Client) *slurp.Interpreter {
-	// Create base environment
-	env := slurp.New()
+func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
+	// Create analyzer for special forms
+	analyzer := &builtin.Analyzer{
+		Specials: map[string]builtin.ParseSpecial{
+			"callc": func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
+				// Special form: (callc capability method arg1 arg2 ...)
+				// TODO: Implement proper argument parsing and return correct core.Expr
+				// For now, return nil to avoid compilation errors
+				return nil, fmt.Errorf("callc special form not yet implemented - need proper core.Expr")
+			},
+		},
+	}
+
+	// Create base environment with analyzer
+	env := slurp.New(slurp.WithAnalyzer(analyzer))
 
 	// Add wetware-specific globals
 	globals := map[string]core.Any{
@@ -64,6 +95,9 @@ func newInterpreter(client capnp.Client) *slurp.Interpreter {
 		"true":    builtin.Bool(true),
 		"false":   builtin.Bool(false),
 		"version": builtin.String("wetware-0.1.0"),
+
+		// System capability - the capability provided by the ww/go/system package
+		"system": t,
 
 		// Basic operations
 		"=": slurp.Func("=", core.Eq),
@@ -102,7 +136,9 @@ func newInterpreter(client capnp.Client) *slurp.Interpreter {
   (> a b)                - Greater than
   (< a b)                - Less than
   (println expr)         - Print expression with newline
-  (print expr)           - Print expression without newline`
+  (print expr)           - Print expression without newline
+  system                  - System capability (use system to see details)
+  (callc capability method args...) - Call method on capability`
 		}),
 		"println": slurp.Func("println", func(args ...core.Any) {
 			for _, arg := range args {
@@ -124,50 +160,12 @@ func newInterpreter(client capnp.Client) *slurp.Interpreter {
 	return env
 }
 
-// createProductionREPL creates a production-grade REPL with readline support
-func createProductionREPL(env *slurp.Interpreter) *repl.REPL {
-	// Create readline instance
-	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          "wetware> ",
-		HistoryFile:     "/tmp/wetware_shell.tmp",
-		AutoComplete:    getCompleter(),
-		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create readline: %v\n", err)
-		// Fallback to basic REPL
-		return repl.New(env,
-			repl.WithBanner("Welcome to Wetware Shell!"),
-			repl.WithPrompts("wetware> ", "  | "))
-	}
-
-	// Create the REPL with custom options
-	r := repl.New(env,
-		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
-		repl.WithPrompts("ww ", "  | "),
-		repl.WithPrinter(&customPrinter{out: os.Stdout}),
-		repl.WithInput(stdio{Driver: rl}, func(err error) error {
-			if err == nil || err == readline.ErrInterrupt {
-				return nil
-			}
-			// Close readline when we're done
-			if err == io.EOF {
-				rl.Close()
-			}
-			return err
-		}),
-	)
-
-	return r
-}
-
-// customPrinter implements the repl.Printer interface for better output formatting
-type customPrinter struct {
+// printer implements the repl.Printer interface for better output formatting
+type printer struct {
 	out io.Writer
 }
 
-func (p *customPrinter) Print(val interface{}) error {
+func (p *printer) Print(val interface{}) error {
 	switch v := val.(type) {
 	case nil:
 		_, err := fmt.Fprintf(p.out, "nil\n")
@@ -194,18 +192,18 @@ func (p *customPrinter) Print(val interface{}) error {
 	}
 }
 
-// stdio implements the repl.Input interface using readline
-type stdio struct {
+// lineReader implements the repl.Input interface using readline
+type lineReader struct {
 	Driver *readline.Instance
 }
 
-func (s stdio) Readline() (string, error) {
+func (s lineReader) Readline() (string, error) {
 	line, err := s.Driver.Readline()
 	return line, err
 }
 
 // Prompt implements the repl.Prompter interface
-func (s stdio) Prompt(p string) {
+func (s lineReader) Prompt(p string) {
 	s.Driver.SetPrompt(p)
 }
 
@@ -216,6 +214,8 @@ func getCompleter() readline.AutoCompleter {
 		readline.PcItem("version"),
 		readline.PcItem("println"),
 		readline.PcItem("print"),
+		readline.PcItem("system"),
+		readline.PcItem("callc"),
 		readline.PcItem("+"),
 		readline.PcItem("*"),
 		readline.PcItem("="),
