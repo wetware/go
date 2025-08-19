@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
@@ -19,10 +17,7 @@ import (
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		syscall.SIGINT,
-		syscall.SIGTERM)
-	defer cancel()
+	ctx := context.Background()
 
 	// Check if the bootstrap file descriptor exists
 	bootstrapFile := os.NewFile(system.BOOTSTRAP_FD, "host")
@@ -41,33 +36,24 @@ func main() {
 	defer client.Release()
 
 	// Create a custom environment with wetware-specific functions
-	env := createWetwareEnvironment(client)
+	env := newInterpreter(client)
+	// if err := env.Bind(globals); err != nil {
+	// 	fmt.Fprintf(os.Stderr, "failed to bind globals: %v\n", err)
+	// 	os.Exit(1)
+	// }
 
 	// Create a production-grade REPL with readline support
 	r := createProductionREPL(env)
-
-	// Set up a goroutine to monitor context cancellation and close readline
-	go func() {
-		<-ctx.Done()
-		fmt.Fprintf(os.Stderr, "\nShell interrupted, exiting...\n")
-		os.Exit(0)
-	}()
 
 	// Run the REPL until context is cancelled
 	if err := r.Loop(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "repl error: %s\n", err)
 		os.Exit(1)
 	}
-
-	// Check if context was cancelled (e.g., by Ctrl+C)
-	if ctx.Err() != nil {
-		fmt.Fprintf(os.Stderr, "Shell interrupted: %v\n", ctx.Err())
-		os.Exit(0)
-	}
 }
 
-// createWetwareEnvironment creates a slurp environment with wetware-specific functions
-func createWetwareEnvironment(client capnp.Client) *slurp.Interpreter {
+// newInterpreter creates a slurp environment with wetware-specific functions
+func newInterpreter(client capnp.Client) *slurp.Interpreter {
 	// Create base environment
 	env := slurp.New()
 
@@ -160,6 +146,7 @@ func createProductionREPL(env *slurp.Interpreter) *repl.REPL {
 	r := repl.New(env,
 		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
 		repl.WithPrompts("ww ", "  | "),
+		repl.WithPrinter(&customPrinter{out: os.Stdout}),
 		repl.WithInput(stdio{Driver: rl}, func(err error) error {
 			if err == nil || err == readline.ErrInterrupt {
 				return nil
@@ -173,6 +160,38 @@ func createProductionREPL(env *slurp.Interpreter) *repl.REPL {
 	)
 
 	return r
+}
+
+// customPrinter implements the repl.Printer interface for better output formatting
+type customPrinter struct {
+	out io.Writer
+}
+
+func (p *customPrinter) Print(val interface{}) error {
+	switch v := val.(type) {
+	case nil:
+		_, err := fmt.Fprintf(p.out, "nil\n")
+		return err
+	case builtin.Bool:
+		_, err := fmt.Fprintf(p.out, "%t\n", bool(v))
+		return err
+	case builtin.Int64:
+		_, err := fmt.Fprintf(p.out, "%d\n", int64(v))
+		return err
+	case builtin.String:
+		_, err := fmt.Fprintf(p.out, "%s\n", string(v))
+		return err
+	case builtin.Float64:
+		_, err := fmt.Fprintf(p.out, "%g\n", float64(v))
+		return err
+	case builtin.Nil:
+		_, err := fmt.Fprintf(p.out, "nil\n")
+		return err
+	default:
+		// For any other type, use Go's default formatting
+		_, err := fmt.Fprintf(p.out, "%v\n", v)
+		return err
+	}
 }
 
 // stdio implements the repl.Input interface using readline
