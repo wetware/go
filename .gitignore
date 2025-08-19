@@ -24,3 +24,4 @@ cmd/scratch/**
 
 **/.DS_Store
 ipld_list
+examples/shell/shell

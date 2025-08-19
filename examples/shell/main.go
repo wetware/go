@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,7 +24,14 @@ func main() {
 		syscall.SIGTERM)
 	defer cancel()
 
-	conn := rpc.NewConn(rpc.NewStreamTransport(os.NewFile(system.BOOTSTRAP_FD, "host")), &rpc.Options{
+	// Check if the bootstrap file descriptor exists
+	bootstrapFile := os.NewFile(system.BOOTSTRAP_FD, "host")
+	if bootstrapFile == nil {
+		fmt.Fprintf(os.Stderr, "ERROR: Failed to create bootstrap file descriptor\n")
+		os.Exit(1)
+	}
+
+	conn := rpc.NewConn(rpc.NewStreamTransport(bootstrapFile), &rpc.Options{
 		BaseContext: func() context.Context { return ctx },
 		// BootstrapClient: export(),
 	})
@@ -38,9 +46,23 @@ func main() {
 	// Create a production-grade REPL with readline support
 	r := createProductionREPL(env)
 
+	// Set up a goroutine to monitor context cancellation and close readline
+	go func() {
+		<-ctx.Done()
+		fmt.Fprintf(os.Stderr, "\nShell interrupted, exiting...\n")
+		os.Exit(0)
+	}()
+
 	// Run the REPL until context is cancelled
 	if err := r.Loop(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "repl error: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Check if context was cancelled (e.g., by Ctrl+C)
+	if ctx.Err() != nil {
+		fmt.Fprintf(os.Stderr, "Shell interrupted: %v\n", ctx.Err())
+		os.Exit(0)
 	}
 }
 
@@ -133,20 +155,24 @@ func createProductionREPL(env *slurp.Interpreter) *repl.REPL {
 			repl.WithBanner("Welcome to Wetware Shell!"),
 			repl.WithPrompts("wetware> ", "  | "))
 	}
-	defer rl.Close()
 
 	// Create the REPL with custom options
-	return repl.New(env,
+	r := repl.New(env,
 		repl.WithBanner("Welcome to Wetware Shell! Type 'help' for available commands."),
 		repl.WithPrompts("ww ", "  | "),
 		repl.WithInput(stdio{Driver: rl}, func(err error) error {
 			if err == nil || err == readline.ErrInterrupt {
 				return nil
 			}
-
+			// Close readline when we're done
+			if err == io.EOF {
+				rl.Close()
+			}
 			return err
 		}),
 	)
+
+	return r
 }
 
 // stdio implements the repl.Input interface using readline
@@ -155,7 +181,8 @@ type stdio struct {
 }
 
 func (s stdio) Readline() (string, error) {
-	return s.Driver.Readline()
+	line, err := s.Driver.Readline()
+	return line, err
 }
 
 // Prompt implements the repl.Prompter interface
