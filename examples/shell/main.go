@@ -76,11 +76,10 @@ func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
 	// Create analyzer for special forms
 	analyzer := &builtin.Analyzer{
 		Specials: map[string]builtin.ParseSpecial{
-			"callc": func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
-				// Special form: (callc capability method arg1 arg2 ...)
-				// TODO: Implement proper argument parsing and return correct core.Expr
-				// For now, return nil to avoid compilation errors
-				return nil, fmt.Errorf("callc special form not yet implemented - need proper core.Expr")
+			"import": func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
+				// Special form: (import "module-name")
+				// For now, just return a placeholder message
+				return &ImportExpr[T]{Client: t, MethodArgs: args}, nil
 			},
 		},
 	}
@@ -95,9 +94,6 @@ func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
 		"true":    builtin.Bool(true),
 		"false":   builtin.Bool(false),
 		"version": builtin.String("wetware-0.1.0"),
-
-		// System capability - the capability provided by the ww/go/system package
-		"system": t,
 
 		// Basic operations
 		"=": slurp.Func("=", core.Eq),
@@ -137,8 +133,7 @@ func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
   (< a b)                - Less than
   (println expr)         - Print expression with newline
   (print expr)           - Print expression without newline
-  system                  - System capability (use system to see details)
-  (callc capability method args...) - Call method on capability`
+  (import "module")      - Import a module (stubbed)`
 		}),
 		"println": slurp.Func("println", func(args ...core.Any) {
 			for _, arg := range args {
@@ -158,6 +153,46 @@ func newInterpreter[T ~capnp.ClientKind](t T) *slurp.Interpreter {
 	}
 
 	return env
+}
+
+// ImportExpr implements core.Expr for import statements
+type ImportExpr[T ~capnp.ClientKind] struct {
+	Client     T
+	MethodArgs core.Seq
+}
+
+func (e ImportExpr[T]) Eval(env core.Env) (core.Any, error) {
+	// Parse the import arguments to get the module name
+	// For now, we'll assume a simple string argument
+	// TODO: Handle more complex import syntax if needed
+
+	// Convert the method args to a slice to access the first argument
+	argsSlice, err := core.ToSlice(e.MethodArgs)
+	if err != nil {
+		return nil, fmt.Errorf("import: failed to parse arguments: %w", err)
+	}
+
+	if len(argsSlice) == 0 {
+		return nil, fmt.Errorf("import: missing module name")
+	}
+
+	// Get the module name (first argument)
+	moduleName := argsSlice[0]
+
+	// Convert module name to string
+	var moduleNameStr string
+	switch v := moduleName.(type) {
+	case builtin.String:
+		moduleNameStr = string(v)
+	case builtin.Symbol:
+		moduleNameStr = string(v)
+	default:
+		return nil, fmt.Errorf("import: module name must be a string or symbol, got %T", moduleName)
+	}
+
+	// For now, return a message showing what we would import
+	// TODO: Actually call the system.Importer.Import method
+	return builtin.String(fmt.Sprintf("import: would import module '%s' using system capability", moduleNameStr)), nil
 }
 
 // printer implements the repl.Printer interface for better output formatting
