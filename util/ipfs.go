@@ -224,11 +224,18 @@ func (env *IPFSEnv) ImportIPFSDirectory(ctx context.Context, node files.Node, ip
 
 // ExtractIPFSDirectory recursively extracts an IPFS directory to the local filesystem
 func (env *IPFSEnv) ExtractIPFSDirectory(ctx context.Context, node files.Node, targetDir string, makeExecutable bool) error {
-	iter := node.(files.DirIterator)
-	for iter.Next() {
-		child := iter.Node()
-		childName := iter.Name()
-		childPath := filepath.Join(targetDir, childName)
+	// Check if the node is a directory
+	dir, ok := node.(files.Directory)
+	if !ok {
+		return fmt.Errorf("node is not a directory: %T", node)
+	}
+
+	// Get directory entries and iterate
+	entries := dir.Entries()
+	for entries.Next() {
+		name := entries.Name()
+		child := entries.Node()
+		childPath := filepath.Join(targetDir, name)
 
 		if _, ok := child.(files.Directory); ok {
 			// Create subdirectory and recurse
@@ -247,7 +254,7 @@ func (env *IPFSEnv) ExtractIPFSDirectory(ctx context.Context, node files.Node, t
 			// Make executable if requested
 			if makeExecutable {
 				if err := os.Chmod(childPath, 0755); err != nil {
-					return fmt.Errorf("failed to make file executable: %w", err)
+					return fmt.Errorf("failed to make file executable %s: %w", childPath, err)
 				}
 			}
 		}
