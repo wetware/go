@@ -136,6 +136,15 @@ func resolveExecPath(ctx context.Context, dir string, name string) (string, erro
 		if err := os.Chmod(name, 0755); err != nil {
 			return "", fmt.Errorf("failed to make file executable: %w", err)
 		}
+	} else {
+		// Handle non-IPFS paths - resolve relative paths to absolute
+		if !filepath.IsAbs(name) {
+			absPath, err := filepath.Abs(name)
+			if err != nil {
+				return "", fmt.Errorf("failed to resolve path %s: %w", name, err)
+			}
+			name = absPath
+		}
 	}
 
 	return name, nil
