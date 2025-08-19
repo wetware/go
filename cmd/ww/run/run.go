@@ -43,19 +43,11 @@ func Command() *cli.Command {
 
 		// Main
 		////
-		Action: func(c *cli.Context) error {
-			dir, err := os.MkdirTemp("", "cell-*")
-			if err != nil {
-				return err
-			}
-			defer os.RemoveAll(dir)
-
-			return Main(c, dir)
-		},
+		Action: Main,
 	}
 }
 
-func Main(c *cli.Context, dir string) error {
+func Main(c *cli.Context) error {
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
@@ -71,7 +63,7 @@ func Main(c *cli.Context, dir string) error {
 	defer guest.Close()
 
 	// Check if first arg is an IPFS path and prepare name for CommandContext
-	name, err := env.ResolveExecPath(ctx, dir, c.Args().First())
+	name, err := env.ResolveExecPath(ctx, c.Args().First())
 	if err != nil {
 		return err
 	}
@@ -79,12 +71,12 @@ func Main(c *cli.Context, dir string) error {
 	// Run target in jailed subprocess
 	////
 	cmd := os_exec.CommandContext(ctx, name, c.Args().Tail()...)
-	cmd.Dir = dir
+	cmd.Dir = env.Dir
 	cmd.Env = c.StringSlice("env")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = sysProcAttr(dir)
+	cmd.SysProcAttr = sysProcAttr(env.Dir)
 	cmd.ExtraFiles = []*os.File{guest}
 	if err := cmd.Start(); err != nil {
 		return err

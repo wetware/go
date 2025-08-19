@@ -29,9 +29,16 @@ func ExpandHome(path string) (string, error) {
 type Env struct {
 	IPFS iface.CoreAPI
 	Host host.Host
+	Dir  string // Temporary directory for cell execution
 }
 
 func (env *Env) Boot(addr string) (err error) {
+	// Create temporary directory for cell execution
+	env.Dir, err = os.MkdirTemp("", "cell-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
 	for _, bind := range []func() error{
 		func() (err error) {
 			env.IPFS, err = util.LoadIPFSFromName(addr)
@@ -52,16 +59,25 @@ func (env *Env) Boot(addr string) (err error) {
 
 func (env *Env) Close() error {
 	if env.Host != nil {
-		return env.Host.Close()
+		if err := env.Host.Close(); err != nil {
+			return err
+		}
+	}
+
+	// Clean up temporary directory
+	if env.Dir != "" {
+		if err := os.RemoveAll(env.Dir); err != nil {
+			return fmt.Errorf("failed to remove temp directory: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // ResolveExecPath resolves an executable path, handling both IPFS paths and local filesystem paths.
-// For IPFS paths, it downloads the file to the specified directory and makes it executable.
+// For IPFS paths, it downloads the file to the environment's temporary directory and makes it executable.
 // For local paths, it resolves relative paths to absolute paths.
-func (env *Env) ResolveExecPath(ctx context.Context, dir string, name string) (string, error) {
+func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error) {
 	if p, err := path.NewPath(name); err == nil {
 		// Get the file from IPFS
 		node, err := env.IPFS.Unixfs().Get(ctx, p)
@@ -70,7 +86,7 @@ func (env *Env) ResolveExecPath(ctx context.Context, dir string, name string) (s
 		}
 
 		// Create target file path and update the 'name' variable.
-		name = filepath.Join(dir, filepath.Base(p.String()))
+		name = filepath.Join(env.Dir, filepath.Base(p.String()))
 
 		// Write the file to disk
 		if err := files.WriteTo(node, name); err != nil {
