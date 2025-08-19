@@ -144,6 +144,18 @@ func (env IPFSEnv) CreateDirectoryNode(ctx context.Context, dirPath string) (fil
 
 // ImportFromIPFS imports content from IPFS to the local filesystem
 func (env *IPFSEnv) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, localPath string, makeExecutable bool) error {
+	// Check if content is already available in the target location
+	// Only check for caching if we're importing to a specific directory (not current directory)
+	if localPath != "" && localPath != "." && !isDirectory(localPath) {
+		if env.IsContentCachedInTempDir(ipfsPath, localPath) {
+			// Content is already available, just ensure permissions if needed
+			if makeExecutable {
+				env.makeFilesExecutable(localPath)
+			}
+			return nil
+		}
+	}
+
 	// Get the node from IPFS
 	if env.IPFS == nil {
 		return fmt.Errorf("IPFS client not initialized")
@@ -255,4 +267,101 @@ func isDirectory(path string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+// isContentAlreadyAvailable checks if the IPFS content is already available at the target location
+func (env *IPFSEnv) isContentAlreadyAvailable(localPath string) bool {
+	// For now, we'll do a simple check - if the target path exists and has content
+	// In a more sophisticated implementation, we could verify the content hash matches
+	if isDirectory(localPath) {
+		// Check if directory exists and has content
+		entries, err := os.ReadDir(localPath)
+		if err != nil {
+			return false
+		}
+		return len(entries) > 0
+	} else {
+		// Check if file exists and has content
+		info, err := os.Stat(localPath)
+		if err != nil {
+			return false
+		}
+		return info.Size() > 0
+	}
+}
+
+// makeFilesExecutable recursively makes all files in a path executable
+func (env *IPFSEnv) makeFilesExecutable(targetPath string) {
+	if isDirectory(targetPath) {
+		entries, err := os.ReadDir(targetPath)
+		if err != nil {
+			return
+		}
+		for _, entry := range entries {
+			entryPath := filepath.Join(targetPath, entry.Name())
+			if entry.IsDir() {
+				env.makeFilesExecutable(entryPath)
+			} else {
+				os.Chmod(entryPath, 0755)
+			}
+		}
+	} else {
+		os.Chmod(targetPath, 0755)
+	}
+}
+
+// IsContentCachedInTempDir checks if IPFS content is already available in a specific temp directory
+// This is useful for run command to avoid re-downloading the same content
+func (env *IPFSEnv) IsContentCachedInTempDir(ipfsPath path.Path, tempDir string) bool {
+	// Return false if temp directory is empty
+	if tempDir == "" {
+		return false
+	}
+
+	// Extract the base name from the IPFS path
+	baseName := filepath.Base(ipfsPath.String())
+	targetPath := filepath.Join(tempDir, baseName)
+
+	// Check if the target exists and has content
+	if isDirectory(targetPath) {
+		entries, err := os.ReadDir(targetPath)
+		if err != nil {
+			return false
+		}
+		return len(entries) > 0
+	} else {
+		info, err := os.Stat(targetPath)
+		if err != nil {
+			return false
+		}
+		return info.Size() > 0
+	}
+}
+
+// ImportFromIPFSToDirWithCaching imports content from IPFS to a specific directory with caching
+func (env *IPFSEnv) ImportFromIPFSToDirWithCaching(ctx context.Context, ipfsPath path.Path, dir string, makeExecutable bool) (string, error) {
+	// Skip caching check if directory is empty
+	if dir != "" {
+		// Check if content is already cached in the directory
+		if env.IsContentCachedInTempDir(ipfsPath, dir) {
+			baseName := filepath.Base(ipfsPath.String())
+			targetPath := filepath.Join(dir, baseName)
+
+			// Ensure permissions if needed
+			if makeExecutable {
+				env.makeFilesExecutable(targetPath)
+			}
+
+			return targetPath, nil
+		}
+	}
+
+	// Content not cached or caching disabled, proceed with normal import
+	if err := env.ImportFromIPFS(ctx, ipfsPath, dir, makeExecutable); err != nil {
+		return "", err
+	}
+
+	// Return the path where content was imported
+	baseName := filepath.Base(ipfsPath.String())
+	return filepath.Join(dir, baseName), nil
 }
