@@ -10,6 +10,7 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
+	"github.com/wetware/go/cmd/ww/export"
 	"github.com/wetware/go/cmd/ww/idgen"
 	"github.com/wetware/go/cmd/ww/run"
 )
@@ -45,6 +46,7 @@ func main() {
 		Commands: []*cli.Command{
 			idgen.Command(),
 			run.Command(),
+			export.Command(),
 		},
 	}
 
