@@ -81,6 +81,9 @@ func (env IPFSEnv) AddToIPFS(ctx context.Context, localPath string) (string, err
 	}
 
 	// Add the node to IPFS using Unixfs API
+	if env.IPFS == nil {
+		return "", fmt.Errorf("IPFS client not initialized")
+	}
 	path, err := env.IPFS.Unixfs().Add(ctx, node)
 	if err != nil {
 		return "", fmt.Errorf("failed to add to IPFS: %w", err)
@@ -142,6 +145,9 @@ func (env IPFSEnv) CreateDirectoryNode(ctx context.Context, dirPath string) (fil
 // ImportFromIPFS imports content from IPFS to the local filesystem
 func (env *IPFSEnv) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, localPath string, makeExecutable bool) error {
 	// Get the node from IPFS
+	if env.IPFS == nil {
+		return fmt.Errorf("IPFS client not initialized")
+	}
 	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
 	if err != nil {
 		return fmt.Errorf("failed to get IPFS path: %w", err)
