@@ -8,12 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wetware/go/cmd/ww/export"
+	"github.com/wetware/go/util"
 )
 
 // TestEnv_Boot tests the Boot method of the export environment
 func TestEnv_Boot(t *testing.T) {
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Test with invalid endpoint (this should always fail)
 	err := env.Boot("invalid-endpoint")
@@ -25,7 +25,7 @@ func TestEnv_Boot(t *testing.T) {
 
 // TestEnv_Close tests the Close method of the export environment
 func TestEnv_Close(t *testing.T) {
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Close should always succeed
 	err := env.Close()
@@ -35,7 +35,7 @@ func TestEnv_Close(t *testing.T) {
 // TestEnv_AddToIPFS_File tests adding a single file to IPFS
 func TestEnv_AddToIPFS_File(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory for test files
 	tempDir := t.TempDir()
@@ -55,7 +55,7 @@ func TestEnv_AddToIPFS_File(t *testing.T) {
 // TestEnv_AddToIPFS_Directory tests adding a directory to IPFS
 func TestEnv_AddToIPFS_Directory(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
@@ -84,7 +84,7 @@ func TestEnv_AddToIPFS_Directory(t *testing.T) {
 // TestEnv_AddToIPFS_NonexistentPath tests error handling for nonexistent paths
 func TestEnv_AddToIPFS_NonexistentPath(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Test with nonexistent path
 	nonexistentPath := "/nonexistent/path"
@@ -96,7 +96,7 @@ func TestEnv_AddToIPFS_NonexistentPath(t *testing.T) {
 // TestEnv_createFileNode tests creating a file node
 func TestEnv_createFileNode(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory for test files
 	tempDir := t.TempDir()
@@ -116,7 +116,7 @@ func TestEnv_createFileNode(t *testing.T) {
 // TestEnv_CreateFileNode_NonexistentFile tests error handling for nonexistent files
 func TestEnv_CreateFileNode_NonexistentFile(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Test with nonexistent file
 	nonexistentFile := "/nonexistent/file.txt"
@@ -128,7 +128,7 @@ func TestEnv_CreateFileNode_NonexistentFile(t *testing.T) {
 // TestEnv_createDirectoryNode tests creating a directory node
 func TestEnv_createDirectoryNode(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
@@ -157,7 +157,7 @@ func TestEnv_createDirectoryNode(t *testing.T) {
 // TestEnv_createDirectoryNode_EmptyDirectory tests creating a node for an empty directory
 func TestEnv_createDirectoryNode_EmptyDirectory(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create an empty temporary directory
 	tempDir := t.TempDir()
@@ -171,7 +171,7 @@ func TestEnv_createDirectoryNode_EmptyDirectory(t *testing.T) {
 // TestEnv_createDirectoryNode_NonexistentDirectory tests error handling for nonexistent directories
 func TestEnv_createDirectoryNode_NonexistentDirectory(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Test with nonexistent directory
 	nonexistentDir := "/nonexistent/directory"
@@ -183,7 +183,7 @@ func TestEnv_createDirectoryNode_NonexistentDirectory(t *testing.T) {
 // TestEnv_createDirectoryNode_ComplexStructure tests creating a node for a complex directory structure
 func TestEnv_createDirectoryNode_ComplexStructure(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a complex temporary directory structure
 	tempDir := t.TempDir()
@@ -220,7 +220,7 @@ func TestEnv_createDirectoryNode_ComplexStructure(t *testing.T) {
 // TestEnv_createDirectoryNode_FilePermissions tests creating directory nodes with different file permissions
 func TestEnv_createDirectoryNode_FilePermissions(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory
 	tempDir := t.TempDir()
@@ -247,7 +247,7 @@ func TestEnv_createDirectoryNode_FilePermissions(t *testing.T) {
 // TestEnv_createDirectoryNode_SpecialCharacters tests creating directory nodes with special characters in names
 func TestEnv_createDirectoryNode_SpecialCharacters(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory
 	tempDir := t.TempDir()
@@ -282,7 +282,7 @@ func TestEnv_createDirectoryNode_SpecialCharacters(t *testing.T) {
 // TestEnv_createDirectoryNode_LargeFiles tests creating directory nodes with large files
 func TestEnv_createDirectoryNode_LargeFiles(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory
 	tempDir := t.TempDir()
@@ -311,7 +311,7 @@ func TestEnv_createDirectoryNode_LargeFiles(t *testing.T) {
 // TestEnv_createDirectoryNode_Symlinks tests creating directory nodes with symbolic links
 func TestEnv_createDirectoryNode_Symlinks(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory
 	tempDir := t.TempDir()
@@ -335,7 +335,7 @@ func TestEnv_createDirectoryNode_Symlinks(t *testing.T) {
 // TestEnv_createDirectoryNode_RecursiveSymlinks tests creating directory nodes with recursive symbolic links
 func TestEnv_createDirectoryNode_RecursiveSymlinks(t *testing.T) {
 	ctx := context.Background()
-	env := &export.Env{}
+	env := util.IPFSEnv{}
 
 	// Create a temporary directory
 	tempDir := t.TempDir()

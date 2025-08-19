@@ -1,19 +1,16 @@
 package importcmd
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/util"
 )
 
-var env Env
+var env util.IPFSEnv
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -94,120 +91,4 @@ func Main(c *cli.Context) error {
 
 	fmt.Printf("Successfully imported %s to %s\n", ipfsPath, absLocalPath)
 	return nil
-}
-
-type Env struct {
-	util.IPFSEnv
-}
-
-// ImportFromIPFS imports content from IPFS to the local filesystem
-func (env *Env) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, localPath string, makeExecutable bool) error {
-	// Get IPFS client
-	ipfs, err := env.GetIPFS()
-	if err != nil {
-		return err
-	}
-
-	// Get the node from IPFS
-	node, err := ipfs.Unixfs().Get(ctx, ipfsPath)
-	if err != nil {
-		return fmt.Errorf("failed to get IPFS path: %w", err)
-	}
-
-	// Handle different node types
-	switch node := node.(type) {
-	case files.Directory:
-		return env.importIPFSDirectory(ctx, node, ipfsPath.String(), localPath, makeExecutable)
-	case files.Node:
-		return env.importIPFSFile(ctx, node, ipfsPath.String(), localPath, makeExecutable)
-	default:
-		return fmt.Errorf("unexpected node type: %T", node)
-	}
-}
-
-// importIPFSFile handles importing a single file from IPFS
-func (env *Env) importIPFSFile(ctx context.Context, node files.Node, ipfsPath, localPath string, makeExecutable bool) error {
-	// Determine target file path
-	var targetPath string
-	if isDirectory(localPath) {
-		// If localPath is a directory, use the filename from IPFS path
-		targetPath = filepath.Join(localPath, filepath.Base(ipfsPath))
-	} else {
-		// If localPath is a file path, use it directly
-		targetPath = localPath
-	}
-
-	// Ensure parent directory exists
-	parentDir := filepath.Dir(targetPath)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
-		return fmt.Errorf("failed to create parent directory: %w", err)
-	}
-
-	// Write the file to disk
-	if err := files.WriteTo(node, targetPath); err != nil {
-		return fmt.Errorf("failed to write IPFS file: %w", err)
-	}
-
-	// Make executable if requested
-	if makeExecutable {
-		if err := os.Chmod(targetPath, 0755); err != nil {
-			return fmt.Errorf("failed to make file executable: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// importIPFSDirectory handles importing a directory from IPFS
-func (env *Env) importIPFSDirectory(ctx context.Context, node files.Node, ipfsPath, localPath string, makeExecutable bool) error {
-	// Ensure local path is a directory
-	if err := os.MkdirAll(localPath, 0755); err != nil {
-		return fmt.Errorf("failed to create local directory: %w", err)
-	}
-
-	// Extract the directory recursively
-	return env.extractIPFSDirectory(ctx, node, localPath, makeExecutable)
-}
-
-// extractIPFSDirectory recursively extracts an IPFS directory to the local filesystem
-func (env *Env) extractIPFSDirectory(ctx context.Context, node files.Node, targetDir string, makeExecutable bool) error {
-	iter := node.(files.DirIterator)
-	for iter.Next() {
-		child := iter.Node()
-		childName := iter.Name()
-		childPath := filepath.Join(targetDir, childName)
-
-		if _, ok := child.(files.Directory); ok {
-			// Create subdirectory and recurse
-			if err := os.MkdirAll(childPath, 0755); err != nil {
-				return fmt.Errorf("failed to create subdirectory %s: %w", childPath, err)
-			}
-			if err := env.extractIPFSDirectory(ctx, child, childPath, makeExecutable); err != nil {
-				return err
-			}
-		} else {
-			// Extract file
-			if err := files.WriteTo(child, childPath); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", childPath, err)
-			}
-
-			// Make executable if requested
-			if makeExecutable {
-				if err := os.Chmod(childPath, 0755); err != nil {
-					return fmt.Errorf("failed to make file executable: %w", err)
-				}
-				return nil
-			}
-		}
-	}
-	return nil
-}
-
-// isDirectory checks if the given path is a directory
-func isDirectory(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
 }

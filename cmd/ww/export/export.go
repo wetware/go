@@ -1,18 +1,16 @@
 package export
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/ipfs/boxo/files"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/util"
 )
 
-var env Env
+var env util.IPFSEnv
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -82,96 +80,4 @@ func Main(c *cli.Context) error {
 	// Print the IPFS path to stdout followed by a newline
 	fmt.Println(ipfsPath)
 	return nil
-}
-
-type Env struct {
-	util.IPFSEnv
-}
-
-// AddToIPFS adds a file or directory to IPFS recursively
-func (env *Env) AddToIPFS(ctx context.Context, localPath string) (string, error) {
-	// Get file info to determine if it's a directory
-	fileInfo, err := os.Stat(localPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to stat %s: %w", localPath, err)
-	}
-
-	var node files.Node
-	if fileInfo.IsDir() {
-		// Handle directory
-		node, err = env.CreateDirectoryNode(ctx, localPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to create directory node: %w", err)
-		}
-	} else {
-		// Handle single file
-		node, err = env.CreateFileNode(ctx, localPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to create file node: %w", err)
-		}
-	}
-
-	// Get IPFS client
-	ipfs, err := env.GetIPFS()
-	if err != nil {
-		return "", err
-	}
-
-	// Add the node to IPFS using Unixfs API
-	path, err := ipfs.Unixfs().Add(ctx, node)
-	if err != nil {
-		return "", fmt.Errorf("failed to add to IPFS: %w", err)
-	}
-
-	return path.String(), nil
-}
-
-// CreateFileNode creates a files.Node for a single file
-func (env *Env) CreateFileNode(ctx context.Context, filePath string) (files.Node, error) {
-	// Read the file content into memory
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a file node from the content
-	return files.NewBytesFile(content), nil
-}
-
-// CreateDirectoryNode creates a files.Node for a directory recursively
-func (env *Env) CreateDirectoryNode(ctx context.Context, dirPath string) (files.Node, error) {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a map to hold directory contents
-	dirMap := make(map[string]files.Node)
-
-	for _, entry := range entries {
-		entryPath := filepath.Join(dirPath, entry.Name())
-
-		if entry.IsDir() {
-			// Recursively handle subdirectories
-			childNode, err := env.CreateDirectoryNode(ctx, entryPath)
-			if err != nil {
-				return nil, err
-			}
-
-			// Add subdirectory to the map
-			dirMap[entry.Name()] = childNode
-		} else {
-			// Handle files
-			childNode, err := env.CreateFileNode(ctx, entryPath)
-			if err != nil {
-				return nil, err
-			}
-
-			// Add file to the map
-			dirMap[entry.Name()] = childNode
-		}
-	}
-
-	// Create directory from the map
-	return files.NewMapDirectory(dirMap), nil
 }
