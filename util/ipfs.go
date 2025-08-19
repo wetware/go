@@ -57,14 +57,6 @@ func (env *IPFSEnv) Close() error {
 	return nil
 }
 
-// GetIPFS returns the IPFS client, ensuring it's initialized
-func (env *IPFSEnv) GetIPFS() (iface.CoreAPI, error) {
-	if env.IPFS == nil {
-		return nil, fmt.Errorf("IPFS client not initialized")
-	}
-	return env.IPFS, nil
-}
-
 // AddToIPFS adds a file or directory to IPFS recursively
 func (env IPFSEnv) AddToIPFS(ctx context.Context, localPath string) (string, error) {
 	// Get file info to determine if it's a directory
@@ -88,14 +80,8 @@ func (env IPFSEnv) AddToIPFS(ctx context.Context, localPath string) (string, err
 		}
 	}
 
-	// Get IPFS client
-	ipfs, err := env.GetIPFS()
-	if err != nil {
-		return "", err
-	}
-
 	// Add the node to IPFS using Unixfs API
-	path, err := ipfs.Unixfs().Add(ctx, node)
+	path, err := env.IPFS.Unixfs().Add(ctx, node)
 	if err != nil {
 		return "", fmt.Errorf("failed to add to IPFS: %w", err)
 	}
@@ -155,14 +141,8 @@ func (env IPFSEnv) CreateDirectoryNode(ctx context.Context, dirPath string) (fil
 
 // ImportFromIPFS imports content from IPFS to the local filesystem
 func (env *IPFSEnv) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, localPath string, makeExecutable bool) error {
-	// Get IPFS client
-	ipfs, err := env.GetIPFS()
-	if err != nil {
-		return err
-	}
-
 	// Get the node from IPFS
-	node, err := ipfs.Unixfs().Get(ctx, ipfsPath)
+	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
 	if err != nil {
 		return fmt.Errorf("failed to get IPFS path: %w", err)
 	}

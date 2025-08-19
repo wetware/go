@@ -100,14 +100,8 @@ func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error
 
 // ResolveIPFSPath resolves an IPFS path using the import functionality
 func (env *Env) ResolveIPFSPath(ctx context.Context, ipfsPath path.Path) (string, error) {
-	// Get IPFS client
-	ipfs, err := env.GetIPFS()
-	if err != nil {
-		return "", err
-	}
-
 	// Get the node from IPFS
-	node, err := ipfs.Unixfs().Get(ctx, ipfsPath)
+	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to get IPFS path: %w", err)
 	}

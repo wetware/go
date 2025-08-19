@@ -33,16 +33,6 @@ func TestIPFSEnv_Close(t *testing.T) {
 	assert.NoError(t, err, "Close should always succeed")
 }
 
-// TestIPFSEnv_GetIPFS tests the GetIPFS method
-func TestIPFSEnv_GetIPFS(t *testing.T) {
-	env := IPFSEnv{}
-
-	// Test when IPFS is not initialized
-	_, err := env.GetIPFS()
-	assert.Error(t, err, "GetIPFS should fail when IPFS is not initialized")
-	assert.Contains(t, err.Error(), "IPFS client not initialized", "Error should contain expected message")
-}
-
 // TestIPFSEnv_AddToIPFS_File tests adding a single file to IPFS
 func TestIPFSEnv_AddToIPFS_File(t *testing.T) {
 	ctx := context.Background()
