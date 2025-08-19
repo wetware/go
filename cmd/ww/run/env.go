@@ -47,7 +47,11 @@ func (env *Env) Boot(addr string) (err error) {
 }
 
 func (env *Env) Close() error {
-	return env.Host.Close()
+	if env.Host != nil {
+		return env.Host.Close()
+	}
+
+	return nil
 }
 
 type HostConfig struct {
