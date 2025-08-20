@@ -46,13 +46,13 @@ func main() {
 	}
 
 	// Check if the bootstrap file descriptor exists
-	bootstrapFile := os.NewFile(system.BOOTSTRAP_FD, "host")
-	if bootstrapFile == nil {
+	host := os.NewFile(system.BOOTSTRAP_FD, "host")
+	if host == nil {
 		fmt.Fprintf(os.Stderr, "ERROR: Failed to create bootstrap file descriptor\n")
 		os.Exit(1)
 	}
 
-	conn := rpc.NewConn(rpc.NewStreamTransport(bootstrapFile), &rpc.Options{
+	conn := rpc.NewConn(rpc.NewStreamTransport(host), &rpc.Options{
 		BaseContext: func() context.Context { return ctx },
 		// BootstrapClient: export(),
 	})
@@ -133,13 +133,6 @@ func executeCommand(ctx context.Context, command string) error {
 			return nil
 		}),
 	).Loop(ctx)
-}
-
-// mockImporter is a mock implementation for testing
-type mockImporter struct{}
-
-func (m *mockImporter) Import(ctx context.Context, envelope *record.Envelope) error {
-	return fmt.Errorf("import not implemented in test mode")
 }
 
 // commandReaderWrapper implements the repl.Input interface for single command execution

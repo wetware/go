@@ -31,8 +31,11 @@ func main() {
 	})
 	defer conn.Close()
 
-	// Get the bootstrap client from the host.
-	conn.Bootstrap(ctx)
+	// // Get the bootstrap client from the host.
+	// conn.Bootstrap(ctx)
+
+	fmt.Println("greeter exported!")
+	<-ctx.Done()
 }
 
 func export() capnp.Client {
