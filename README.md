@@ -1,14 +1,14 @@
-# Go Wetware
+# Wetware Go
 
-[![Godoc Reference](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/wetware/go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/wetware/go?style=flat-square)](https://goreportcard.com/report/github.com/wetware/go)
-[![tests](https://github.com/wetware/go/workflows/Go/badge.svg)](https://github.com/wetware/go/actions/workflows/go.yml)
-[![Matrix](https://img.shields.io/matrix/wetware:matrix.org?color=lightpink&label=support%20chat&logo=matrix&style=flat-square)](https://matrix.to/#/#wetware:matrix.org)
-[![white paper](https://img.shields.io/badge/white%20paper-reading%20time%20--%207%20min-9cf?style=flat-square)](https://hackmd.io/@fCsHyW7yR3C5lGQFbh9KdQ/SJzOIt9k3)
+A Go implementation of the Wetware system for distributed computing and cellular automata.
 
-Wetware node implementation and client libraries for Go programmers.
+## Getting Started
 
-## Installation
+```bash
+go install github.com/wetware/go/cmd/ww
+```
 
-The latest binaries can be installed by running `go install github.com/wetware/cmd`.
-
+Then try starting the shell:
+```
+ww run /ipfs/QmcCFV1Vure9qs2nSQaNH9WjQdhbN4NgoQA5FoDazjyMK9
+```

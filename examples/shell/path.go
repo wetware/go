@@ -33,7 +33,8 @@ func IPFSPathReader(rd *reader.Reader, init rune) (core.Any, error) {
 		}
 
 		// Check if this rune should terminate the path
-		if unicode.IsSpace(r) || rd.IsTerminal(r) {
+		// Only stop on whitespace, not on forward slashes or other path characters
+		if unicode.IsSpace(r) {
 			rd.Unread(r)
 			break
 		}

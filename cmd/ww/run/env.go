@@ -100,7 +100,69 @@ func (env *Env) ResolveExecPath(ctx context.Context, name string) (string, error
 // ResolveIPFSPath resolves an IPFS path using the import functionality with caching
 func (env *Env) ResolveIPFSPath(ctx context.Context, ipfsPath path.Path) (string, error) {
 	// Use the cached import functionality to avoid re-downloading
-	return env.IPFSEnv.ImportFromIPFSToDirWithCaching(ctx, ipfsPath, env.Dir, true)
+	importedPath, err := env.IPFSEnv.ImportFromIPFSToDirWithCaching(ctx, ipfsPath, env.Dir, true)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if the imported path is a directory
+	if isDirectory(importedPath) {
+		// If it's a directory, look for an executable file
+		executablePath, err := env.findExecutableInDirectory(importedPath)
+		if err != nil {
+			return "", fmt.Errorf("IPFS path points to a directory but no executable found: %w", err)
+		}
+		return executablePath, nil
+	}
+
+	return importedPath, nil
+}
+
+// findExecutableInDirectory searches for an executable file in a directory
+func (env *Env) findExecutableInDirectory(dirPath string) (string, error) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+	}
+
+	// Look for common executable names first
+	commonExecutables := []string{"main", "app", "bin", "exec", "run", "start"}
+	for _, name := range commonExecutables {
+		path := filepath.Join(dirPath, name)
+		if isExecutable(path) {
+			return path, nil
+		}
+	}
+
+	// If no common names found, look for any executable file
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			path := filepath.Join(dirPath, entry.Name())
+			if isExecutable(path) {
+				return path, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no executable file found in directory %s", dirPath)
+}
+
+// isDirectory checks if a path is a directory
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// isExecutable checks if a file is executable
+func isExecutable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.Mode()&0111 != 0
 }
 
 // OS returns the operating system name, preferring WW_OS environment variable over runtime.GOOS

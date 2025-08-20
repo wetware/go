@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
@@ -28,6 +29,21 @@ var config = readline.Config{
 
 func main() {
 	ctx := context.Background()
+
+	// Check command line arguments for -c flag
+	if len(os.Args) > 1 && os.Args[1] == "-c" {
+		if len(os.Args) < 3 {
+			fmt.Fprintf(os.Stderr, "Usage: %s -c <command>\n", os.Args[0])
+			os.Exit(1)
+		}
+
+		// Execute single command
+		if err := executeCommand(ctx, os.Args[2]); err != nil {
+			fmt.Fprintf(os.Stderr, "repl error: %s\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Check if the bootstrap file descriptor exists
 	bootstrapFile := os.NewFile(system.BOOTSTRAP_FD, "host")
@@ -74,6 +90,85 @@ func runREPL(ctx context.Context, i system.Importer) error {
 	).Loop(ctx)
 }
 
+// executeCommand executes a single command line
+func executeCommand(ctx context.Context, command string) error {
+	// Create a basic interpreter without import functionality for testing
+	env := slurp.New()
+
+	// Add basic globals for testing
+	globals := map[string]core.Any{
+		"nil":     builtin.Nil{},
+		"true":    builtin.Bool(true),
+		"false":   builtin.Bool(false),
+		"version": builtin.String("wetware-0.1.0"),
+		"println": slurp.Func("println", func(args ...core.Any) {
+			for _, arg := range args {
+				fmt.Println(arg)
+			}
+		}),
+		"print": slurp.Func("print", func(args ...core.Any) {
+			for _, arg := range args {
+				fmt.Print(arg)
+			}
+		}),
+	}
+
+	if err := env.Bind(globals); err != nil {
+		return fmt.Errorf("failed to bind globals: %w", err)
+	}
+
+	// Create a reader from the command string
+	commandReader := strings.NewReader(command)
+
+	// Create the REPL with the command reader
+	return repl.New(env,
+		repl.WithBanner(""),      // No banner for single command execution
+		repl.WithPrompts("", ""), // No prompts for single command execution
+		repl.WithPrinter(printer{out: os.Stdout}),
+		repl.WithReaderFactory(DefaultReaderFactory{}),
+		repl.WithInput(commandReaderWrapper{Reader: commandReader}, func(err error) error {
+			if err != nil && err != io.EOF {
+				return err
+			}
+			return nil
+		}),
+	).Loop(ctx)
+}
+
+// mockImporter is a mock implementation for testing
+type mockImporter struct{}
+
+func (m *mockImporter) Import(ctx context.Context, envelope *record.Envelope) error {
+	return fmt.Errorf("import not implemented in test mode")
+}
+
+// commandReaderWrapper implements the repl.Input interface for single command execution
+type commandReaderWrapper struct {
+	*strings.Reader
+}
+
+func (r commandReaderWrapper) Readline() (string, error) {
+	// Read a line from the strings.Reader
+	buf := make([]byte, 0, 1024)
+	for {
+		if b, err := r.ReadByte(); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return "", err
+		} else if b == '\n' {
+			break
+		} else {
+			buf = append(buf, b)
+		}
+	}
+	return strings.TrimSpace(string(buf)), nil
+}
+
+func (r commandReaderWrapper) Prompt(p string) {
+	// No prompting for single command execution
+}
+
 // Path represents an IPFS path and implements core.Any
 type Path struct {
 	path.Path
@@ -87,21 +182,24 @@ func (p Path) String() string {
 func newInterpreter(i system.Importer) *slurp.Interpreter {
 	// Create analyzer for special forms
 	analyzer := &builtin.Analyzer{
-		Specials: map[string]builtin.ParseSpecial{
-			"import": func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
-				v, err := args.First()
-				if err != nil {
-					return nil, err
-				}
+		Specials: make(map[string]builtin.ParseSpecial),
+	}
 
-				e, ok := v.(*record.Envelope)
-				if !ok {
-					return nil, fmt.Errorf("expected envelope, got %T", v)
-				}
+	// Only add import special form if importer is available
+	if i.IsValid() {
+		analyzer.Specials["import"] = func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
+			v, err := args.First()
+			if err != nil {
+				return nil, err
+			}
 
-				return &ImportExpr{Client: i, Envelope: e}, nil
-			},
-		},
+			e, ok := v.(*record.Envelope)
+			if !ok {
+				return nil, fmt.Errorf("expected envelope, got %T", v)
+			}
+
+			return &ImportExpr{Client: i, Envelope: e}, nil
+		}
 	}
 
 	// Create base environment with analyzer
