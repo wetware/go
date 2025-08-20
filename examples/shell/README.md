@@ -52,7 +52,7 @@ go run main.go
 
 ```
 Welcome to Wetware Shell! Type 'help' for available commands.
-wetware> help
+ww> help
 Wetware Shell - Available commands:
   help                    - Show this help message
   version                 - Show wetware version
@@ -64,15 +64,15 @@ Wetware Shell - Available commands:
   (println expr)         - Print expression with newline
   (print expr)           - Print expression without newline
 
-wetware> (+ 1 2 3 4)
+ww> (+ 1 2 3 4)
 10
-wetware> (* 2 3 4)
+ww> (* 2 3 4)
 24
-wetware> (> 10 5)
+ww> (> 10 5)
 true
-wetware> (println "Hello, Wetware!")
+ww> (println "Hello, Wetware!")
 Hello, Wetware!
-wetware> 
+ww>
 ```
 
 ## Architecture

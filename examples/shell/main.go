@@ -20,7 +20,7 @@ import (
 )
 
 var config = readline.Config{
-	Prompt:          "ww ",
+	Prompt:          "ww> ",
 	HistoryFile:     "/tmp/ww-shell.tmp",
 	AutoComplete:    getCompleter(),
 	InterruptPrompt: "^C",
@@ -252,7 +252,7 @@ func newInterpreter(i system.Importer) *slurp.Interpreter {
   (println expr)         - Print expression with newline
   (print expr)           - Print expression without newline
   (import "module")      - Import a module (stubbed)
-  
+
   IPFS Path Syntax:
   /ipfs/QmHash/...       - Direct IPFS path
   /ipns/domain/...       - IPNS path`
