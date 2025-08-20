@@ -269,27 +269,6 @@ func isDirectory(path string) bool {
 	return info.IsDir()
 }
 
-// isContentAlreadyAvailable checks if the IPFS content is already available at the target location
-func (env *IPFSEnv) isContentAlreadyAvailable(localPath string) bool {
-	// For now, we'll do a simple check - if the target path exists and has content
-	// In a more sophisticated implementation, we could verify the content hash matches
-	if isDirectory(localPath) {
-		// Check if directory exists and has content
-		entries, err := os.ReadDir(localPath)
-		if err != nil {
-			return false
-		}
-		return len(entries) > 0
-	} else {
-		// Check if file exists and has content
-		info, err := os.Stat(localPath)
-		if err != nil {
-			return false
-		}
-		return info.Size() > 0
-	}
-}
-
 // makeFilesExecutable recursively makes all files in a path executable
 func (env *IPFSEnv) makeFilesExecutable(targetPath string) {
 	if isDirectory(targetPath) {
