@@ -86,6 +86,33 @@ WW_OS=linux WW_ARCH=amd64 ww run /ipfs/QmDirectoryHash/
 WW_ARCH=arm64 ww run /ipfs/QmDirectoryHash/
 ```
 
+## File Descriptor Passing
+
+The `ww run` command supports secure file descriptor passing, allowing you to grant specific file descriptors to child processes with fine-grained control over access modes and types.
+
+### Basic Usage
+
+```bash
+# Pass a database socket
+ww run --fd db=3,mode=rw,type=socket /ipfs/foo
+
+# Pass multiple file descriptors
+ww run \
+  --fd db=3,mode=rw,type=socket \
+  --fd logs=5,mode=w,type=file \
+  /ipfs/foo
+```
+
+### Advanced Features
+
+- **Bulk configuration** via S-expression files
+- **Systemd socket activation** support
+- **Automatic target fd assignment** (starts from 10)
+- **Symlink creation** in jail directories
+- **Verbose logging** of fd grants
+
+For complete documentation, see the [main README](../../../README.md#file-descriptor-passing).
+
 ## Fallback Behavior
 
 The command uses intelligent fallback logic:
