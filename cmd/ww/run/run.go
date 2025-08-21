@@ -35,8 +35,6 @@ func Command() *cli.Command {
 				Name:     "fd",
 				Category: "FILE DESCRIPTORS",
 				Usage:    "map existing parent fd to name (e.g., db=3). Use --fd multiple times for multiple fds.",
-				// Note: Each --fd flag should be name=fdnum
-				// Use --fd-map for target fd, --fd-verbose for logging
 			},
 			&cli.StringSliceFlag{
 				Name:     "fd-map",
@@ -57,11 +55,6 @@ func Command() *cli.Command {
 				Name:     "fd-from",
 				Category: "FILE DESCRIPTORS",
 				Usage:    "bulk capability imports from file or stdin (e.g., @imports or -)",
-			},
-			&cli.BoolFlag{
-				Name:     "fd-verbose",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "verbose logging of fd grants",
 			},
 		}, flags.CapabilityFlags()...),
 
@@ -96,7 +89,7 @@ func Main(c *cli.Context) error {
 	defer guest.Close()
 
 	// Initialize fd manager
-	fdManager := NewFDManager(c.Bool("fd-verbose"))
+	fdManager := NewFDManager()
 
 	// Process fd-related flags
 	if err := processFDFlags(c, fdManager); err != nil {
@@ -116,10 +109,10 @@ func Main(c *cli.Context) error {
 	}
 	defer fdManager.Close()
 
-	// Create symlinks in jail if requested
-	if err := fdManager.CreateSymlinks(env.Dir); err != nil {
-		return fmt.Errorf("failed to create symlinks: %w", err)
-	}
+	// Create symlinks in jail if requested (removed - simplified interface)
+	// if err := fdManager.CreateSymlinks(env.Dir); err != nil {
+	// 	return fmt.Errorf("failed to create symlinks: %w", err)
+	// }
 
 	// Run target in jailed subprocess
 	////
@@ -173,34 +166,6 @@ func processFDFlags(c *cli.Context, fdManager *FDManager) error {
 	for _, fdFlag := range c.StringSlice("fd") {
 		if err := fdManager.ParseFDFlag(fdFlag); err != nil {
 			return fmt.Errorf("invalid --fd flag '%s': %w", fdFlag, err)
-		}
-	}
-
-	// Process --fd-map flags
-	for _, fdMapFlag := range c.StringSlice("fd-map") {
-		if err := fdManager.ParseFDMapFlag(fdMapFlag); err != nil {
-			return fmt.Errorf("invalid --fd-map flag '%s': %w", fdMapFlag, err)
-		}
-	}
-
-	// Process --fdctl flags
-	for _, fdctlFlag := range c.StringSlice("fdctl") {
-		if err := fdManager.ParseFDCTLFlag(fdctlFlag); err != nil {
-			return fmt.Errorf("invalid --fdctl flag '%s': %w", fdctlFlag, err)
-		}
-	}
-
-	// Process --use-systemd-fds flag
-	if systemdPrefix := c.String("use-systemd-fds"); systemdPrefix != "" {
-		if err := fdManager.UseSystemdFDs(systemdPrefix); err != nil {
-			return fmt.Errorf("systemd fd import failed: %w", err)
-		}
-	}
-
-	// Process --fd-from flag
-	if fdFromPath := c.String("fd-from"); fdFromPath != "" {
-		if err := fdManager.ParseFDFromFile(fdFromPath); err != nil {
-			return fmt.Errorf("fd spec file parsing failed: %w", err)
 		}
 	}
 
