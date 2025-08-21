@@ -1,36 +1,32 @@
-# Wetware Shell Example
+# Shell Example
 
-This is a production-grade REPL (Read-Eval-Print Loop) shell built with the Wetware framework and Slurp LISP toolkit.
+Production-grade REPL shell built with the Wetware framework and Slurp LISP toolkit.
 
 ## Features
 
-- **Production-grade REPL**: Built using the `github.com/spy16/slurp` package for robust LISP interpretation
-- **Readline Support**: Uses `github.com/chzyer/readline` for enhanced terminal experience including:
-  - Command history
-  - Tab completion
-  - Line editing
-  - Interrupt handling (Ctrl+C)
-- **Wetware Integration**: Runs within the Wetware cell environment with access to system capabilities
-- **Rich Function Set**: Includes basic arithmetic, comparison, and utility functions
+- **REPL**: Built using `github.com/spy16/slurp` for LISP interpretation
+- **Readline**: Uses `github.com/chzyer/readline` for terminal experience
+- **Wetware Integration**: Runs within Wetware cell environment with system capabilities
+- **Function Registry**: Extensible set of built-in functions
 
-## Available Commands
+## Available Functions
 
 ### Basic Values
 - `nil` - null value
 - `true` / `false` - boolean values
 - `version` - wetware version string
 
-### Arithmetic Operations
+### Arithmetic
 - `(+ a b ...)` - sum of numbers
 - `(* a b ...)` - product of numbers
 - `(/ a b)` - division (returns float)
 
-### Comparison Operations
+### Comparison
 - `(= a b)` - equality comparison
 - `(> a b)` - greater than
 - `(< a b)` - less than
 
-### Utility Functions
+### Utilities
 - `help` - display help message
 - `println expr` - print expression with newline
 - `print expr` - print expression without newline
@@ -38,13 +34,13 @@ This is a production-grade REPL (Read-Eval-Print Loop) shell built with the Wetw
 ## Usage
 
 ```bash
-# Build the shell
+# Build
 go build -o wetware-shell
 
-# Run the shell (requires wetware environment)
+# Run (requires wetware environment)
 ./wetware-shell
 
-# Or run directly with go
+# Or run directly
 go run main.go
 ```
 
@@ -77,21 +73,19 @@ ww>
 
 ## Architecture
 
-The shell is built with several key components:
-
-1. **Wetware Environment**: Integrates with the Wetware cell system for capabilities
-2. **Slurp Interpreter**: Provides the LISP evaluation engine
+1. **Wetware Environment**: Integrates with Wetware cell system for capabilities
+2. **Slurp Interpreter**: Provides LISP evaluation engine
 3. **Custom REPL**: Production-grade read-eval-print loop with error handling
 4. **Readline Integration**: Enhanced terminal input with history and completion
 5. **Function Registry**: Extensible set of built-in functions
 
-## Extending the Shell
+## Extending
 
 To add new functions, modify the `createWetwareEnvironment` function in `main.go`:
 
 ```go
 "my-function": slurp.Func("my-function", func(args ...core.Any) {
-    // Your function implementation
+    // Implementation
     return result
 }),
 ```
