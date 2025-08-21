@@ -166,7 +166,7 @@ func (c Importer_import) AllocResults() (Importer_import_Results, error) {
 // Importer_List is a list of Importer.
 type Importer_List = capnp.CapList[Importer]
 
-// NewImporter creates a new list of Importer.
+// NewImporter_List creates a new list of Importer.
 func NewImporter_List(s *capnp.Segment, sz int32) (Importer_List, error) {
 	l, err := capnp.NewPointerList(s, sz)
 	return capnp.CapList[Importer](l), err
