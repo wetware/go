@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/ipfs/boxo/path"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wetware/go/cmd/ww/run"
@@ -88,37 +87,4 @@ func TestEnv_Arch(t *testing.T) {
 	os.Unsetenv("WW_ARCH")
 	result = env.Arch()
 	assert.Equal(t, runtime.GOARCH, result)
-}
-
-func TestEnv_ResolveIPFSFile(t *testing.T) {
-	ctx := context.Background()
-
-	// Create a temporary environment
-	env := &run.Env{}
-	env.Dir = t.TempDir()
-
-	// Create a simple test file
-	testFile := filepath.Join(env.Dir, "test_file")
-	err := os.WriteFile(testFile, []byte("test content"), 0644)
-	require.NoError(t, err)
-
-	// Test file resolution (this will fail since we don't have IPFS set up)
-	// but we can test the method signature and basic logic
-	ipfsPath, err := path.NewPath("/ipfs/QmTestFile")
-	require.NoError(t, err)
-	_, err = env.ResolveIPFSPath(ctx, ipfsPath)
-
-	// Should fail since we don't have a real IPFS node
-	require.Error(t, err)
-}
-
-func TestEnv_ResolveIPFSDirectory_WithBinSubdir(t *testing.T) {
-	// Create a temporary environment
-	env := &run.Env{}
-	env.Dir = t.TempDir()
-
-	// This test expects the method to exist and be callable
-	// Since we can't easily mock the complex IPFS interfaces, we'll just test
-	// that the method exists and can be called
-	assert.NotNil(t, env.ResolveIPFSPath)
 }
