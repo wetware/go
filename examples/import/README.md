@@ -15,7 +15,7 @@ Binary is placed in `/tmp` to avoid polluting the git workspace.
 Uses `name=fdnum` format for file descriptor passing:
 
 ```bash
-ww run --fd <name>=<fdnum> <binary>
+ww run --with-fd <name>=<fdnum> <binary>
 ```
 
 ## Examples
@@ -27,7 +27,7 @@ ww run --fd <name>=<fdnum> <binary>
 echo 'Hello World' > test.txt
 
 # Pass as fd 3, named "input"
-ww run --fd input=3 3<test.txt /tmp/fd-demo
+ww run --with-fd input=3 3<test.txt /tmp/fd-demo
 ```
 
 ### Multiple File Descriptors
@@ -38,7 +38,7 @@ echo 'input data' > input.txt
 touch output.txt
 
 # Pass both files
-ww run --fd input=3 --fd output=4 3<input.txt 4>output.txt /tmp/fd-demo
+ww run --with-fd input=3 --with-fd output=4 3<input.txt 4>output.txt /tmp/fd-demo
 ```
 
 ### Database and Cache
@@ -49,7 +49,7 @@ echo 'db data' > db.txt
 echo 'cache data' > cache.txt
 
 # Pass to child process
-ww run --fd db=3 --fd cache=4 3<db.txt 4<cache.txt /tmp/fd-demo
+ww run --with-fd db=3 --with-fd cache=4 3<db.txt 4<cache.txt /tmp/fd-demo
 ```
 
 ## Environment Variables
@@ -66,7 +66,7 @@ WW_FD_CACHE=6
 
 ## Implementation
 
-- **Syntax**: `--fd name=fdnum`
+- **Syntax**: `--with-fd name=fdnum`
 - **Target Assignment**: Auto-assigned starting at fd 3
 - **Environment**: `WW_FD_<NAME>=<target_fd>` variables
 - **Validation**: Prevents duplicate names, validates FD numbers
@@ -89,7 +89,7 @@ Current implementation does not include:
 
 # Test with fd passing
 echo 'test data' > test.txt
-ww run --fd input=3 3<test.txt /tmp/fd-demo
+ww run --with-fd input=3 3<test.txt /tmp/fd-demo
 ```
 
 Child process displays environment variables and attempts to access passed file descriptors.
