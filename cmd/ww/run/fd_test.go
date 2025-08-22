@@ -26,7 +26,7 @@ func TestParseFDFlag(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid basic fd",
+			name:    "valid basic with-fd",
 			value:   "db=3",
 			wantErr: false,
 		},
