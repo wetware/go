@@ -33,7 +33,7 @@ type Env struct {
 	Dir  string // Temporary directory for cell execution
 }
 
-func (env *Env) Boot(addr string) (err error) {
+func (env *Env) Boot(addr string, port int) (err error) {
 	// Create temporary directory for cell execution
 	env.Dir, err = os.MkdirTemp("", "cell-*")
 	if err != nil {
@@ -46,7 +46,7 @@ func (env *Env) Boot(addr string) (err error) {
 	}
 
 	// Initialize libp2p host
-	env.Host, err = HostConfig{IPFS: env.IPFS}.New()
+	env.Host, err = HostConfig{IPFS: env.IPFS, Port: port}.New()
 	return err
 }
 
@@ -127,6 +127,7 @@ func (env *Env) Arch() string {
 type HostConfig struct {
 	IPFS    iface.CoreAPI
 	Options []libp2p.Option
+	Port    int
 }
 
 func (cfg HostConfig) New() (host.Host, error) {
@@ -139,6 +140,6 @@ func (cfg HostConfig) CombinedOptions() []libp2p.Option {
 
 func (c HostConfig) DefaultOptions() []libp2p.Option {
 	return []libp2p.Option{
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/2020"),
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", c.Port)),
 	}
 }

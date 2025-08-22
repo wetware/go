@@ -31,6 +31,12 @@ func Command() *cli.Command {
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},
 			},
+			&cli.IntFlag{
+				Name:    "port",
+				Aliases: []string{"p"},
+				EnvVars: []string{"WW_PORT"},
+				Value:   2020,
+			},
 			&cli.StringSliceFlag{
 				Name:     "with-fd",
 				Category: "FILE DESCRIPTORS",
@@ -41,7 +47,7 @@ func Command() *cli.Command {
 		// Environment hooks.
 		////
 		Before: func(c *cli.Context) error {
-			return env.Boot(c.String("ipfs"))
+			return env.Boot(c.String("ipfs"), c.Int("port"))
 		},
 		After: func(c *cli.Context) error {
 			return env.Close()
