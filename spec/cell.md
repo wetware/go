@@ -29,26 +29,26 @@ This document is for users who want to write their own cells. Simply adhere to t
 - **fd 3**: One end of a Unix domain socket pair for Cap'n Proto RPC communication with host
 
 ### User-Configurable File Descriptors
-Additional file descriptors can be passed from host to cell using the `--fd` flag:
+Additional file descriptors can be passed from host to cell using the `--with-fd` flag:
 
 ```bash
-ww run --fd name=fdnum [--fd name2=fdnum2 ...] <command>
+ww run --with-fd name=fdnum [--with-fd name2=fdnum2 ...] <command>
 ```
 
-**Format**: `--fd name=fdnum` where:
+**Format**: `--with-fd name=fdnum` where:
 - `name`: Logical name for the file descriptor (e.g., "db", "cache", "input")
 - `fdnum`: Source file descriptor number in the host process
 
 **Target Assignment**: File descriptors are automatically assigned to the cell in **predictable positional order** starting at fd 3:
-- First `--fd` flag → fd 3 (first argument)
-- Second `--fd` flag → fd 4 (second argument)  
-- Third `--fd` flag → fd 5 (third argument)
+- First `--with-fd` flag → fd 3 (first argument)
+- Second `--with-fd` flag → fd 4 (second argument)
+- Third `--with-fd` flag → fd 5 (third argument)
 - And so on...
 
 **Naming Benefits**: Each file descriptor gets a semantic name that the cell can use:
 - **Predictable positioning**: The child knows exactly which FD number to use
 - **Semantic meaning**: Names like "db", "cache", "logs" make the purpose clear
-- **Flexible ordering**: You can reorder `--fd` flags without breaking the child
+- **Flexible ordering**: You can reorder `--with-fd` flags without breaking the child
 - **Environment mapping**: Clear mapping from names to FD numbers
 
 **Environment Variables**: The cell receives environment variables that map names to FD numbers:
@@ -77,9 +77,9 @@ The cell process must:
 3. Access additional file descriptors via predictable FD numbers (3, 4, 5...) or environment variables (`WW_FD_*`)
 
 **Key Benefits**:
-- **Predictable access**: First `--fd` is always at FD 3, second at FD 4, etc.
+- **Predictable access**: First `--with-fd` is always at FD 3, second at FD 4, etc.
 - **Named resources**: Environment variables tell you what each FD represents
-- **Flexible ordering**: Change the order of `--fd` flags without breaking the child
+- **Flexible ordering**: Change the order of `--with-fd` flags without breaking the child
 - **Self-documenting**: The child knows exactly what each FD is for
 
 ## Capabilities
@@ -138,12 +138,12 @@ The `ww run` subcommand is a reference implementation that demonstrates the cell
 - Creates a jailed execution environment
 - Sets up the Unix domain socket pair for RPC communication
 - Launches the specified executable with the required file descriptors
-- Supports file descriptor passing via `--fd` flags
+- Supports file descriptor passing via `--with-fd` flags
 
 **Example Usage**:
 ```bash
 # Example usage:
-# ww run --fd db=3 --fd cache=4 /ipfs/QmMyApp
+# ww run --with-fd db=3 --with-fd cache=4 /ipfs/QmMyApp
 # 
 # Environment variables in cell:
 # - WW_FD_DB=3 (fd 3 mapped to fd 3 in cell)
