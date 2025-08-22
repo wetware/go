@@ -1,11 +1,11 @@
-# File Descriptor Flag (`--fd`) for `ww run`
+# File Descriptor Flag (`--with-fd`) for `ww run`
 
-This document describes the `--fd` flag implementation in the `ww run` command, which provides a clean, predictable way to grant child processes access to specific file descriptors with semantic naming.
+This document describes the `--with-fd` flag implementation in the `ww run` command, which provides a clean, predictable way to grant child processes access to specific file descriptors with semantic naming.
 
 ## Usage
 
 ```bash
-ww run --fd <name>=<fdnum> <binary>
+ww run --with-fd <name>=<fdnum> <binary>
 ```
 
 ## Behavior
@@ -19,20 +19,20 @@ ww run --fd <name>=<fdnum> <binary>
 
 ```bash
 # Pass database socket
-ww run --fd db=3 /ipfs/foo
+ww run --with-fd db=3 /ipfs/foo
 
 # Pass multiple FDs
-ww run --fd db=3 --fd cache=4 /ipfs/foo
+ww run --with-fd db=3 --with-fd cache=4 /ipfs/foo
 
 # Pass multiple FDs with different ordering (same result)
-ww run --fd cache=4 --fd db=3 /ipfs/foo
+ww run --with-fd cache=4 --with-fd db=3 /ipfs/foo
 ```
 
 ## Implementation Details
 
 ### FD Processing Flow
 
-1. **Flag Parsing**: Each `--fd` flag is parsed in `name=fdnum` format
+1. **Flag Parsing**: Each `--with-fd` flag is parsed in `name=fdnum` format
 2. **Validation**: Checks for duplicate names and valid FD numbers
 3. **File Preparation**: Source FDs are duplicated using `syscall.Dup()`
 4. **Target Assignment**: FDs are assigned sequentially starting at 3
@@ -48,7 +48,7 @@ ww run --fd cache=4 --fd db=3 /ipfs/foo
 ### Code Structure
 
 - **`FDManager`**: Main struct managing FD configurations and operations
-- **`ParseFDFlag()`**: Parses individual `--fd` flag values
+- **`ParseFDFlag()`**: Parses individual `--with-fd` flag values
 - **`PrepareFDs()`**: Prepares and assigns target FDs
 - **`GenerateEnvVars()`**: Creates environment variables for child process
 - **`Close()`**: Cleanup and resource management
