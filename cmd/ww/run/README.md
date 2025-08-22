@@ -17,7 +17,7 @@ ww run <binary> [args...]
 
 - `--ipfs` - IPFS API endpoint (default: `/dns4/localhost/tcp/5001/http`)
 - `--env` - Environment variables for the cell (can be specified multiple times)
-- `--fd <name>=<fdnum>` - Map parent file descriptor to name (can be specified multiple times)
+- `--with-fd <name>=<fdnum>` - Map parent file descriptor to name (can be specified multiple times)
 - `WW_IPFS` environment variable overrides `--ipfs` flag
 - `WW_ENV` environment variable provides comma-separated list of environment variables
 
@@ -39,7 +39,7 @@ ww run /ipfs/QmHash.../my-program --help
 ### Basic Syntax
 
 ```bash
-ww run --fd <name>=<fdnum> <binary>
+ww run --with-fd <name>=<fdnum> <binary>
 ```
 
 - **`<name>`** - Logical name for the file descriptor
@@ -49,9 +49,9 @@ ww run --fd <name>=<fdnum> <binary>
 
 File descriptors are automatically assigned to the cell in predictable order starting at fd 3:
 
-- First `--fd` flag → fd 3
-- Second `--fd` flag → fd 4
-- Third `--fd` flag → fd 5
+- First `--with-fd` flag → fd 3
+- Second `--with-fd` flag → fd 4
+- Third `--with-fd` flag → fd 5
 - And so on...
 
 **Note**: FDs are assigned in the order they appear in the child's `ExtraFiles` slice, ensuring consistent numbering regardless of command-line flag order.
@@ -70,11 +70,11 @@ WW_FD_INPUT=5    # "input" is available at FD 5
 
 ```bash
 # Pass database socket and cache
-ww run --fd db=3 --fd cache=4 /ipfs/foo
+ww run --with-fd db=3 --with-fd cache=4 /ipfs/foo
 
 # Pass multiple file descriptors
 ww run \
-  --fd db=3 --fd logs=5 \
+  --with-fd db=3 --with-fd logs=5 \
   /ipfs/foo
 ```
 
@@ -142,7 +142,7 @@ ww run /ipfs/QmHash... --help
 
 ```bash
 # Pass database socket to cell
-ww run --fd db=3 /ipfs/QmHash.../database-app
+ww run --with-fd db=3 /ipfs/QmHash.../database-app
 
 # Cell can access database at fd 3
 # Environment: WW_FD_DB=3
