@@ -54,6 +54,8 @@ File descriptors are automatically assigned to the cell in predictable order sta
 - Third `--fd` flag → fd 5
 - And so on...
 
+**Note**: FDs are assigned in the order they appear in the child's `ExtraFiles` slice, ensuring consistent numbering regardless of command-line flag order.
+
 ### Environment Variables
 
 The cell receives environment variables mapping names to FD numbers:
