@@ -29,11 +29,11 @@ func NewFDManager() *FDManager {
 	}
 }
 
-// ParseFDFlag parses the --fd flag value in simple "name=fdnum" format
+// ParseFDFlag parses the --with-fd flag value in simple "name=fdnum" format
 func (fm *FDManager) ParseFDFlag(value string) error {
 	parts := strings.Split(value, "=")
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid --fd format: must be name=fdnum")
+		return fmt.Errorf("invalid --with-fd format: must be name=fdnum")
 	}
 
 	name := parts[0]

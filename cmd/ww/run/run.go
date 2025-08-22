@@ -32,29 +32,9 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_ENV"},
 			},
 			&cli.StringSliceFlag{
-				Name:     "fd",
+				Name:     "with-fd",
 				Category: "FILE DESCRIPTORS",
-				Usage:    "map existing parent fd to name (e.g., db=3). Use --fd multiple times for multiple fds.",
-			},
-			&cli.StringSliceFlag{
-				Name:     "fd-map",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "override numeric target for a named fd (e.g., db=10)",
-			},
-			&cli.StringSliceFlag{
-				Name:     "fdctl",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "accept fds via SCM_RIGHTS or inherit existing (e.g., /path/to/sock or inherit:5)",
-			},
-			&cli.StringFlag{
-				Name:     "use-systemd-fds",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "import fds from systemd socket activation (optional prefix)",
-			},
-			&cli.StringFlag{
-				Name:     "fd-from",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "bulk capability imports from file or stdin (e.g., @imports or -)",
+				Usage:    "map existing parent fd to name (e.g., db=3). Use --with-fd multiple times for multiple fds.",
 			},
 		}, flags.CapabilityFlags()...),
 
@@ -91,9 +71,9 @@ func Main(c *cli.Context) error {
 	// Initialize fd manager
 	fdManager := NewFDManager()
 
-	// Process fd-related flags
-	if err := processFDFlags(c, fdManager); err != nil {
-		return fmt.Errorf("fd flag processing failed: %w", err)
+	// Process with-fd-related flags
+	if err := processWithFDFlags(c, fdManager); err != nil {
+		return fmt.Errorf("--with-fd flag processing failed: %w", err)
 	}
 
 	// Check if first arg is an IPFS path and prepare name for CommandContext
@@ -160,12 +140,12 @@ func Main(c *cli.Context) error {
 	return cmd.Wait()
 }
 
-// processFDFlags processes all fd-related command line flags
-func processFDFlags(c *cli.Context, fdManager *FDManager) error {
-	// Process --fd flags (can be specified multiple times)
-	for _, fdFlag := range c.StringSlice("fd") {
+// processWithFDFlags processes all --with-fd command line flags
+func processWithFDFlags(c *cli.Context, fdManager *FDManager) error {
+	// Process --with-fd flags (can be specified multiple times)
+	for _, fdFlag := range c.StringSlice("with-fd") {
 		if err := fdManager.ParseFDFlag(fdFlag); err != nil {
-			return fmt.Errorf("invalid --fd flag '%s': %w", fdFlag, err)
+			return fmt.Errorf("invalid --with-fd flag '%s': %w", fdFlag, err)
 		}
 	}
 
