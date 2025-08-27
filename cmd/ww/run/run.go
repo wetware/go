@@ -101,7 +101,7 @@ func Main(c *cli.Context) error {
 	extraFiles := []*os.File{guest}
 	userFiles, err := fdManager.PrepareFDs()
 	if err != nil {
-		return fmt.Errorf("failed to prepare file descriptors: %w", err)
+		return err
 	}
 	cmd.ExtraFiles = append(extraFiles, userFiles...)
 
