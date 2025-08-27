@@ -335,7 +335,9 @@ func (env *IPFSEnv) ImportFromIPFSToDirWithCaching(ctx context.Context, ipfsPath
 
 			// Ensure permissions if needed
 			if makeExecutable {
-				env.makeFilesExecutable(targetPath)
+				if err := env.makeFilesExecutable(targetPath); err != nil {
+					return "", err
+				}
 			}
 
 			return targetPath, nil
