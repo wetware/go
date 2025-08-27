@@ -50,22 +50,28 @@ package main
 import (
     "fmt"
     "os"
-    "strconv"
+
+    "github.com/wetware/go/util"
 )
 
 func main() {
-    // Check for database FD
-    dbFDStr := os.Getenv("WW_FD_DB")
-    if dbFDStr == "" {
+    // Get all available file descriptors
+    fdMap := util.GetFDMap()
+    
+    // Check for specific FD
+    if dbFD, exists := fdMap["db"]; exists {
+        dbFile := os.NewFile(uintptr(dbFD), "database")
+        defer dbFile.Close()
+        // Use dbFile for database operations
+        fmt.Printf("Using database at FD %d\n", dbFD)
+    } else {
         fmt.Fprintf(os.Stderr, "Database FD not provided\n")
         os.Exit(1)
     }
     
-    // Convert to integer and use
-    if dbFD, err := strconv.Atoi(dbFDStr); err == nil {
-        dbFile := os.NewFile(uintptr(dbFD), "database")
-        defer dbFile.Close()
-        // Use dbFile for database operations
+    // Or iterate through all available FDs
+    for name, fd := range fdMap {
+        fmt.Printf("Available: %s -> FD %d\n", name, fd)
     }
 }
 ```
