@@ -16,6 +16,8 @@ import (
 
 var env Env
 
+const protocol = "/ww/0.1.0"
+
 func Command() *cli.Command {
 	return &cli.Command{
 		// ww run <binary> [args...]
@@ -128,7 +130,7 @@ func Main(c *cli.Context) error {
 
 	// Set up libp2p protocol handler
 	////
-	env.Host.SetStreamHandler("/ww/0.1.0", func(s network.Stream) {
+	env.Host.SetStreamHandler(protocol, func(s network.Stream) {
 		defer s.Close()
 
 		conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
@@ -142,7 +144,7 @@ func Main(c *cli.Context) error {
 		case <-conn.Done():
 		}
 	})
-	defer env.Host.RemoveStreamHandler("/ww/0.1.0")
+	defer env.Host.RemoveStreamHandler(protocol)
 
 	return cmd.Wait()
 }
