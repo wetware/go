@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
+	"github.com/wetware/go/cmd/ww/args"
 	"github.com/wetware/go/system"
 )
 
@@ -60,6 +61,7 @@ func Command() *cli.Command {
 }
 
 func Main(c *cli.Context) error {
+
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
@@ -82,6 +84,12 @@ func Main(c *cli.Context) error {
 		return err
 	}
 
+	// Fetch or create the arguments for the guest process.
+	guestArgs, ok := c.Context.Value(args.GuestArgs).([]string)
+	if !ok {
+		guestArgs = []string{}
+	}
+
 	// Set up file descriptor management
 	////
 	fdManager, err := NewFDManager(c.StringSlice("with-fd"))
@@ -92,7 +100,7 @@ func Main(c *cli.Context) error {
 
 	// Run target in jailed subprocess
 	////
-	cmd := os_exec.CommandContext(ctx, name, c.Args().Tail()...)
+	cmd := os_exec.CommandContext(ctx, name, guestArgs...)
 	cmd.Dir = env.Dir
 
 	// Combine environment variables: base env + --env flags + FD mappings
