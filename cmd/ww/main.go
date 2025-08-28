@@ -10,6 +10,7 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
+	"github.com/wetware/go/cmd/ww/args"
 	"github.com/wetware/go/cmd/ww/export"
 	"github.com/wetware/go/cmd/ww/idgen"
 	importcmd "github.com/wetware/go/cmd/ww/import"
@@ -52,7 +53,10 @@ func main() {
 		},
 	}
 
-	err := app.RunContext(ctx, os.Args)
+	hostArgs, guestArgs := args.SplitArgs(os.Args)
+	ctx = context.WithValue(ctx, args.GuestArgs, guestArgs)
+
+	err := app.RunContext(ctx, hostArgs)
 	if err != nil {
 		slog.ErrorContext(ctx, err.Error())
 		os.Exit(1)

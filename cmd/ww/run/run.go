@@ -10,10 +10,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
+	"github.com/wetware/go/cmd/ww/args"
 	"github.com/wetware/go/system"
 )
 
 var env Env
+
+const protocol = "/ww/0.1.0"
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -31,6 +34,12 @@ func Command() *cli.Command {
 				Name:    "env",
 				EnvVars: []string{"WW_ENV"},
 			},
+			&cli.IntFlag{
+				Name:    "port",
+				Aliases: []string{"p"},
+				EnvVars: []string{"WW_PORT"},
+				Value:   2020,
+			},
 			&cli.StringSliceFlag{
 				Name:     "with-fd",
 				Category: "FILE DESCRIPTORS",
@@ -41,7 +50,7 @@ func Command() *cli.Command {
 		// Environment hooks.
 		////
 		Before: func(c *cli.Context) error {
-			return env.Boot(c.String("ipfs"))
+			return env.Boot(c.String("ipfs"), c.Int("port"))
 		},
 		After: func(c *cli.Context) error {
 			return env.Close()
@@ -54,6 +63,7 @@ func Command() *cli.Command {
 }
 
 func Main(c *cli.Context) error {
+
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
@@ -76,6 +86,12 @@ func Main(c *cli.Context) error {
 		return err
 	}
 
+	// Fetch or create the arguments for the guest process.
+	guestArgs, ok := c.Context.Value(args.GuestArgs).([]string)
+	if !ok {
+		guestArgs = []string{}
+	}
+
 	// Set up file descriptor management
 	////
 	fdManager, err := NewFDManager(c.StringSlice("with-fd"))
@@ -86,7 +102,7 @@ func Main(c *cli.Context) error {
 
 	// Run target in jailed subprocess
 	////
-	cmd := os_exec.CommandContext(ctx, name, c.Args().Tail()...)
+	cmd := os_exec.CommandContext(ctx, name, guestArgs...)
 	cmd.Dir = env.Dir
 
 	// Combine environment variables: base env + --env flags + FD mappings
@@ -114,7 +130,7 @@ func Main(c *cli.Context) error {
 
 	// Set up libp2p protocol handler
 	////
-	env.Host.SetStreamHandler("/ww/0.1.0", func(s network.Stream) {
+	env.Host.SetStreamHandler(protocol, func(s network.Stream) {
 		defer s.Close()
 
 		conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
@@ -128,7 +144,7 @@ func Main(c *cli.Context) error {
 		case <-conn.Done():
 		}
 	})
-	defer env.Host.RemoveStreamHandler("/ww/0.1.0")
+	defer env.Host.RemoveStreamHandler(protocol)
 
 	return cmd.Wait()
 }

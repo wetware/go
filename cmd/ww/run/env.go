@@ -3,6 +3,7 @@ package run
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,7 +34,7 @@ type Env struct {
 	Dir  string // Temporary directory for cell execution
 }
 
-func (env *Env) Boot(addr string) (err error) {
+func (env *Env) Boot(addr string, port int) (err error) {
 	// Create temporary directory for cell execution
 	env.Dir, err = os.MkdirTemp("", "cell-*")
 	if err != nil {
@@ -46,8 +47,20 @@ func (env *Env) Boot(addr string) (err error) {
 	}
 
 	// Initialize libp2p host
-	env.Host, err = HostConfig{IPFS: env.IPFS}.New()
+	env.Host, err = HostConfig{IPFS: env.IPFS, Port: port}.New()
+	if err == nil {
+		logBoot(env)
+	}
 	return err
+}
+
+func logBoot(env *Env) {
+	args := make([]any, 0, len(env.Host.Addrs())+1)
+	args = append(args, slog.String("id", env.Host.ID().String()))
+	for _, addr := range env.Host.Addrs() {
+		args = append(args, slog.String("addr", addr.String()))
+	}
+	slog.Info("LibP2P initialized", args...)
 }
 
 func (env *Env) Close() error {
@@ -127,6 +140,7 @@ func (env *Env) Arch() string {
 type HostConfig struct {
 	IPFS    iface.CoreAPI
 	Options []libp2p.Option
+	Port    int
 }
 
 func (cfg HostConfig) New() (host.Host, error) {
@@ -139,6 +153,6 @@ func (cfg HostConfig) CombinedOptions() []libp2p.Option {
 
 func (c HostConfig) DefaultOptions() []libp2p.Option {
 	return []libp2p.Option{
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/2020"),
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", c.Port)),
 	}
 }
