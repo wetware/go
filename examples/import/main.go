@@ -61,12 +61,16 @@ Example:
 	}
 	defer s.Close()
 
-	conn := rpc.NewConn(rpc.NewStreamTransport(s), &rpc.Options{
+	conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
 		BaseContext: func() context.Context { return ctx },
 	})
 
 	client := conn.Bootstrap(ctx)
 	defer client.Release()
+
+	if err = client.Resolve(ctx); err != nil {
+		fail(err.Error())
+	}
 
 	greeter := export_cap.Greeter(client)
 	f, release := greeter.Greet(ctx, func(params export_cap.Greeter_greet_Params) error {
@@ -79,12 +83,12 @@ Example:
 
 	res, err := f.Struct()
 	if err != nil {
-		fail(fmt.Sprintf("ERROR: Failed to get greeting: %v\n", err))
+		fail(fmt.Sprintf("ERROR: greet failed: %v\n", err))
 	}
 
 	greeting, err := res.Greeting()
 	if err != nil {
-		fail(fmt.Sprintf("ERROR: Failed to get greeting: %v\n", err))
+		fail(fmt.Sprintf("ERROR: greet failed: %v\n", err))
 	}
 
 	fmt.Println(greeting)
