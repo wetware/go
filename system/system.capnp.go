@@ -219,16 +219,16 @@ func (s Importer_import_Params) Message() *capnp.Message {
 func (s Importer_import_Params) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Importer_import_Params) Envelope() ([]byte, error) {
+func (s Importer_import_Params) ServiceToken() ([]byte, error) {
 	p, err := capnp.Struct(s).Ptr(0)
 	return []byte(p.Data()), err
 }
 
-func (s Importer_import_Params) HasEnvelope() bool {
+func (s Importer_import_Params) HasServiceToken() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Importer_import_Params) SetEnvelope(v []byte) error {
+func (s Importer_import_Params) SetServiceToken(v []byte) error {
 	return capnp.Struct(s).SetData(0, v)
 }
 
@@ -334,31 +334,364 @@ func (p Importer_import_Results_Future) Service() capnp.Client {
 	return p.Future.Field(0, nil).Client()
 }
 
-const schema_da965b22da734daf = "x\xda\x84\xd0\xbdJ\x03A\x14\xc5\xf1sff]\x0b" +
-	"\x17\x9dl\x10\x0bE\x08\x0a\x12$\xa0vi\x12l$" +
-	"\x82\x90\xb1\xb5\x0aa\x8a@>\xd6\x9d$\xb0\x95o`" +
-	"aa#J*\xdb\x80\xb5o`m\x93'\x10Rh" +
-	"m\xe1JV\"\xb1\xb2\xbb\xc5\x9f\xdf\x85\xb3v]U" +
-	"\x07AO@\x98Mo)}\xdc\xfb\xba{;,\xde" +
-	"@\xaf\x13\xf0\xe8\x03G[,\x10\x0cwY\x01\xd3\xe1" +
-	"\xc3\xf3(?\xe6\xebbPcq\x16\x98,\x98\xbe\x8f" +
-	">>\x93\x97)t \xd3\xf1\x99\x9b\x14.n'\x00" +
-	"\xc3K>\x85\xc9\xac\x0f\x07<\x09\xef\xe9c?u\x89" +
-	"\xeb\xdbN\xa9)\x1bQ7*\xd7:Q/\xee\xdb\xb8" +
-	"\xd4\xca\x8e\x9dz#\xf6\x1b\x1dg\x94T\x80\"\xa0\x83" +
-	"S\xc0\xacH\x9a\x0d\xc1\xd4v\x87\xb6\xdd\x8b,\x00\x06" +
-	"\x10\x0c\xc0\x7f\xc0s\xebV\x07\xed\xfe\x1f\xf1\x180\xcb" +
-	"\x92&/x\xe5l<l5-sJ\x82\xcc-x" +
-	"\x9c{\xdb\x19X'\x8d\x92\x1e\xf0;\x18\xe7\xc3h]" +
-	"\x86\xd0\x9e_\xf9\xf9Ye\x9d\xfc\x0e\x00\x00\xff\xff\x98" +
-	"F`."
+type Exporter capnp.Client
+
+// Exporter_TypeID is the unique identifier for the type Exporter.
+const Exporter_TypeID = 0x812208d26efb36e7
+
+func (c Exporter) Export(ctx context.Context, params func(Exporter_export_Params) error) (Exporter_export_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0x812208d26efb36e7,
+			MethodID:      0,
+			InterfaceName: "system.capnp:Exporter",
+			MethodName:    "export",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Exporter_export_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Exporter_export_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c Exporter) WaitStreaming() error {
+	return capnp.Client(c).WaitStreaming()
+}
+
+// String returns a string that identifies this capability for debugging
+// purposes.  Its format should not be depended on: in particular, it
+// should not be used to compare clients.  Use IsSame to compare clients
+// for equality.
+func (c Exporter) String() string {
+	return "Exporter(" + capnp.Client(c).String() + ")"
+}
+
+// AddRef creates a new Client that refers to the same capability as c.
+// If c is nil or has resolved to null, then AddRef returns nil.
+func (c Exporter) AddRef() Exporter {
+	return Exporter(capnp.Client(c).AddRef())
+}
+
+// Release releases a capability reference.  If this is the last
+// reference to the capability, then the underlying resources associated
+// with the capability will be released.
+//
+// Release will panic if c has already been released, but not if c is
+// nil or resolved to null.
+func (c Exporter) Release() {
+	capnp.Client(c).Release()
+}
+
+// Resolve blocks until the capability is fully resolved or the Context
+// expires.
+func (c Exporter) Resolve(ctx context.Context) error {
+	return capnp.Client(c).Resolve(ctx)
+}
+
+func (c Exporter) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Client(c).EncodeAsPtr(seg)
+}
+
+func (Exporter) DecodeFromPtr(p capnp.Ptr) Exporter {
+	return Exporter(capnp.Client{}.DecodeFromPtr(p))
+}
+
+// IsValid reports whether c is a valid reference to a capability.
+// A reference is invalid if it is nil, has resolved to null, or has
+// been released.
+func (c Exporter) IsValid() bool {
+	return capnp.Client(c).IsValid()
+}
+
+// IsSame reports whether c and other refer to a capability created by the
+// same call to NewClient.  This can return false negatives if c or other
+// are not fully resolved: use Resolve if this is an issue.  If either
+// c or other are released, then IsSame panics.
+func (c Exporter) IsSame(other Exporter) bool {
+	return capnp.Client(c).IsSame(capnp.Client(other))
+}
+
+// Update the flowcontrol.FlowLimiter used to manage flow control for
+// this client. This affects all future calls, but not calls already
+// waiting to send. Passing nil sets the value to flowcontrol.NopLimiter,
+// which is also the default.
+func (c Exporter) SetFlowLimiter(lim fc.FlowLimiter) {
+	capnp.Client(c).SetFlowLimiter(lim)
+}
+
+// Get the current flowcontrol.FlowLimiter used to manage flow control
+// for this client.
+func (c Exporter) GetFlowLimiter() fc.FlowLimiter {
+	return capnp.Client(c).GetFlowLimiter()
+}
+
+// A Exporter_Server is a Exporter with a local implementation.
+type Exporter_Server interface {
+	Export(context.Context, Exporter_export) error
+}
+
+// Exporter_NewServer creates a new Server from an implementation of Exporter_Server.
+func Exporter_NewServer(s Exporter_Server) *server.Server {
+	c, _ := s.(server.Shutdowner)
+	return server.New(Exporter_Methods(nil, s), s, c)
+}
+
+// Exporter_ServerToClient creates a new Client from an implementation of Exporter_Server.
+// The caller is responsible for calling Release on the returned Client.
+func Exporter_ServerToClient(s Exporter_Server) Exporter {
+	return Exporter(capnp.NewClient(Exporter_NewServer(s)))
+}
+
+// Exporter_Methods appends Methods to a slice that invoke the methods on s.
+// This can be used to create a more complicated Server.
+func Exporter_Methods(methods []server.Method, s Exporter_Server) []server.Method {
+	if cap(methods) == 0 {
+		methods = make([]server.Method, 0, 1)
+	}
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0x812208d26efb36e7,
+			MethodID:      0,
+			InterfaceName: "system.capnp:Exporter",
+			MethodName:    "export",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Export(ctx, Exporter_export{call})
+		},
+	})
+
+	return methods
+}
+
+// Exporter_export holds the state for a server call to Exporter.export.
+// See server.Call for documentation.
+type Exporter_export struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Exporter_export) Args() Exporter_export_Params {
+	return Exporter_export_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Exporter_export) AllocResults() (Exporter_export_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Exporter_export_Results(r), err
+}
+
+// Exporter_List is a list of Exporter.
+type Exporter_List = capnp.CapList[Exporter]
+
+// NewExporter creates a new list of Exporter.
+func NewExporter_List(s *capnp.Segment, sz int32) (Exporter_List, error) {
+	l, err := capnp.NewPointerList(s, sz)
+	return capnp.CapList[Exporter](l), err
+}
+
+type Exporter_export_Params capnp.Struct
+
+// Exporter_export_Params_TypeID is the unique identifier for the type Exporter_export_Params.
+const Exporter_export_Params_TypeID = 0xe648541b52dad1f9
+
+func NewExporter_export_Params(s *capnp.Segment) (Exporter_export_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Exporter_export_Params(st), err
+}
+
+func NewRootExporter_export_Params(s *capnp.Segment) (Exporter_export_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Exporter_export_Params(st), err
+}
+
+func ReadRootExporter_export_Params(msg *capnp.Message) (Exporter_export_Params, error) {
+	root, err := msg.Root()
+	return Exporter_export_Params(root.Struct()), err
+}
+
+func (s Exporter_export_Params) String() string {
+	str, _ := text.Marshal(0xe648541b52dad1f9, capnp.Struct(s))
+	return str
+}
+
+func (s Exporter_export_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Exporter_export_Params) DecodeFromPtr(p capnp.Ptr) Exporter_export_Params {
+	return Exporter_export_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Exporter_export_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Exporter_export_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Exporter_export_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Exporter_export_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Exporter_export_Params) Service() capnp.Client {
+	p, _ := capnp.Struct(s).Ptr(0)
+	return p.Interface().Client()
+}
+
+func (s Exporter_export_Params) HasService() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Exporter_export_Params) SetService(c capnp.Client) error {
+	if !c.IsValid() {
+		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(c))
+	return capnp.Struct(s).SetPtr(0, in.ToPtr())
+}
+
+// Exporter_export_Params_List is a list of Exporter_export_Params.
+type Exporter_export_Params_List = capnp.StructList[Exporter_export_Params]
+
+// NewExporter_export_Params creates a new list of Exporter_export_Params.
+func NewExporter_export_Params_List(s *capnp.Segment, sz int32) (Exporter_export_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Exporter_export_Params](l), err
+}
+
+// Exporter_export_Params_Future is a wrapper for a Exporter_export_Params promised by a client call.
+type Exporter_export_Params_Future struct{ *capnp.Future }
+
+func (f Exporter_export_Params_Future) Struct() (Exporter_export_Params, error) {
+	p, err := f.Future.Ptr()
+	return Exporter_export_Params(p.Struct()), err
+}
+func (p Exporter_export_Params_Future) Service() capnp.Client {
+	return p.Future.Field(0, nil).Client()
+}
+
+type Exporter_export_Results capnp.Struct
+
+// Exporter_export_Results_TypeID is the unique identifier for the type Exporter_export_Results.
+const Exporter_export_Results_TypeID = 0xa5000ba9df292d6f
+
+func NewExporter_export_Results(s *capnp.Segment) (Exporter_export_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Exporter_export_Results(st), err
+}
+
+func NewRootExporter_export_Results(s *capnp.Segment) (Exporter_export_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Exporter_export_Results(st), err
+}
+
+func ReadRootExporter_export_Results(msg *capnp.Message) (Exporter_export_Results, error) {
+	root, err := msg.Root()
+	return Exporter_export_Results(root.Struct()), err
+}
+
+func (s Exporter_export_Results) String() string {
+	str, _ := text.Marshal(0xa5000ba9df292d6f, capnp.Struct(s))
+	return str
+}
+
+func (s Exporter_export_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Exporter_export_Results) DecodeFromPtr(p capnp.Ptr) Exporter_export_Results {
+	return Exporter_export_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Exporter_export_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Exporter_export_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Exporter_export_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Exporter_export_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Exporter_export_Results) ServiceToken() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Exporter_export_Results) HasServiceToken() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Exporter_export_Results) SetServiceToken(v []byte) error {
+	return capnp.Struct(s).SetData(0, v)
+}
+
+// Exporter_export_Results_List is a list of Exporter_export_Results.
+type Exporter_export_Results_List = capnp.StructList[Exporter_export_Results]
+
+// NewExporter_export_Results creates a new list of Exporter_export_Results.
+func NewExporter_export_Results_List(s *capnp.Segment, sz int32) (Exporter_export_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Exporter_export_Results](l), err
+}
+
+// Exporter_export_Results_Future is a wrapper for a Exporter_export_Results promised by a client call.
+type Exporter_export_Results_Future struct{ *capnp.Future }
+
+func (f Exporter_export_Results_Future) Struct() (Exporter_export_Results, error) {
+	p, err := f.Future.Ptr()
+	return Exporter_export_Results(p.Struct()), err
+}
+
+const schema_da965b22da734daf = "x\xda\x12x\xe5\xc0b\xc8[\xce\xcc\xc0\x14\xa8\xc1\xca" +
+	"\xf6\xff\xb9\xd9\xef\xbcK\x1cJ\x8d\x0c\x82\xbc\xcc\xff\xd7" +
+	"\xfb\x16\xdfR\x8a\x9ev\x8b\x81\x81Qx!\xe3&\xe1" +
+	"\x95\x8c\xec\x0c\x0c\xc2K\x19\xdd\x85\xcf\x82X\xff\x97i" +
+	"\xfc\x9b\xfd\xc2Hk\x12\x83\xa0\x18#\x03\x03+H\xcc" +
+	"x+\xa3\x12#\x03\xa3\xf0^F{\x06\xc6\xfd\xf9\xba" +
+	"\x9a\xf7Wr/E\x92~\xc8\xa8\x05\x92~\x09\x92\xfe" +
+	"_6o\xcf\x02\x91\xf5\x8cW\x91\xf5\xf32\x81\x15\x88" +
+	"2\x81\x14\xfc\xbcx+H:\xc4\xe3\x19\xb2\x02S&" +
+	"\xb0\x05\xb6`\x05\xaf\xdf/\xf8\xf0\xab\xf2\xf4k\x0c\xe7" +
+	"\xc62m\x12Ne\x0297\x91\xc9]\xb8\x93\x89\x9d" +
+	"A\xe7\x7fqeqIj\xae^2cbA^\x81" +
+	"\x95kE\x81|~QIjQ\x00#c \x0b3" +
+	"+\x03\x03\xdc:F\x88\xbb\x19\x96\x0a\x0aZ10\x09" +
+	"\xb2\xb2\xdb\xa7V\x14\xe4\x17\x9580\x0602\xc2\x8d" +
+	"a\x06\x1b\xe3\x99[\x006E/\x13\xccP\x09H," +
+	"bO\xcc-\x0edafa``ad`\x10\xe4" +
+	"\xcdb`\x08\xe4af\x0c\x94`b\xfc_\x9cZT" +
+	"\x96\x99\x9c\x1a\xc2\xc0\x9f\x9f\x9d\x9a\xc7\xc8\xcb\xc0\xc4\xc8" +
+	"\xcb\x80n\xa6k\x05\xd4L\x88\xb5*A\xa9\xc5\xfc\xa5" +
+	"9%\x94\x19\x8a\xeePl\x86:10\x04r03" +
+	"\x06\x8a01\xd6C\x0de\x14baf`d\x14\"" +
+	"\xe8H,\x1e'\xce8F\x98\xf3\xd0\xa3\x03\x96\xbc\x18" +
+	"a\xe9\x04\x1e\x1d\x10/\x80\xa3\x03\x10\x00\x00\xff\xff\x8e" +
+	"m\xc0\x99"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_da965b22da734daf,
 		Nodes: []uint64{
+			0x812208d26efb36e7,
 			0x922a32e89bfe28a6,
+			0xa5000ba9df292d6f,
 			0xd501af14a0bc9e76,
+			0xe648541b52dad1f9,
 			0xebcb79faf0a0efeb,
 		},
 		Compressed: true,
