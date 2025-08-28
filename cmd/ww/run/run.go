@@ -61,7 +61,7 @@ func Main(c *cli.Context) error {
 	////
 	host, guest, err := system.SocketConfig[system.Importer]{
 		BootstrapClient: system.Importer_ServerToClient(&system.Membrane{
-			// system.ServiceToken{}: system.Importer{}  // token -> client
+			// someServiceToken: someClient,
 		}),
 	}.New(ctx)
 	if err != nil {
