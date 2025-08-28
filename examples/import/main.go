@@ -67,7 +67,6 @@ Example:
 	// Bootstrap the object capability over the p2p connection.
 	conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
 		BaseContext: func() context.Context { return ctx },
-		Logger:      slog.Default(),
 	})
 
 	client := conn.Bootstrap(ctx)
