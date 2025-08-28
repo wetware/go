@@ -6,16 +6,15 @@ import (
 	"time"
 
 	"capnproto.org/go/capnp/v3"
-	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/spy16/slurp/core"
 	"github.com/wetware/go/system"
 )
 
 // ImportExpr implements core.Expr for import statements
 type ImportExpr struct {
-	Client   system.Importer
-	Envelope *record.Envelope
-	Timeout  time.Duration
+	Client       system.Importer
+	ServiceToken system.ServiceToken
+	Timeout      time.Duration
 }
 
 func (e ImportExpr) NewEvalContext() (context.Context, context.CancelFunc) {
@@ -32,7 +31,7 @@ func (e ImportExpr) Eval(env core.Env) (core.Any, error) {
 	ctx, cancel := e.NewEvalContext()
 	defer cancel()
 
-	f, release := e.Client.Import(ctx, e.SetEnvelope)
+	f, release := e.Client.Import(ctx, e.SetServiceToken)
 	runtime.SetFinalizer(f.Future, func(*capnp.Future) {
 		release()
 	})
@@ -40,11 +39,6 @@ func (e ImportExpr) Eval(env core.Env) (core.Any, error) {
 	return f, nil
 }
 
-func (e ImportExpr) SetEnvelope(p system.Importer_import_Params) error {
-	b, err := e.Envelope.Marshal()
-	if err != nil {
-		return err
-	}
-
-	return p.SetEnvelope(b)
+func (e ImportExpr) SetServiceToken(call system.Importer_import_Params) error {
+	return call.SetServiceToken(e.ServiceToken[:])
 }
