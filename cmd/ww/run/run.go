@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"os"
 	os_exec "os/exec"
 
@@ -73,17 +74,36 @@ func Main(c *cli.Context) error {
 		return err
 	}
 
+	// Set up file descriptor management
+	////
+	fdManager, err := NewFDManager(c.StringSlice("with-fd"))
+	if err != nil {
+		return fmt.Errorf("file descriptor setup failed: %w", err)
+	}
+	defer fdManager.Close()
+
 	// Run target in jailed subprocess
 	////
 	cmd := os_exec.CommandContext(ctx, name, c.Args().Tail()...)
 	cmd.Dir = env.Dir
-	cmd.Env = c.StringSlice("env")
+
+	// Combine environment variables: base env + --env flags + FD mappings
+	baseEnv := c.StringSlice("env")
+	fdEnvVars := fdManager.GenerateEnvVars()
+	cmd.Env = append(baseEnv, fdEnvVars...)
+
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = sysProcAttr(env.Dir)
 
-	cmd.ExtraFiles = []*os.File{guest}
+	// Set up ExtraFiles: RPC socket first, then user FDs
+	extraFiles := []*os.File{guest}
+	userFiles, err := fdManager.PrepareFDs()
+	if err != nil {
+		return err
+	}
+	cmd.ExtraFiles = append(extraFiles, userFiles...)
 
 	if err := cmd.Start(); err != nil {
 		return err

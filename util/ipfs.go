@@ -150,7 +150,9 @@ func (env *IPFSEnv) ImportFromIPFS(ctx context.Context, ipfsPath path.Path, loca
 		if env.IsContentCachedInTempDir(ipfsPath, localPath) {
 			// Content is already available, just ensure permissions if needed
 			if makeExecutable {
-				env.makeFilesExecutable(localPath)
+				if err := env.makeFilesExecutable(localPath); err != nil {
+					return fmt.Errorf("%s: %w", localPath, err)
+				}
 			}
 			return nil
 		}
@@ -270,23 +272,28 @@ func isDirectory(path string) bool {
 }
 
 // makeFilesExecutable recursively makes all files in a path executable
-func (env *IPFSEnv) makeFilesExecutable(targetPath string) {
-	if isDirectory(targetPath) {
-		entries, err := os.ReadDir(targetPath)
-		if err != nil {
-			return
-		}
-		for _, entry := range entries {
-			entryPath := filepath.Join(targetPath, entry.Name())
-			if entry.IsDir() {
-				env.makeFilesExecutable(entryPath)
-			} else {
-				os.Chmod(entryPath, 0755)
+func (env *IPFSEnv) makeFilesExecutable(targetPath string) error {
+	if !isDirectory(targetPath) {
+		return os.Chmod(targetPath, 0755)
+	}
+
+	entries, err := os.ReadDir(targetPath)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		entryPath := filepath.Join(targetPath, entry.Name())
+		if entry.IsDir() {
+			if err := env.makeFilesExecutable(entryPath); err != nil {
+				return err
+			}
+		} else {
+			if err := os.Chmod(entryPath, 0755); err != nil {
+				return err
 			}
 		}
-	} else {
-		os.Chmod(targetPath, 0755)
 	}
+	return nil
 }
 
 // IsContentCachedInTempDir checks if IPFS content is already available in a specific temp directory
@@ -328,7 +335,9 @@ func (env *IPFSEnv) ImportFromIPFSToDirWithCaching(ctx context.Context, ipfsPath
 
 			// Ensure permissions if needed
 			if makeExecutable {
-				env.makeFilesExecutable(targetPath)
+				if err := env.makeFilesExecutable(targetPath); err != nil {
+					return "", err
+				}
 			}
 
 			return targetPath, nil
