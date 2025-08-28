@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"capnproto.org/go/capnp/v3/rpc"
@@ -22,6 +23,7 @@ func fail(error string) {
 func main() {
 	ctx := context.Background()
 
+	// Validate and extract the process arguments.
 	if len(os.Args) != 3 {
 		fmt.Println(`Usage:
 			./<executable> <export peer id> <export peer maddr>
@@ -31,6 +33,7 @@ Example:
 
 	remote, remoteAddr := os.Args[1], os.Args[2]
 
+	// Build the libp2p host and connect to the remote peer.
 	host, err := libp2p.New()
 	if err != nil {
 		fail(fmt.Sprintf("ERROR: Failed to create libp2p host: %v\n", err))
@@ -61,8 +64,10 @@ Example:
 	}
 	defer s.Close()
 
+	// Bootstrap the object capability over the p2p connection.
 	conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
 		BaseContext: func() context.Context { return ctx },
+		Logger:      slog.Default(),
 	})
 
 	client := conn.Bootstrap(ctx)
@@ -72,6 +77,7 @@ Example:
 		fail(err.Error())
 	}
 
+	// Call the object capability.
 	greeter := export_cap.Greeter(client)
 	f, release := greeter.Greet(ctx, func(params export_cap.Greeter_greet_Params) error {
 		return params.SetName("Import Example")
@@ -91,5 +97,5 @@ Example:
 		fail(fmt.Sprintf("ERROR: greet failed: %v\n", err))
 	}
 
-	fmt.Println(greeting)
+	slog.Info(fmt.Sprintf("Object capability response: %s", greeting))
 }
