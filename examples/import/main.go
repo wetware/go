@@ -40,9 +40,12 @@ Example:
 	addr, err := ma.NewMultiaddr(remoteAddr)
 	if err != nil {
 		fail(err.Error())
-	} // TODO mikel: dial or add peer with protocol "/ww/0.1.0"
-	addr.Protocols()
-	id := peer.ID(remote)
+	}
+
+	id, err := peer.Decode(remote)
+	if err != nil {
+		fail(err.Error())
+	}
 
 	err = host.Connect(ctx, peer.AddrInfo{
 		ID:    id,
