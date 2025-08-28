@@ -3,6 +3,7 @@ package run
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,7 +48,19 @@ func (env *Env) Boot(addr string, port int) (err error) {
 
 	// Initialize libp2p host
 	env.Host, err = HostConfig{IPFS: env.IPFS, Port: port}.New()
+	if err == nil {
+		logBoot(env)
+	}
 	return err
+}
+
+func logBoot(env *Env) {
+	args := make([]any, 0, len(env.Host.Addrs())+1)
+	args = append(args, slog.String("id", env.Host.ID().String()))
+	for _, addr := range env.Host.Addrs() {
+		args = append(args, slog.String("addr", addr.String()))
+	}
+	slog.Info("LibP2P initialized", args...)
 }
 
 func (env *Env) Close() error {
