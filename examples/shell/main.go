@@ -10,7 +10,6 @@ import (
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
 	"github.com/ipfs/boxo/path"
-	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -181,17 +180,15 @@ func newInterpreter(i system.Importer) *slurp.Interpreter {
 	// Only add import special form if importer is available
 	if i.IsValid() {
 		analyzer.Specials["import"] = func(analyzer core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
-			v, err := args.First()
-			if err != nil {
-				return nil, err
-			}
-
-			e, ok := v.(*record.Envelope)
-			if !ok {
-				return nil, fmt.Errorf("expected envelope, got %T", v)
-			}
-
-			return &ImportExpr{Client: i, Envelope: e}, nil
+			expr := builtin.DoExpr{}
+			err := core.ForEach(args, func(item core.Any) (bool, error) {
+				if e, ok := item.(system.ServiceToken); ok {
+					expr = append(expr, ImportExpr{Client: i, ServiceToken: e})
+					return true, nil
+				}
+				return false, fmt.Errorf("expected envelope, got %T", item)
+			})
+			return expr, err
 		}
 	}
 
