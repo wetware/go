@@ -59,8 +59,10 @@ func Main(c *cli.Context) error {
 
 	// Set up the RPC socket for the cell
 	////
-	host, guest, err := system.SocketConfig{
-		Membrane: &system.Membrane{},
+	host, guest, err := system.SocketConfig[system.Importer]{
+		BootstrapClient: system.Importer_ServerToClient(&system.Membrane{
+			// someServiceToken: someClient,
+		}),
 	}.New(ctx)
 	if err != nil {
 		return err

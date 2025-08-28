@@ -7,5 +7,5 @@ $Go.import("github.com/wetware/go/system");
 
 
 interface Importer {
-    import @0 (envelope :Data) -> (service :Capability);
+    import @0 (serviceToken :Data) -> (service :Capability);
 }
