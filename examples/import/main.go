@@ -6,8 +6,12 @@ import (
 	"os"
 
 	"capnproto.org/go/capnp/v3/rpc"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	ma "github.com/multiformats/go-multiaddr"
+
 	export_cap "github.com/wetware/go/examples/export/cap"
-	"github.com/wetware/go/system"
 )
 
 func fail(error string) {
@@ -18,17 +22,45 @@ func fail(error string) {
 func main() {
 	ctx := context.Background()
 
-	// Check if the bootstrap file descriptor exists
-	bootstrapFile := os.NewFile(system.BOOTSTRAP_FD, "host")
-	if bootstrapFile == nil {
-		fail("ERROR: Failed to create bootstrap file descriptor\n")
+	if len(os.Args) != 3 {
+		fmt.Println(`Usage:
+			./<executable> <export peer id> <export peer maddr>
+Example:
+			./<executable> id=12D3KooWMh9743yKf2h3ZrjAGVtVBmDqyqnghxEoyqz3wSiPfv5e /ip4/127.0.0.1/tcp/2020`)
 	}
 
-	conn := rpc.NewConn(rpc.NewStreamTransport(bootstrapFile), &rpc.Options{
-		BaseContext: func() context.Context { return ctx },
-		// BootstrapClient: export(),
+	remote, remoteAddr := os.Args[1], os.Args[2]
+
+	host, err := libp2p.New()
+	if err != nil {
+		fail(fmt.Sprintf("ERROR: Failed to create libp2p host: %v\n", err))
+	}
+	defer host.Close()
+
+	addr, err := ma.NewMultiaddr(remoteAddr)
+	if err != nil {
+		fail(err.Error())
+	} // TODO mikel: dial or add peer with protocol "/ww/0.1.0"
+	addr.Protocols()
+	id := peer.ID(remote)
+
+	err = host.Connect(ctx, peer.AddrInfo{
+		ID:    id,
+		Addrs: []ma.Multiaddr{addr},
 	})
-	defer conn.Close()
+	if err != nil {
+		fail(err.Error())
+	}
+
+	s, err := host.NewStream(ctx, id, protocol.ID("/ww/0.1.0"))
+	if err != nil {
+		fail(err.Error())
+	}
+	defer s.Close()
+
+	conn := rpc.NewConn(rpc.NewStreamTransport(s), &rpc.Options{
+		BaseContext: func() context.Context { return ctx },
+	})
 
 	client := conn.Bootstrap(ctx)
 	defer client.Release()
