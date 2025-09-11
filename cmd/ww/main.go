@@ -15,6 +15,7 @@ import (
 	"github.com/wetware/go/cmd/ww/idgen"
 	importcmd "github.com/wetware/go/cmd/ww/import"
 	"github.com/wetware/go/cmd/ww/run"
+	"github.com/wetware/go/cmd/ww/shell"
 )
 
 func main() {
@@ -48,6 +49,7 @@ func main() {
 		Commands: []*cli.Command{
 			idgen.Command(),
 			run.Command(),
+			shell.Command(),
 			export.Command(),
 			importcmd.Command(),
 		},
