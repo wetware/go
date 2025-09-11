@@ -166,7 +166,7 @@ func (c Greeter_greet) AllocResults() (Greeter_greet_Results, error) {
 // Greeter_List is a list of Greeter.
 type Greeter_List = capnp.CapList[Greeter]
 
-// NewGreeter_List creates a new list of Greeter.
+// NewGreeter creates a new list of Greeter.
 func NewGreeter_List(s *capnp.Segment, sz int32) (Greeter_List, error) {
 	l, err := capnp.NewPointerList(s, sz)
 	return capnp.CapList[Greeter](l), err
