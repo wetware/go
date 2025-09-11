@@ -11,32 +11,32 @@ import (
 	context "context"
 )
 
-type Importer capnp.Client
+type Terminal capnp.Client
 
-// Importer_TypeID is the unique identifier for the type Importer.
-const Importer_TypeID = 0xebcb79faf0a0efeb
+// Terminal_TypeID is the unique identifier for the type Terminal.
+const Terminal_TypeID = 0xab27f53bfa9ddf26
 
-func (c Importer) Import(ctx context.Context, params func(Importer_import_Params) error) (Importer_import_Results_Future, capnp.ReleaseFunc) {
+func (c Terminal) Login(ctx context.Context, params func(Terminal_login_Params) error) (Terminal_login_Results_Future, capnp.ReleaseFunc) {
 
 	s := capnp.Send{
 		Method: capnp.Method{
-			InterfaceID:   0xebcb79faf0a0efeb,
+			InterfaceID:   0xab27f53bfa9ddf26,
 			MethodID:      0,
-			InterfaceName: "system.capnp:Importer",
-			MethodName:    "import",
+			InterfaceName: "system.capnp:Terminal",
+			MethodName:    "login",
 		},
 	}
 	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
-		s.PlaceArgs = func(s capnp.Struct) error { return params(Importer_import_Params(s)) }
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 0}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Terminal_login_Params(s)) }
 	}
 
 	ans, release := capnp.Client(c).SendCall(ctx, s)
-	return Importer_import_Results_Future{Future: ans.Future()}, release
+	return Terminal_login_Results_Future{Future: ans.Future()}, release
 
 }
 
-func (c Importer) WaitStreaming() error {
+func (c Terminal) WaitStreaming() error {
 	return capnp.Client(c).WaitStreaming()
 }
 
@@ -44,14 +44,14 @@ func (c Importer) WaitStreaming() error {
 // purposes.  Its format should not be depended on: in particular, it
 // should not be used to compare clients.  Use IsSame to compare clients
 // for equality.
-func (c Importer) String() string {
-	return "Importer(" + capnp.Client(c).String() + ")"
+func (c Terminal) String() string {
+	return "Terminal(" + capnp.Client(c).String() + ")"
 }
 
 // AddRef creates a new Client that refers to the same capability as c.
 // If c is nil or has resolved to null, then AddRef returns nil.
-func (c Importer) AddRef() Importer {
-	return Importer(capnp.Client(c).AddRef())
+func (c Terminal) AddRef() Terminal {
+	return Terminal(capnp.Client(c).AddRef())
 }
 
 // Release releases a capability reference.  If this is the last
@@ -60,28 +60,28 @@ func (c Importer) AddRef() Importer {
 //
 // Release will panic if c has already been released, but not if c is
 // nil or resolved to null.
-func (c Importer) Release() {
+func (c Terminal) Release() {
 	capnp.Client(c).Release()
 }
 
 // Resolve blocks until the capability is fully resolved or the Context
 // expires.
-func (c Importer) Resolve(ctx context.Context) error {
+func (c Terminal) Resolve(ctx context.Context) error {
 	return capnp.Client(c).Resolve(ctx)
 }
 
-func (c Importer) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+func (c Terminal) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
 	return capnp.Client(c).EncodeAsPtr(seg)
 }
 
-func (Importer) DecodeFromPtr(p capnp.Ptr) Importer {
-	return Importer(capnp.Client{}.DecodeFromPtr(p))
+func (Terminal) DecodeFromPtr(p capnp.Ptr) Terminal {
+	return Terminal(capnp.Client{}.DecodeFromPtr(p))
 }
 
 // IsValid reports whether c is a valid reference to a capability.
 // A reference is invalid if it is nil, has resolved to null, or has
 // been released.
-func (c Importer) IsValid() bool {
+func (c Terminal) IsValid() bool {
 	return capnp.Client(c).IsValid()
 }
 
@@ -89,7 +89,7 @@ func (c Importer) IsValid() bool {
 // same call to NewClient.  This can return false negatives if c or other
 // are not fully resolved: use Resolve if this is an issue.  If either
 // c or other are released, then IsSame panics.
-func (c Importer) IsSame(other Importer) bool {
+func (c Terminal) IsSame(other Terminal) bool {
 	return capnp.Client(c).IsSame(capnp.Client(other))
 }
 
@@ -97,269 +97,701 @@ func (c Importer) IsSame(other Importer) bool {
 // this client. This affects all future calls, but not calls already
 // waiting to send. Passing nil sets the value to flowcontrol.NopLimiter,
 // which is also the default.
-func (c Importer) SetFlowLimiter(lim fc.FlowLimiter) {
+func (c Terminal) SetFlowLimiter(lim fc.FlowLimiter) {
 	capnp.Client(c).SetFlowLimiter(lim)
 }
 
 // Get the current flowcontrol.FlowLimiter used to manage flow control
 // for this client.
-func (c Importer) GetFlowLimiter() fc.FlowLimiter {
+func (c Terminal) GetFlowLimiter() fc.FlowLimiter {
 	return capnp.Client(c).GetFlowLimiter()
 }
 
-// A Importer_Server is a Importer with a local implementation.
-type Importer_Server interface {
-	Import(context.Context, Importer_import) error
+// A Terminal_Server is a Terminal with a local implementation.
+type Terminal_Server interface {
+	Login(context.Context, Terminal_login) error
 }
 
-// Importer_NewServer creates a new Server from an implementation of Importer_Server.
-func Importer_NewServer(s Importer_Server) *server.Server {
+// Terminal_NewServer creates a new Server from an implementation of Terminal_Server.
+func Terminal_NewServer(s Terminal_Server) *server.Server {
 	c, _ := s.(server.Shutdowner)
-	return server.New(Importer_Methods(nil, s), s, c)
+	return server.New(Terminal_Methods(nil, s), s, c)
 }
 
-// Importer_ServerToClient creates a new Client from an implementation of Importer_Server.
+// Terminal_ServerToClient creates a new Client from an implementation of Terminal_Server.
 // The caller is responsible for calling Release on the returned Client.
-func Importer_ServerToClient(s Importer_Server) Importer {
-	return Importer(capnp.NewClient(Importer_NewServer(s)))
+func Terminal_ServerToClient(s Terminal_Server) Terminal {
+	return Terminal(capnp.NewClient(Terminal_NewServer(s)))
 }
 
-// Importer_Methods appends Methods to a slice that invoke the methods on s.
+// Terminal_Methods appends Methods to a slice that invoke the methods on s.
 // This can be used to create a more complicated Server.
-func Importer_Methods(methods []server.Method, s Importer_Server) []server.Method {
+func Terminal_Methods(methods []server.Method, s Terminal_Server) []server.Method {
 	if cap(methods) == 0 {
 		methods = make([]server.Method, 0, 1)
 	}
 
 	methods = append(methods, server.Method{
 		Method: capnp.Method{
-			InterfaceID:   0xebcb79faf0a0efeb,
+			InterfaceID:   0xab27f53bfa9ddf26,
 			MethodID:      0,
-			InterfaceName: "system.capnp:Importer",
-			MethodName:    "import",
+			InterfaceName: "system.capnp:Terminal",
+			MethodName:    "login",
 		},
 		Impl: func(ctx context.Context, call *server.Call) error {
-			return s.Import(ctx, Importer_import{call})
+			return s.Login(ctx, Terminal_login{call})
 		},
 	})
 
 	return methods
 }
 
-// Importer_import holds the state for a server call to Importer.import.
+// Terminal_login holds the state for a server call to Terminal.login.
 // See server.Call for documentation.
-type Importer_import struct {
+type Terminal_login struct {
 	*server.Call
 }
 
 // Args returns the call's arguments.
-func (c Importer_import) Args() Importer_import_Params {
-	return Importer_import_Params(c.Call.Args())
+func (c Terminal_login) Args() Terminal_login_Params {
+	return Terminal_login_Params(c.Call.Args())
 }
 
 // AllocResults allocates the results struct.
-func (c Importer_import) AllocResults() (Importer_import_Results, error) {
+func (c Terminal_login) AllocResults() (Terminal_login_Results, error) {
 	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Importer_import_Results(r), err
+	return Terminal_login_Results(r), err
 }
 
-// Importer_List is a list of Importer.
-type Importer_List = capnp.CapList[Importer]
+// Terminal_List is a list of Terminal.
+type Terminal_List = capnp.CapList[Terminal]
 
-// NewImporter_List creates a new list of Importer.
-func NewImporter_List(s *capnp.Segment, sz int32) (Importer_List, error) {
+// NewTerminal creates a new list of Terminal.
+func NewTerminal_List(s *capnp.Segment, sz int32) (Terminal_List, error) {
 	l, err := capnp.NewPointerList(s, sz)
-	return capnp.CapList[Importer](l), err
+	return capnp.CapList[Terminal](l), err
 }
 
-type Importer_import_Params capnp.Struct
+type Terminal_login_Params capnp.Struct
 
-// Importer_import_Params_TypeID is the unique identifier for the type Importer_import_Params.
-const Importer_import_Params_TypeID = 0x922a32e89bfe28a6
+// Terminal_login_Params_TypeID is the unique identifier for the type Terminal_login_Params.
+const Terminal_login_Params_TypeID = 0xc3cb58f30a5551af
 
-func NewImporter_import_Params(s *capnp.Segment) (Importer_import_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Importer_import_Params(st), err
+func NewTerminal_login_Params(s *capnp.Segment) (Terminal_login_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Terminal_login_Params(st), err
 }
 
-func NewRootImporter_import_Params(s *capnp.Segment) (Importer_import_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Importer_import_Params(st), err
+func NewRootTerminal_login_Params(s *capnp.Segment) (Terminal_login_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Terminal_login_Params(st), err
 }
 
-func ReadRootImporter_import_Params(msg *capnp.Message) (Importer_import_Params, error) {
+func ReadRootTerminal_login_Params(msg *capnp.Message) (Terminal_login_Params, error) {
 	root, err := msg.Root()
-	return Importer_import_Params(root.Struct()), err
+	return Terminal_login_Params(root.Struct()), err
 }
 
-func (s Importer_import_Params) String() string {
-	str, _ := text.Marshal(0x922a32e89bfe28a6, capnp.Struct(s))
+func (s Terminal_login_Params) String() string {
+	str, _ := text.Marshal(0xc3cb58f30a5551af, capnp.Struct(s))
 	return str
 }
 
-func (s Importer_import_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+func (s Terminal_login_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
 	return capnp.Struct(s).EncodeAsPtr(seg)
 }
 
-func (Importer_import_Params) DecodeFromPtr(p capnp.Ptr) Importer_import_Params {
-	return Importer_import_Params(capnp.Struct{}.DecodeFromPtr(p))
+func (Terminal_login_Params) DecodeFromPtr(p capnp.Ptr) Terminal_login_Params {
+	return Terminal_login_Params(capnp.Struct{}.DecodeFromPtr(p))
 }
 
-func (s Importer_import_Params) ToPtr() capnp.Ptr {
+func (s Terminal_login_Params) ToPtr() capnp.Ptr {
 	return capnp.Struct(s).ToPtr()
 }
-func (s Importer_import_Params) IsValid() bool {
+func (s Terminal_login_Params) IsValid() bool {
 	return capnp.Struct(s).IsValid()
 }
 
-func (s Importer_import_Params) Message() *capnp.Message {
+func (s Terminal_login_Params) Message() *capnp.Message {
 	return capnp.Struct(s).Message()
 }
 
-func (s Importer_import_Params) Segment() *capnp.Segment {
+func (s Terminal_login_Params) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Importer_import_Params) Envelope() ([]byte, error) {
+
+// Terminal_login_Params_List is a list of Terminal_login_Params.
+type Terminal_login_Params_List = capnp.StructList[Terminal_login_Params]
+
+// NewTerminal_login_Params creates a new list of Terminal_login_Params.
+func NewTerminal_login_Params_List(s *capnp.Segment, sz int32) (Terminal_login_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[Terminal_login_Params](l), err
+}
+
+// Terminal_login_Params_Future is a wrapper for a Terminal_login_Params promised by a client call.
+type Terminal_login_Params_Future struct{ *capnp.Future }
+
+func (f Terminal_login_Params_Future) Struct() (Terminal_login_Params, error) {
+	p, err := f.Future.Ptr()
+	return Terminal_login_Params(p.Struct()), err
+}
+
+type Terminal_login_Results capnp.Struct
+
+// Terminal_login_Results_TypeID is the unique identifier for the type Terminal_login_Results.
+const Terminal_login_Results_TypeID = 0xa584e813c754d96d
+
+func NewTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Terminal_login_Results(st), err
+}
+
+func NewRootTerminal_login_Results(s *capnp.Segment) (Terminal_login_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Terminal_login_Results(st), err
+}
+
+func ReadRootTerminal_login_Results(msg *capnp.Message) (Terminal_login_Results, error) {
+	root, err := msg.Root()
+	return Terminal_login_Results(root.Struct()), err
+}
+
+func (s Terminal_login_Results) String() string {
+	str, _ := text.Marshal(0xa584e813c754d96d, capnp.Struct(s))
+	return str
+}
+
+func (s Terminal_login_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Terminal_login_Results) DecodeFromPtr(p capnp.Ptr) Terminal_login_Results {
+	return Terminal_login_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Terminal_login_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Terminal_login_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Terminal_login_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Terminal_login_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Terminal_login_Results) Exec() Executor {
+	p, _ := capnp.Struct(s).Ptr(0)
+	return Executor(p.Interface().Client())
+}
+
+func (s Terminal_login_Results) HasExec() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Terminal_login_Results) SetExec(v Executor) error {
+	if !v.IsValid() {
+		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(capnp.Client(v)))
+	return capnp.Struct(s).SetPtr(0, in.ToPtr())
+}
+
+// Terminal_login_Results_List is a list of Terminal_login_Results.
+type Terminal_login_Results_List = capnp.StructList[Terminal_login_Results]
+
+// NewTerminal_login_Results creates a new list of Terminal_login_Results.
+func NewTerminal_login_Results_List(s *capnp.Segment, sz int32) (Terminal_login_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Terminal_login_Results](l), err
+}
+
+// Terminal_login_Results_Future is a wrapper for a Terminal_login_Results promised by a client call.
+type Terminal_login_Results_Future struct{ *capnp.Future }
+
+func (f Terminal_login_Results_Future) Struct() (Terminal_login_Results, error) {
+	p, err := f.Future.Ptr()
+	return Terminal_login_Results(p.Struct()), err
+}
+func (p Terminal_login_Results_Future) Exec() Executor {
+	return Executor(p.Future.Field(0, nil).Client())
+}
+
+type Executor capnp.Client
+
+// Executor_TypeID is the unique identifier for the type Executor.
+const Executor_TypeID = 0xccef5e6e46834543
+
+func (c Executor) Exec(ctx context.Context, params func(Executor_exec_Params) error) (Executor_exec_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xccef5e6e46834543,
+			MethodID:      0,
+			InterfaceName: "system.capnp:Executor",
+			MethodName:    "exec",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Executor_exec_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Executor_exec_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c Executor) WaitStreaming() error {
+	return capnp.Client(c).WaitStreaming()
+}
+
+// String returns a string that identifies this capability for debugging
+// purposes.  Its format should not be depended on: in particular, it
+// should not be used to compare clients.  Use IsSame to compare clients
+// for equality.
+func (c Executor) String() string {
+	return "Executor(" + capnp.Client(c).String() + ")"
+}
+
+// AddRef creates a new Client that refers to the same capability as c.
+// If c is nil or has resolved to null, then AddRef returns nil.
+func (c Executor) AddRef() Executor {
+	return Executor(capnp.Client(c).AddRef())
+}
+
+// Release releases a capability reference.  If this is the last
+// reference to the capability, then the underlying resources associated
+// with the capability will be released.
+//
+// Release will panic if c has already been released, but not if c is
+// nil or resolved to null.
+func (c Executor) Release() {
+	capnp.Client(c).Release()
+}
+
+// Resolve blocks until the capability is fully resolved or the Context
+// expires.
+func (c Executor) Resolve(ctx context.Context) error {
+	return capnp.Client(c).Resolve(ctx)
+}
+
+func (c Executor) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Client(c).EncodeAsPtr(seg)
+}
+
+func (Executor) DecodeFromPtr(p capnp.Ptr) Executor {
+	return Executor(capnp.Client{}.DecodeFromPtr(p))
+}
+
+// IsValid reports whether c is a valid reference to a capability.
+// A reference is invalid if it is nil, has resolved to null, or has
+// been released.
+func (c Executor) IsValid() bool {
+	return capnp.Client(c).IsValid()
+}
+
+// IsSame reports whether c and other refer to a capability created by the
+// same call to NewClient.  This can return false negatives if c or other
+// are not fully resolved: use Resolve if this is an issue.  If either
+// c or other are released, then IsSame panics.
+func (c Executor) IsSame(other Executor) bool {
+	return capnp.Client(c).IsSame(capnp.Client(other))
+}
+
+// Update the flowcontrol.FlowLimiter used to manage flow control for
+// this client. This affects all future calls, but not calls already
+// waiting to send. Passing nil sets the value to flowcontrol.NopLimiter,
+// which is also the default.
+func (c Executor) SetFlowLimiter(lim fc.FlowLimiter) {
+	capnp.Client(c).SetFlowLimiter(lim)
+}
+
+// Get the current flowcontrol.FlowLimiter used to manage flow control
+// for this client.
+func (c Executor) GetFlowLimiter() fc.FlowLimiter {
+	return capnp.Client(c).GetFlowLimiter()
+}
+
+// A Executor_Server is a Executor with a local implementation.
+type Executor_Server interface {
+	Exec(context.Context, Executor_exec) error
+}
+
+// Executor_NewServer creates a new Server from an implementation of Executor_Server.
+func Executor_NewServer(s Executor_Server) *server.Server {
+	c, _ := s.(server.Shutdowner)
+	return server.New(Executor_Methods(nil, s), s, c)
+}
+
+// Executor_ServerToClient creates a new Client from an implementation of Executor_Server.
+// The caller is responsible for calling Release on the returned Client.
+func Executor_ServerToClient(s Executor_Server) Executor {
+	return Executor(capnp.NewClient(Executor_NewServer(s)))
+}
+
+// Executor_Methods appends Methods to a slice that invoke the methods on s.
+// This can be used to create a more complicated Server.
+func Executor_Methods(methods []server.Method, s Executor_Server) []server.Method {
+	if cap(methods) == 0 {
+		methods = make([]server.Method, 0, 1)
+	}
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xccef5e6e46834543,
+			MethodID:      0,
+			InterfaceName: "system.capnp:Executor",
+			MethodName:    "exec",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Exec(ctx, Executor_exec{call})
+		},
+	})
+
+	return methods
+}
+
+// Executor_exec holds the state for a server call to Executor.exec.
+// See server.Call for documentation.
+type Executor_exec struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Executor_exec) Args() Executor_exec_Params {
+	return Executor_exec_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Executor_exec) AllocResults() (Executor_exec_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Executor_exec_Results(r), err
+}
+
+// Executor_List is a list of Executor.
+type Executor_List = capnp.CapList[Executor]
+
+// NewExecutor creates a new list of Executor.
+func NewExecutor_List(s *capnp.Segment, sz int32) (Executor_List, error) {
+	l, err := capnp.NewPointerList(s, sz)
+	return capnp.CapList[Executor](l), err
+}
+
+type Executor_exec_Params capnp.Struct
+
+// Executor_exec_Params_TypeID is the unique identifier for the type Executor_exec_Params.
+const Executor_exec_Params_TypeID = 0xb8078038290eb30b
+
+func NewExecutor_exec_Params(s *capnp.Segment) (Executor_exec_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Executor_exec_Params(st), err
+}
+
+func NewRootExecutor_exec_Params(s *capnp.Segment) (Executor_exec_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Executor_exec_Params(st), err
+}
+
+func ReadRootExecutor_exec_Params(msg *capnp.Message) (Executor_exec_Params, error) {
+	root, err := msg.Root()
+	return Executor_exec_Params(root.Struct()), err
+}
+
+func (s Executor_exec_Params) String() string {
+	str, _ := text.Marshal(0xb8078038290eb30b, capnp.Struct(s))
+	return str
+}
+
+func (s Executor_exec_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Executor_exec_Params) DecodeFromPtr(p capnp.Ptr) Executor_exec_Params {
+	return Executor_exec_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Executor_exec_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Executor_exec_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Executor_exec_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Executor_exec_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Executor_exec_Params) Bytecode() ([]byte, error) {
 	p, err := capnp.Struct(s).Ptr(0)
 	return []byte(p.Data()), err
 }
 
-func (s Importer_import_Params) HasEnvelope() bool {
+func (s Executor_exec_Params) HasBytecode() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Importer_import_Params) SetEnvelope(v []byte) error {
+func (s Executor_exec_Params) SetBytecode(v []byte) error {
 	return capnp.Struct(s).SetData(0, v)
 }
 
-// Importer_import_Params_List is a list of Importer_import_Params.
-type Importer_import_Params_List = capnp.StructList[Importer_import_Params]
+// Executor_exec_Params_List is a list of Executor_exec_Params.
+type Executor_exec_Params_List = capnp.StructList[Executor_exec_Params]
 
-// NewImporter_import_Params creates a new list of Importer_import_Params.
-func NewImporter_import_Params_List(s *capnp.Segment, sz int32) (Importer_import_Params_List, error) {
+// NewExecutor_exec_Params creates a new list of Executor_exec_Params.
+func NewExecutor_exec_Params_List(s *capnp.Segment, sz int32) (Executor_exec_Params_List, error) {
 	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
-	return capnp.StructList[Importer_import_Params](l), err
+	return capnp.StructList[Executor_exec_Params](l), err
 }
 
-// Importer_import_Params_Future is a wrapper for a Importer_import_Params promised by a client call.
-type Importer_import_Params_Future struct{ *capnp.Future }
+// Executor_exec_Params_Future is a wrapper for a Executor_exec_Params promised by a client call.
+type Executor_exec_Params_Future struct{ *capnp.Future }
 
-func (f Importer_import_Params_Future) Struct() (Importer_import_Params, error) {
+func (f Executor_exec_Params_Future) Struct() (Executor_exec_Params, error) {
 	p, err := f.Future.Ptr()
-	return Importer_import_Params(p.Struct()), err
+	return Executor_exec_Params(p.Struct()), err
 }
 
-type Importer_import_Results capnp.Struct
+type Executor_exec_Results capnp.Struct
 
-// Importer_import_Results_TypeID is the unique identifier for the type Importer_import_Results.
-const Importer_import_Results_TypeID = 0xd501af14a0bc9e76
+// Executor_exec_Results_TypeID is the unique identifier for the type Executor_exec_Results.
+const Executor_exec_Results_TypeID = 0xa04c2cd2ed66b51c
 
-func NewImporter_import_Results(s *capnp.Segment) (Importer_import_Results, error) {
+func NewExecutor_exec_Results(s *capnp.Segment) (Executor_exec_Results, error) {
 	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Importer_import_Results(st), err
+	return Executor_exec_Results(st), err
 }
 
-func NewRootImporter_import_Results(s *capnp.Segment) (Importer_import_Results, error) {
+func NewRootExecutor_exec_Results(s *capnp.Segment) (Executor_exec_Results, error) {
 	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Importer_import_Results(st), err
+	return Executor_exec_Results(st), err
 }
 
-func ReadRootImporter_import_Results(msg *capnp.Message) (Importer_import_Results, error) {
+func ReadRootExecutor_exec_Results(msg *capnp.Message) (Executor_exec_Results, error) {
 	root, err := msg.Root()
-	return Importer_import_Results(root.Struct()), err
+	return Executor_exec_Results(root.Struct()), err
 }
 
-func (s Importer_import_Results) String() string {
-	str, _ := text.Marshal(0xd501af14a0bc9e76, capnp.Struct(s))
+func (s Executor_exec_Results) String() string {
+	str, _ := text.Marshal(0xa04c2cd2ed66b51c, capnp.Struct(s))
 	return str
 }
 
-func (s Importer_import_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+func (s Executor_exec_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
 	return capnp.Struct(s).EncodeAsPtr(seg)
 }
 
-func (Importer_import_Results) DecodeFromPtr(p capnp.Ptr) Importer_import_Results {
-	return Importer_import_Results(capnp.Struct{}.DecodeFromPtr(p))
+func (Executor_exec_Results) DecodeFromPtr(p capnp.Ptr) Executor_exec_Results {
+	return Executor_exec_Results(capnp.Struct{}.DecodeFromPtr(p))
 }
 
-func (s Importer_import_Results) ToPtr() capnp.Ptr {
+func (s Executor_exec_Results) ToPtr() capnp.Ptr {
 	return capnp.Struct(s).ToPtr()
 }
-func (s Importer_import_Results) IsValid() bool {
+func (s Executor_exec_Results) IsValid() bool {
 	return capnp.Struct(s).IsValid()
 }
 
-func (s Importer_import_Results) Message() *capnp.Message {
+func (s Executor_exec_Results) Message() *capnp.Message {
 	return capnp.Struct(s).Message()
 }
 
-func (s Importer_import_Results) Segment() *capnp.Segment {
+func (s Executor_exec_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s Importer_import_Results) Service() capnp.Client {
-	p, _ := capnp.Struct(s).Ptr(0)
-	return p.Interface().Client()
+func (s Executor_exec_Results) Protocol() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
 }
 
-func (s Importer_import_Results) HasService() bool {
+func (s Executor_exec_Results) HasProtocol() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s Importer_import_Results) SetService(c capnp.Client) error {
-	if !c.IsValid() {
-		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
-	}
-	seg := s.Segment()
-	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(c))
-	return capnp.Struct(s).SetPtr(0, in.ToPtr())
+func (s Executor_exec_Results) ProtocolBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
 }
 
-// Importer_import_Results_List is a list of Importer_import_Results.
-type Importer_import_Results_List = capnp.StructList[Importer_import_Results]
+func (s Executor_exec_Results) SetProtocol(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
 
-// NewImporter_import_Results creates a new list of Importer_import_Results.
-func NewImporter_import_Results_List(s *capnp.Segment, sz int32) (Importer_import_Results_List, error) {
+// Executor_exec_Results_List is a list of Executor_exec_Results.
+type Executor_exec_Results_List = capnp.StructList[Executor_exec_Results]
+
+// NewExecutor_exec_Results creates a new list of Executor_exec_Results.
+func NewExecutor_exec_Results_List(s *capnp.Segment, sz int32) (Executor_exec_Results_List, error) {
 	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
-	return capnp.StructList[Importer_import_Results](l), err
+	return capnp.StructList[Executor_exec_Results](l), err
 }
 
-// Importer_import_Results_Future is a wrapper for a Importer_import_Results promised by a client call.
-type Importer_import_Results_Future struct{ *capnp.Future }
+// Executor_exec_Results_Future is a wrapper for a Executor_exec_Results promised by a client call.
+type Executor_exec_Results_Future struct{ *capnp.Future }
 
-func (f Importer_import_Results_Future) Struct() (Importer_import_Results, error) {
+func (f Executor_exec_Results_Future) Struct() (Executor_exec_Results, error) {
 	p, err := f.Future.Ptr()
-	return Importer_import_Results(p.Struct()), err
-}
-func (p Importer_import_Results_Future) Service() capnp.Client {
-	return p.Future.Field(0, nil).Client()
+	return Executor_exec_Results(p.Struct()), err
 }
 
-const schema_da965b22da734daf = "x\xda\x84\xd0\xbdJ\x03A\x14\xc5\xf1sff]\x0b" +
-	"\x17\x9dl\x10\x0bE\x08\x0a\x12$\xa0vi\x12l$" +
-	"\x82\x90\xb1\xb5\x0aa\x8a@>\xd6\x9d$\xb0\x95o`" +
-	"aa#J*\xdb\x80\xb5o`m\x93'\x10Rh" +
-	"m\xe1JV\"\xb1\xb2\xbb\xc5\x9f\xdf\x85\xb3v]U" +
-	"\x07AO@\x98Mo)}\xdc\xfb\xba{;,\xde" +
-	"@\xaf\x13\xf0\xe8\x03G[,\x10\x0cwY\x01\xd3\xe1" +
-	"\xc3\xf3(?\xe6\xebbPcq\x16\x98,\x98\xbe\x8f" +
-	">>\x93\x97)t \xd3\xf1\x99\x9b\x14.n'\x00" +
-	"\xc3K>\x85\xc9\xac\x0f\x07<\x09\xef\xe9c?u\x89" +
-	"\xeb\xdbN\xa9)\x1bQ7*\xd7:Q/\xee\xdb\xb8" +
-	"\xd4\xca\x8e\x9dz#\xf6\x1b\x1dg\x94T\x80\"\xa0\x83" +
-	"S\xc0\xacH\x9a\x0d\xc1\xd4v\x87\xb6\xdd\x8b,\x00\x06" +
-	"\x10\x0c\xc0\x7f\xc0s\xebV\x07\xed\xfe\x1f\xf1\x180\xcb" +
-	"\x92&/x\xe5l<l5-sJ\x82\xcc-x" +
-	"\x9c{\xdb\x19X'\x8d\x92\x1e\xf0;\x18\xe7\xc3h]" +
-	"\x86\xd0\x9e_\xf9\xf9Ye\x9d\xfc\x0e\x00\x00\xff\xff\x98" +
-	"F`."
+type MethodCall capnp.Struct
+
+// MethodCall_TypeID is the unique identifier for the type MethodCall.
+const MethodCall_TypeID = 0x93b36f32fc6a9c38
+
+func NewMethodCall(s *capnp.Segment) (MethodCall, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return MethodCall(st), err
+}
+
+func NewRootMethodCall(s *capnp.Segment) (MethodCall, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return MethodCall(st), err
+}
+
+func ReadRootMethodCall(msg *capnp.Message) (MethodCall, error) {
+	root, err := msg.Root()
+	return MethodCall(root.Struct()), err
+}
+
+func (s MethodCall) String() string {
+	str, _ := text.Marshal(0x93b36f32fc6a9c38, capnp.Struct(s))
+	return str
+}
+
+func (s MethodCall) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (MethodCall) DecodeFromPtr(p capnp.Ptr) MethodCall {
+	return MethodCall(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s MethodCall) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s MethodCall) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s MethodCall) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s MethodCall) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s MethodCall) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s MethodCall) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s MethodCall) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s MethodCall) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s MethodCall) Stack() (capnp.UInt64List, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return capnp.UInt64List(p.List()), err
+}
+
+func (s MethodCall) HasStack() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s MethodCall) SetStack(v capnp.UInt64List) error {
+	return capnp.Struct(s).SetPtr(1, v.ToPtr())
+}
+
+// NewStack sets the stack field to a newly
+// allocated capnp.UInt64List, preferring placement in s's segment.
+func (s MethodCall) NewStack(n int32) (capnp.UInt64List, error) {
+	l, err := capnp.NewUInt64List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp.UInt64List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(1, l.ToPtr())
+	return l, err
+}
+
+// MethodCall_List is a list of MethodCall.
+type MethodCall_List = capnp.StructList[MethodCall]
+
+// NewMethodCall creates a new list of MethodCall.
+func NewMethodCall_List(s *capnp.Segment, sz int32) (MethodCall_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	return capnp.StructList[MethodCall](l), err
+}
+
+// MethodCall_Future is a wrapper for a MethodCall promised by a client call.
+type MethodCall_Future struct{ *capnp.Future }
+
+func (f MethodCall_Future) Struct() (MethodCall, error) {
+	p, err := f.Future.Ptr()
+	return MethodCall(p.Struct()), err
+}
+
+const schema_da965b22da734daf = "x\xda\x84\x92\xbfk\x14A\x18\x86\xbfwf\xcf\x8dz" +
+	"\x9b0n\x10\x11\xe1 \x045\xe1<\xe2\xd9\x04E\x0c" +
+	"\xc43 \x06n$\x82 \x08\xebf\xd4\xd3\xfdq\xde" +
+	"n\xf0\xd2\x09\xfa\x0f\x88(\x08\x0a6\xa9D\x02\x09\x82" +
+	"\x16)\xd4\xc2BE\"X\x98\xc6J\xb0\x11\x0b\xb1\x11" +
+	"aeF\xf6\xee\x8ch\xbaa\xe7\xe3y\xde\xf7\xdb\x19" +
+	"+b\xc2\xda\xef\xbc\xe5\xc4d\xb9\xb0)\x1b\xbfw\xe9" +
+	"g5^\xbeE\xc2A\xb68\x9d\xac\x0d\x9d\xb9\xb3F" +
+	"\x05f\x13\xb9o\xf0\xdc}\x0f}Z\xc5UB\xb6\xeb" +
+	"\xf1\xf9/\xef\xca'\x1e\x90\xd8\x0e\xa2\x82\xbe9p\x98" +
+	"\xed\x04\xc1\xad\xb1#\x84,\xfc0\xf3\xd2\xfd|c\xa1" +
+	"w\xa0\xc1\x86\xf4\xc0\x153\xb0\xfb\xe3\xfd\x1f\x87\xbe\xef" +
+	"yH\xc2\xe1]\x1b\xc1\xbd\xc9\x96\xdc\xbbFz\x9bM" +
+	"\xb9+\xfa\x94m]\xee\x1f\x19\xbff?\xe9\xa5-\xb0" +
+	"m\x9a\xf6\xc8\xd0\x16\xe5\xa9-\xdfN\xbfz\xf1{\xc0" +
+	"\xd2\xf7\xab:\x8e\x95M\xd6\xae\x1f\x8b\xce~}\xfd\x97" +
+	"\xe7)[r\x9f\x19\xcf\x0a\x9br?1\x9b\xcaY2" +
+	"\x9f\xa4*\xac\xf8\xcckF\xcd\x83\xd3*\xbd\x18\xcfN" +
+	"zA@u@\xf6q\x8b\xc8\x02\x91\x18\x19%\x92\xc3" +
+	"\x1cr\x8cA\x00\x83\xd0\x1f\xf7U\x89\xe4^\x0ey\x94" +
+	"a \xf2B\x85\"1\x14\x09\xa5$\xf5\xfc\xcb\xe8'" +
+	"\xd49\xb0\x99\x98>vT\xdc\xa8jm\xe5\xcf\xa5q" +
+	"\xab\xa2\xda\xca\x1f>\xa9\x92\xb9\x80\xa7\x89\xb4:J\xe7" +
+	"8\x91,r\xc8\x1d\x0cY\xb3\x15\xa7\xb1\x1f\x07D\x94" +
+	"K\xd6\xf1fT+lD^P\x09\xe2\x0b\x8d\xc8\x00" +
+	"\xed\xe0O\xa0\xee\xd0\xc7!\x07\x19\x06\xb4\x15\xa2\xbb+" +
+	"\x02D\x0f\x139\xb3d\xa0z\x19\x16/\x10u\xd6\x8e" +
+	"\xfcw\x0bQ%&\x0av\xc9x'P\xc7\xff\x9b\xd6" +
+	"\xbd\x96\x17\xe2\x9fE\xcf\xcd\xa7\xca\x8fg\x95.\xea\x10" +
+	"\x83\xb3QQ\xcd\xe3a\xb2.y\xad\xadJF\xdaM" +
+	"\x9e\xbf(\xe4/Y\x88Q\x93\xdc\xec\xc2\x04\xff\x15\x00" +
+	"\x00\xff\xffh*\xd3#"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_da965b22da734daf,
 		Nodes: []uint64{
-			0x922a32e89bfe28a6,
-			0xd501af14a0bc9e76,
-			0xebcb79faf0a0efeb,
+			0x93b36f32fc6a9c38,
+			0xa04c2cd2ed66b51c,
+			0xa584e813c754d96d,
+			0xab27f53bfa9ddf26,
+			0xb8078038290eb30b,
+			0xc3cb58f30a5551af,
+			0xccef5e6e46834543,
 		},
 		Compressed: true,
 	})
