@@ -8,6 +8,7 @@ import (
 
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/tetratelabs/wazero"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/cmd/ww/args"
@@ -63,16 +64,15 @@ func Command() *cli.Command {
 }
 
 func Main(c *cli.Context) error {
-
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
 	// Set up the RPC socket for the cell
 	////
-	host, guest, err := system.SocketConfig[system.Importer]{
-		BootstrapClient: system.Importer_ServerToClient(&system.Membrane{
-			// someServiceToken: someClient,
-		}),
+	host, guest, err := system.SocketConfig[system.Terminal]{
+		BootstrapClient: system.TerminalConfig{
+			Exec: exec(c),
+		}.New(),
 	}.New(ctx)
 	if err != nil {
 		return err
@@ -147,4 +147,16 @@ func Main(c *cli.Context) error {
 	defer env.Host.RemoveStreamHandler(protocol)
 
 	return cmd.Wait()
+}
+
+func exec(c *cli.Context) system.Executor {
+	if !c.Bool("with-exec") {
+		return system.Executor{} // null client
+	}
+
+	return system.ExecutorConfig{
+		Host: env.Host,
+		Runtime: wazero.NewRuntimeConfig().
+			WithCloseOnContextDone(true),
+	}.New(c.Context)
 }
