@@ -12,7 +12,6 @@ import (
 
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
-	"github.com/ipfs/boxo/path"
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -21,7 +20,10 @@ import (
 	"github.com/spy16/slurp/repl"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
+	"github.com/wetware/go/util"
 )
+
+var env util.IPFSEnv
 
 func getReadlineConfig(c *cli.Context) readline.Config {
 	return readline.Config{
@@ -35,9 +37,21 @@ func getReadlineConfig(c *cli.Context) readline.Config {
 
 func Command() *cli.Command {
 	return &cli.Command{
-		Name:   "shell",
+		Name: "shell",
+		Before: func(c *cli.Context) error {
+			addr := c.String("ipfs")
+			return env.Boot(addr)
+		},
+		After: func(c *cli.Context) error {
+			return env.Close()
+		},
 		Action: Main,
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "ipfs",
+				EnvVars: []string{"WW_IPFS"},
+				Value:   "/dns4/localhost/tcp/5001/http",
+			},
 			&cli.StringFlag{
 				Name:    "command",
 				Aliases: []string{"c"},
@@ -140,12 +154,16 @@ func runGuestMode(ctx context.Context, c *cli.Context) error {
 	defer release()
 
 	// Create base environment with analyzer and globals to it.
-	env := slurp.New()
-	if err := env.Bind(globals); err != nil {
-		return fmt.Errorf("failed to bind globals: %w", err)
+	eval := slurp.New()
+
+	// Bind base globals (common to both modes)
+	if err := eval.Bind(getBaseGlobals(ctx)); err != nil {
+		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
-	if err := env.Bind(session(ctx, f)); err != nil {
-		return fmt.Errorf("failed to bind session: %w", err)
+
+	// Bind session-specific globals (interactive mode only)
+	if err := eval.Bind(getSessionGlobals(ctx, f)); err != nil {
+		return fmt.Errorf("failed to bind session globals: %w", err)
 	}
 
 	// Set up readline
@@ -162,11 +180,11 @@ func runGuestMode(ctx context.Context, c *cli.Context) error {
 		banner = "Welcome to Wetware Shell! Type 'help' for available commands."
 	}
 
-	if err := repl.New(env,
+	if err := repl.New(eval,
 		repl.WithBanner(banner),
 		repl.WithPrompts("ww ", "  | "),
 		repl.WithPrinter(printer{out: os.Stdout}),
-		repl.WithReaderFactory(DefaultReaderFactory{}),
+		repl.WithReaderFactory(lang.DefaultReaderFactory{IPFS: env.IPFS}),
 		repl.WithInput(lineReader{Driver: rl}, func(err error) error {
 			if err == nil || err == readline.ErrInterrupt {
 				return nil
@@ -181,83 +199,47 @@ func runGuestMode(ctx context.Context, c *cli.Context) error {
 
 // executeCommand executes a single command line
 func executeCommand(ctx context.Context, command string) error {
+	// Use the global IPFS environment that was already initialized
+
 	// Create a basic interpreter without import functionality for testing
-	env := slurp.New()
+	eval := slurp.New()
 
-	// Add basic globals for testing
-	globals := map[string]core.Any{
-		"nil":     builtin.Nil{},
-		"true":    builtin.Bool(true),
-		"false":   builtin.Bool(false),
-		"version": builtin.String("wetware-0.1.0"),
-		"println": slurp.Func("println", func(args ...core.Any) {
-			for _, arg := range args {
-				fmt.Println(arg)
-			}
-		}),
-		"print": slurp.Func("print", func(args ...core.Any) {
-			for _, arg := range args {
-				fmt.Print(arg)
-			}
-		}),
-	}
-
-	if err := env.Bind(globals); err != nil {
+	// Use the same base globals as the interactive mode
+	if err := eval.Bind(getBaseGlobals(ctx)); err != nil {
 		return fmt.Errorf("failed to bind globals: %w", err)
 	}
 
 	// Create a reader from the command string
 	commandReader := strings.NewReader(command)
 
-	// Create the REPL with the command reader
-	return repl.New(env,
-		repl.WithBanner(""),      // No banner for single command execution
-		repl.WithPrompts("", ""), // No prompts for single command execution
-		repl.WithPrinter(printer{out: os.Stdout}),
-		repl.WithReaderFactory(DefaultReaderFactory{}),
-		repl.WithInput(commandReaderWrapper{Reader: commandReader}, func(err error) error {
-			if err != nil && err != io.EOF {
-				return err
-			}
-			return nil
-		}),
-	).Loop(ctx)
-}
+	// Create a reader factory for IPFS path support
+	readerFactory := lang.DefaultReaderFactory{IPFS: env.IPFS}
 
-// commandReaderWrapper implements the repl.Input interface for single command execution
-type commandReaderWrapper struct {
-	*strings.Reader
-}
+	// Read and evaluate the command directly
+	reader := readerFactory.NewReader(commandReader)
 
-func (r commandReaderWrapper) Readline() (string, error) {
-	// Read a line from the strings.Reader
-	buf := make([]byte, 0, 1024)
-	for {
-		if b, err := r.ReadByte(); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return "", err
-		} else if b == '\n' {
-			break
-		} else {
-			buf = append(buf, b)
+	// Read the expression
+	expr, err := reader.One()
+	if err != nil {
+		if err == io.EOF {
+			return nil // Empty command, nothing to do
 		}
+		return fmt.Errorf("failed to read command: %w", err)
 	}
-	return strings.TrimSpace(string(buf)), nil
-}
 
-func (r commandReaderWrapper) Prompt(p string) {
-	// No prompting for single command execution
-}
+	// Evaluate the expression
+	result, err := eval.Eval(expr)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate command: %w", err)
+	}
 
-// Path represents an IPFS path and implements core.Any
-type Path struct {
-	path.Path
-}
+	// Print the result if it's not nil
+	if result != nil {
+		printer := printer{out: os.Stdout}
+		return printer.Print(result)
+	}
 
-func (p Path) String() string {
-	return p.Path.String()
+	return nil
 }
 
 // printer implements the repl.Printer interface for better output formatting
@@ -285,8 +267,8 @@ func (p printer) Print(val interface{}) error {
 	case builtin.Nil:
 		_, err := fmt.Fprintf(p.out, "nil\n")
 		return err
-	case Path:
-		_, err := fmt.Fprintf(p.out, "Path: %s\n", v.String())
+	case *lang.Path:
+		_, err := fmt.Fprintf(p.out, "Path: %s\n", v.Path.String())
 		return err
 	default:
 		// For any other type, use Go's default formatting
@@ -319,6 +301,8 @@ func getCompleter() readline.AutoCompleter {
 		readline.PcItem("print"),
 		readline.PcItem("system"),
 		readline.PcItem("callc"),
+		readline.PcItem("exec"),
+		readline.PcItem("ipfs"),
 		readline.PcItem("+"),
 		readline.PcItem("*"),
 		readline.PcItem("="),
@@ -330,8 +314,27 @@ func getCompleter() readline.AutoCompleter {
 	)
 }
 
-func session(ctx context.Context, f system.Terminal_login_Results_Future) map[string]core.Any {
-	return map[string]core.Any{
-		"exec": lang.NewExecutor(ctx, f.Exec()),
+// getBaseGlobals returns the base globals that are common to both interactive and command modes
+func getBaseGlobals(ctx context.Context) map[string]core.Any {
+	baseGlobals := make(map[string]core.Any)
+
+	// Copy the base globals from globals.go
+	for k, v := range globals {
+		baseGlobals[k] = v
 	}
+
+	// Add IPFS support (available in both modes)
+	baseGlobals["ipfs"] = lang.NewIPFS(ctx, env.IPFS)
+
+	return baseGlobals
+}
+
+// getSessionGlobals returns additional globals for interactive mode (requires terminal connection)
+func getSessionGlobals(ctx context.Context, f system.Terminal_login_Results_Future) map[string]core.Any {
+	sessionGlobals := make(map[string]core.Any)
+
+	// Add exec functionality (only available in interactive mode with terminal connection)
+	sessionGlobals["exec"] = lang.NewExecutor(ctx, f.Exec())
+
+	return sessionGlobals
 }
