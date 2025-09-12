@@ -18,6 +18,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/spy16/slurp/repl"
+	"github.com/wetware/go/cmd/internal/flags"
 	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
@@ -46,7 +47,7 @@ func Command() *cli.Command {
 			return env.Close()
 		},
 		Action: Main,
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
@@ -74,24 +75,22 @@ func Command() *cli.Command {
 				Usage:   "disable welcome banner",
 				EnvVars: []string{"WW_SHELL_NO_BANNER"},
 			},
-		},
+		}, flags.CapabilityFlags()...),
 	}
 }
 
 func Main(c *cli.Context) error {
-	ctx := c.Context
-
 	// Check if we're in guest mode (cell process)
 	if os.Getenv("WW_CELL") == "true" {
-		return runGuestMode(ctx, c)
+		return runGuestMode(c)
 	}
 
 	// Host mode: spawn guest process with ww run
-	return runHostMode(ctx, c)
+	return runHostMode(c)
 }
 
 // runHostMode runs the shell in host mode, spawning a guest process
-func runHostMode(ctx context.Context, c *cli.Context) error {
+func runHostMode(c *cli.Context) error {
 	// Get the current executable path
 	execPath, err := os.Executable()
 	if err != nil {
@@ -99,7 +98,7 @@ func runHostMode(ctx context.Context, c *cli.Context) error {
 	}
 
 	// Build the command to run the shell in guest mode
-	cmd := exec.CommandContext(ctx, execPath, "run", "-env", "WW_CELL=true", execPath, "--", "shell")
+	cmd := exec.CommandContext(c.Context, execPath, "run", "-env", "WW_CELL=true", execPath, "--", "shell")
 
 	// Pass through shell-specific flags
 	if command := c.String("command"); command != "" {
@@ -125,11 +124,11 @@ func runHostMode(ctx context.Context, c *cli.Context) error {
 }
 
 // runGuestMode runs the shell in guest mode (as a cell process)
-func runGuestMode(ctx context.Context, c *cli.Context) error {
+func runGuestMode(c *cli.Context) error {
 	// Check if command flag is provided
 	if command := c.String("command"); command != "" {
 		// Execute single command
-		if err := executeCommand(ctx, command); err != nil {
+		if err := executeCommand(c, command); err != nil {
 			return fmt.Errorf("repl error: %w", err)
 		}
 		return nil
@@ -142,27 +141,27 @@ func runGuestMode(ctx context.Context, c *cli.Context) error {
 	}
 
 	conn := rpc.NewConn(rpc.NewStreamTransport(host), &rpc.Options{
-		BaseContext: func() context.Context { return ctx },
+		BaseContext: func() context.Context { return c.Context },
 		// BootstrapClient: export(),
 	})
 	defer conn.Close()
 
-	client := conn.Bootstrap(ctx)
+	client := conn.Bootstrap(c.Context)
 	defer client.Release()
 
-	f, release := system.Terminal(client).Login(ctx, nil)
+	f, release := system.Terminal(client).Login(c.Context, nil)
 	defer release()
 
 	// Create base environment with analyzer and globals to it.
 	eval := slurp.New()
 
 	// Bind base globals (common to both modes)
-	if err := eval.Bind(getBaseGlobals(ctx)); err != nil {
+	if err := eval.Bind(getBaseGlobals(c)); err != nil {
 		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
 
 	// Bind session-specific globals (interactive mode only)
-	if err := eval.Bind(getSessionGlobals(ctx, f)); err != nil {
+	if err := eval.Bind(getSessionGlobals(f, c)); err != nil {
 		return fmt.Errorf("failed to bind session globals: %w", err)
 	}
 
@@ -191,21 +190,21 @@ func runGuestMode(ctx context.Context, c *cli.Context) error {
 			}
 			return err
 		}),
-	).Loop(ctx); err != nil {
+	).Loop(c.Context); err != nil {
 		return fmt.Errorf("repl: %w", err)
 	}
 	return nil
 }
 
 // executeCommand executes a single command line
-func executeCommand(ctx context.Context, command string) error {
+func executeCommand(c *cli.Context, command string) error {
 	// Use the global IPFS environment that was already initialized
 
 	// Create a basic interpreter without import functionality for testing
 	eval := slurp.New()
 
 	// Use the same base globals as the interactive mode
-	if err := eval.Bind(getBaseGlobals(ctx)); err != nil {
+	if err := eval.Bind(getBaseGlobals(c)); err != nil {
 		return fmt.Errorf("failed to bind globals: %w", err)
 	}
 
@@ -315,7 +314,7 @@ func getCompleter() readline.AutoCompleter {
 }
 
 // getBaseGlobals returns the base globals that are common to both interactive and command modes
-func getBaseGlobals(ctx context.Context) map[string]core.Any {
+func getBaseGlobals(c *cli.Context) map[string]core.Any {
 	baseGlobals := make(map[string]core.Any)
 
 	// Copy the base globals from globals.go
@@ -323,18 +322,24 @@ func getBaseGlobals(ctx context.Context) map[string]core.Any {
 		baseGlobals[k] = v
 	}
 
-	// Add IPFS support (available in both modes)
-	baseGlobals["ipfs"] = lang.NewIPFS(ctx, env.IPFS)
+	// Add IPFS support if --with-ipfs flag is set
+	if c.Bool("with-ipfs") || c.Bool("with-all") {
+		if env.IPFS != nil {
+			baseGlobals["ipfs"] = lang.NewIPFS(c.Context, env.IPFS)
+		}
+	}
 
 	return baseGlobals
 }
 
 // getSessionGlobals returns additional globals for interactive mode (requires terminal connection)
-func getSessionGlobals(ctx context.Context, f system.Terminal_login_Results_Future) map[string]core.Any {
+func getSessionGlobals(f system.Terminal_login_Results_Future, c *cli.Context) map[string]core.Any {
 	sessionGlobals := make(map[string]core.Any)
 
-	// Add exec functionality (only available in interactive mode with terminal connection)
-	sessionGlobals["exec"] = lang.NewExecutor(ctx, f.Exec())
+	// Add exec functionality if --with-exec flag is set
+	if c.Bool("with-exec") || c.Bool("with-all") {
+		sessionGlobals["exec"] = lang.NewExecutor(c.Context, f.Exec())
+	}
 
 	return sessionGlobals
 }

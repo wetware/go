@@ -73,6 +73,9 @@ func (e Executor) Invoke(args ...core.Any) (core.Any, error) {
 	})
 	defer release()
 
+	// TODO: This should block until execution completes, but it appears to return immediately
+	// The issue is that future.Struct() is not properly waiting for the WASM execution to finish
+	// This causes exec to return immediately instead of blocking until completion
 	result, err := future.Struct()
 	if err != nil {
 		return "", err
