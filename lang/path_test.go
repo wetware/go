@@ -1,4 +1,4 @@
-package shell
+package lang
 
 import (
 	"strings"
@@ -53,7 +53,7 @@ func TestIPFSPathReader(t *testing.T) {
 			rd := reader.New(strings.NewReader(tt.input))
 
 			// Call the IPFS path reader
-			result, err := IPFSPathReader(rd, '/')
+			result, err := IPFSPathReader(nil)(rd, '/')
 
 			// Check error expectations
 			if tt.wantErr {
@@ -70,7 +70,7 @@ func TestIPFSPathReader(t *testing.T) {
 
 			// Check result type
 			if tt.expected == "Path" {
-				if _, ok := result.(Path); !ok {
+				if _, ok := result.(*Path); !ok {
 					t.Errorf("IPFSPathReader() expected Path type, got %T", result)
 				}
 			}
@@ -93,21 +93,21 @@ func TestIPFSPathReaderWithValidPaths(t *testing.T) {
 		t.Run("valid_"+pathStr, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(pathStr))
 
-			result, err := IPFSPathReader(rd, '/')
+			result, err := IPFSPathReader(nil)(rd, '/')
 			if err != nil {
 				t.Errorf("IPFSPathReader() failed for valid path %s: %v", pathStr, err)
 				return
 			}
 
-			pathObj, ok := result.(Path)
+			pathObj, ok := result.(*Path)
 			if !ok {
 				t.Errorf("IPFSPathReader() returned wrong type for %s: %T", pathStr, result)
 				return
 			}
 
 			// Verify the path string matches
-			if pathObj.String() != pathStr {
-				t.Errorf("IPFSPathReader() returned path %s, expected %s", pathObj.String(), pathStr)
+			if pathObj.Path.String() != pathStr {
+				t.Errorf("IPFSPathReader() returned path %s, expected %s", pathObj.Path.String(), pathStr)
 			}
 		})
 	}
@@ -127,7 +127,7 @@ func TestIPFSPathReaderWithInvalidPaths(t *testing.T) {
 		t.Run("invalid_"+pathStr, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(pathStr))
 
-			result, err := IPFSPathReader(rd, '/')
+			result, err := IPFSPathReader(nil)(rd, '/')
 			if err == nil {
 				t.Errorf("IPFSPathReader() should have failed for invalid path %s, got result: %v", pathStr, result)
 			}
@@ -178,7 +178,7 @@ func TestIPFSPathReaderEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(tt.input))
 
-			result, err := IPFSPathReader(rd, '/')
+			result, err := IPFSPathReader(nil)(rd, '/')
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("IPFSPathReader() expected error for %s but got none", tt.input)
@@ -191,7 +191,7 @@ func TestIPFSPathReaderEdgeCases(t *testing.T) {
 
 			// If no error, result should be a Path
 			if err == nil {
-				if _, ok := result.(Path); !ok {
+				if _, ok := result.(*Path); !ok {
 					t.Errorf("IPFSPathReader() returned wrong type for %s: %T", tt.input, result)
 				}
 			}
