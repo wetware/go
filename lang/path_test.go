@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ipfs/boxo/path"
 	"github.com/spy16/slurp/reader"
 )
 
@@ -70,7 +71,7 @@ func TestIPFSPathReader(t *testing.T) {
 
 			// Check result type
 			if tt.expected == "Path" {
-				if _, ok := result.(*Path); !ok {
+				if _, ok := result.(path.Path); !ok {
 					t.Errorf("IPFSPathReader() expected Path type, got %T", result)
 				}
 			}
@@ -99,15 +100,15 @@ func TestIPFSPathReaderWithValidPaths(t *testing.T) {
 				return
 			}
 
-			pathObj, ok := result.(*Path)
+			pathObj, ok := result.(path.Path)
 			if !ok {
 				t.Errorf("IPFSPathReader() returned wrong type for %s: %T", pathStr, result)
 				return
 			}
 
 			// Verify the path string matches
-			if pathObj.Path.String() != pathStr {
-				t.Errorf("IPFSPathReader() returned path %s, expected %s", pathObj.Path.String(), pathStr)
+			if pathObj.String() != pathStr {
+				t.Errorf("IPFSPathReader() returned path %s, expected %s", pathObj.String(), pathStr)
 			}
 		})
 	}
@@ -191,7 +192,7 @@ func TestIPFSPathReaderEdgeCases(t *testing.T) {
 
 			// If no error, result should be a Path
 			if err == nil {
-				if _, ok := result.(*Path); !ok {
+				if _, ok := result.(path.Path); !ok {
 					t.Errorf("IPFSPathReader() returned wrong type for %s: %T", tt.input, result)
 				}
 			}

@@ -1,7 +1,6 @@
 package lang
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/spy16/slurp/core"
 	"github.com/spy16/slurp/reader"
-	"github.com/wetware/go/util"
 )
 
 // IPFSPathReader is a ReaderMacro that handles IPFS and IPNS paths
@@ -20,8 +18,8 @@ func IPFSPathReader(ipfs iface.CoreAPI) func(*reader.Reader, rune) (core.Any, er
 		beginPos := rd.Position()
 
 		// Read the full path manually by reading runes until we hit whitespace or a delimiter
-		var pathBuilder strings.Builder
-		pathBuilder.WriteRune(init) // Start with the '/' character
+		var b strings.Builder
+		b.WriteRune(init) // Start with the '/' character
 
 		for {
 			r, err := rd.NextRune()
@@ -43,38 +41,20 @@ func IPFSPathReader(ipfs iface.CoreAPI) func(*reader.Reader, rune) (core.Any, er
 				break
 			}
 
-			pathBuilder.WriteRune(r)
+			b.WriteRune(r)
 		}
 
-		pathStr := pathBuilder.String()
-
-		// Try to create an IPFS path - path.NewPath will validate the format
-		_, err := path.NewPath(pathStr)
-		if err == nil {
-			// Successfully created an IPFS path, return the invokable Path type
-			return NewPath(context.Background(), pathStr)
+		p, err := path.NewPath(b.String())
+		if err != nil {
+			return nil, &reader.Error{
+				Cause: fmt.Errorf("invalid IPFS/IPNS path: %s", err),
+				Begin: beginPos,
+				End:   beginPos,
+			}
 		}
 
-		// If path.NewPath failed, it's a syntax error
-		return nil, &reader.Error{
-			Cause: fmt.Errorf("invalid IPFS/IPNS path: %s", err),
-			Begin: beginPos,
-			End:   beginPos,
-		}
+		return p, nil
 	}
-}
-
-type Path struct {
-	Path path.Path
-	Env  *util.IPFSEnv
-}
-
-func NewPath(ctx context.Context, pathStr string) (core.Any, error) {
-	ipfsPath, err := path.NewPath(pathStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid IPFS path %s: %w", pathStr, err)
-	}
-	return &Path{Path: ipfsPath}, nil
 }
 
 // DefaultReaderFactory creates readers with IPFS path support

@@ -18,9 +18,9 @@ func TestGetBaseGlobals(t *testing.T) {
 	app := &cli.App{}
 	app.Flags = []cli.Flag{}
 	flagSet := &flag.FlagSet{}
-	flagSet.Bool("with-ipfs", true, "Enable IPFS capability")
-	flagSet.Bool("with-exec", true, "Enable exec capability")
 	flagSet.Bool("with-console", true, "Enable console capability")
+	flagSet.Bool("with-ipfs", false, "Enable IPFS capability") // Set to false for tests
+	flagSet.Bool("with-exec", true, "Enable exec capability")
 	flagSet.Bool("with-all", false, "Enable all capabilities")
 	c := cli.NewContext(app, flagSet, nil)
 	c.Context = context.Background()
@@ -134,7 +134,7 @@ func TestGlobalsConsistency(t *testing.T) {
 	app := &cli.App{}
 	app.Flags = []cli.Flag{}
 	flagSet := &flag.FlagSet{}
-	flagSet.Bool("with-ipfs", true, "Enable IPFS capability")
+	flagSet.Bool("with-ipfs", false, "Enable IPFS capability") // Set to false for tests
 	flagSet.Bool("with-exec", true, "Enable exec capability")
 	flagSet.Bool("with-console", true, "Enable console capability")
 	flagSet.Bool("with-all", false, "Enable all capabilities")

@@ -3,6 +3,7 @@ package run
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	os_exec "os/exec"
 
@@ -45,6 +46,11 @@ func Command() *cli.Command {
 				Name:     "with-fd",
 				Category: "FILE DESCRIPTORS",
 				Usage:    "map existing parent fd to name (e.g., db=3). Use --with-fd multiple times for multiple fds.",
+			},
+			&cli.BoolFlag{
+				Name:    "wasm-debug",
+				Usage:   "enable wasm debug info",
+				EnvVars: []string{"WW_WASM_DEBUG"},
 			},
 		}, flags.CapabilityFlags()...),
 
@@ -150,13 +156,17 @@ func Main(c *cli.Context) error {
 }
 
 func exec(c *cli.Context) system.Executor {
-	if !c.Bool("with-exec") {
+	if !c.Bool("with-exec") && !c.Bool("with-all") {
+		slog.DebugContext(c.Context, "returning null executor client",
+			"--with-exec", c.Bool("with-exec"),
+			"--with-all", c.Bool("with-all"))
 		return system.Executor{} // null client
 	}
 
 	return system.ExecutorConfig{
 		Host: env.Host,
 		Runtime: wazero.NewRuntimeConfig().
+			WithDebugInfoEnabled(c.Bool("wasm-debug")).
 			WithCloseOnContextDone(true),
 	}.New(c.Context)
 }
