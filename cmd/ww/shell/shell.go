@@ -12,6 +12,7 @@ import (
 
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/chzyer/readline"
+	"github.com/ipfs/boxo/path"
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
@@ -25,16 +26,6 @@ import (
 )
 
 var env util.IPFSEnv
-
-func getReadlineConfig(c *cli.Context) readline.Config {
-	return readline.Config{
-		Prompt:          c.String("prompt"),
-		HistoryFile:     c.String("history-file"),
-		AutoComplete:    getCompleter(),
-		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
-	}
-}
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -101,7 +92,38 @@ func runHostMode(c *cli.Context) error {
 	}
 
 	// Build the command to run the shell in guest mode
-	cmd := exec.CommandContext(c.Context, execPath, "run", "-env", "WW_CELL=true", execPath, "--", "shell")
+	cmd := exec.CommandContext(c.Context, execPath, "run", "-env", "WW_CELL=true")
+
+	// Pass through capability flags to the run command
+	if c.Bool("with-ipfs") {
+		cmd.Args = append(cmd.Args, "--with-ipfs")
+	}
+	if c.Bool("with-exec") {
+		cmd.Args = append(cmd.Args, "--with-exec")
+	}
+	if c.Bool("with-console") {
+		cmd.Args = append(cmd.Args, "--with-console")
+	}
+	if c.Bool("with-all") {
+		cmd.Args = append(cmd.Args, "--with-all")
+	}
+
+	// Add the executable and shell command
+	cmd.Args = append(cmd.Args, execPath, "--", "shell")
+
+	// Pass through capability flags to the shell command as well
+	if c.Bool("with-ipfs") {
+		cmd.Args = append(cmd.Args, "--with-ipfs")
+	}
+	if c.Bool("with-exec") {
+		cmd.Args = append(cmd.Args, "--with-exec")
+	}
+	if c.Bool("with-console") {
+		cmd.Args = append(cmd.Args, "--with-console")
+	}
+	if c.Bool("with-all") {
+		cmd.Args = append(cmd.Args, "--with-all")
+	}
 
 	// Pass through shell-specific flags
 	if command := c.String("command"); command != "" {
@@ -115,20 +137,6 @@ func runHostMode(c *cli.Context) error {
 	}
 	if c.Bool("no-banner") {
 		cmd.Args = append(cmd.Args, "--no-banner")
-	}
-
-	// Pass through capability flags
-	if c.Bool("with-ipfs") {
-		cmd.Args = append(cmd.Args, "--with-ipfs")
-	}
-	if c.Bool("with-exec") {
-		cmd.Args = append(cmd.Args, "--with-exec")
-	}
-	if c.Bool("with-console") {
-		cmd.Args = append(cmd.Args, "--with-console")
-	}
-	if c.Bool("with-all") {
-		cmd.Args = append(cmd.Args, "--with-all")
 	}
 
 	// Set up stdio
@@ -169,22 +177,29 @@ func runGuestMode(c *cli.Context) error {
 	f, release := system.Terminal(client).Login(c.Context, nil)
 	defer release()
 
+	res, err := f.Struct()
+	if err != nil {
+		return fmt.Errorf("failed to resolve terminal login: %w", err)
+	}
+
 	// Create base environment with analyzer and globals to it.
 	eval := slurp.New()
-
 	// Bind base globals (common to both modes)
 	if err := eval.Bind(getBaseGlobals(c)); err != nil {
 		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
-
 	// Bind session-specific globals (interactive mode only)
-	if err := eval.Bind(getSessionGlobals(f, c)); err != nil {
+	if err := eval.Bind(NewSessionGlobals(c, &res)); err != nil {
 		return fmt.Errorf("failed to bind session globals: %w", err)
 	}
 
-	// Set up readline
-	config := getReadlineConfig(c)
-	rl, err := readline.NewEx(&config)
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          c.String("prompt"),
+		HistoryFile:     c.String("history-file"),
+		AutoComplete:    getCompleter(c),
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
 	if err != nil {
 		return fmt.Errorf("readline: %w", err)
 	}
@@ -215,14 +230,41 @@ func runGuestMode(c *cli.Context) error {
 
 // executeCommand executes a single command line
 func executeCommand(c *cli.Context, command string) error {
-	// Use the global IPFS environment that was already initialized
+	// Check if the bootstrap file descriptor exists
+	host := os.NewFile(system.BOOTSTRAP_FD, "host")
+	if host == nil {
+		return fmt.Errorf("failed to create bootstrap file descriptor")
+	}
 
-	// Create a basic interpreter without import functionality for testing
+	conn := rpc.NewConn(rpc.NewStreamTransport(host), &rpc.Options{
+		BaseContext: func() context.Context { return c.Context },
+		// BootstrapClient: export(),
+	})
+	defer conn.Close()
+
+	client := conn.Bootstrap(c.Context)
+	defer client.Release()
+
+	f, release := system.Terminal(client).Login(c.Context, nil)
+	defer release()
+
+	// Resolve the future to get the actual results
+	results, err := f.Struct()
+	if err != nil {
+		return fmt.Errorf("failed to resolve terminal login: %w", err)
+	}
+
+	// Create base environment with analyzer and globals to it.
 	eval := slurp.New()
 
-	// Use the same base globals as the interactive mode
+	// Bind base globals (common to both modes)
 	if err := eval.Bind(getBaseGlobals(c)); err != nil {
-		return fmt.Errorf("failed to bind globals: %w", err)
+		return fmt.Errorf("failed to bind base globals: %w", err)
+	}
+
+	// Bind session-specific globals (including executor if --with-exec is set)
+	if err := eval.Bind(NewSessionGlobals(c, results)); err != nil {
+		return fmt.Errorf("failed to bind session globals: %w", err)
 	}
 
 	// Create a reader from the command string
@@ -283,8 +325,8 @@ func (p printer) Print(val interface{}) error {
 	case builtin.Nil:
 		_, err := fmt.Fprintf(p.out, "nil\n")
 		return err
-	case *lang.Path:
-		_, err := fmt.Fprintf(p.out, "Path: %s\n", v.Path.String())
+	case path.Path:
+		_, err := fmt.Fprintf(p.out, "Path: %s\n", v.String())
 		return err
 	default:
 		// For any other type, use Go's default formatting
@@ -309,16 +351,14 @@ func (s lineReader) Prompt(p string) {
 }
 
 // getCompleter returns a readline completer for wetware commands
-func getCompleter() readline.AutoCompleter {
-	return readline.NewPrefixCompleter(
+func getCompleter(c *cli.Context) readline.AutoCompleter {
+	completers := []readline.PrefixCompleterInterface{
 		readline.PcItem("help"),
 		readline.PcItem("version"),
 		readline.PcItem("println"),
 		readline.PcItem("print"),
 		readline.PcItem("system"),
 		readline.PcItem("callc"),
-		readline.PcItem("exec"),
-		readline.PcItem("ipfs"),
 		readline.PcItem("+"),
 		readline.PcItem("*"),
 		readline.PcItem("="),
@@ -327,7 +367,16 @@ func getCompleter() readline.AutoCompleter {
 		readline.PcItem("nil"),
 		readline.PcItem("true"),
 		readline.PcItem("false"),
-	)
+	}
+
+	if c.Bool("with-ipfs") || c.Bool("with-all") {
+		completers = append(completers, readline.PcItem("ipfs"))
+	}
+	if c.Bool("with-exec") || c.Bool("with-all") {
+		completers = append(completers, readline.PcItem("exec"))
+	}
+
+	return readline.NewPrefixCompleter(completers...)
 }
 
 // getBaseGlobals returns the base globals that are common to both interactive and command modes
@@ -340,11 +389,9 @@ func getBaseGlobals(c *cli.Context) map[string]core.Any {
 	}
 
 	// Add IPFS support if --with-ipfs flag is set
-	withIPFS := c.Bool("with-ipfs")
-	withAll := c.Bool("with-all")
-	if withIPFS || withAll {
+	if c.Bool("with-ipfs") || c.Bool("with-all") {
 		if env.IPFS != nil {
-			gs["ipfs"] = lang.NewIPFS(c.Context, env.IPFS)
+			gs["ipfs"] = &lang.IPFS{CoreAPI: env.IPFS}
 		} else {
 			panic("uninitialized IPFS environment")
 		}
@@ -353,14 +400,14 @@ func getBaseGlobals(c *cli.Context) map[string]core.Any {
 	return gs
 }
 
-// getSessionGlobals returns additional globals for interactive mode (requires terminal connection)
-func getSessionGlobals(f system.Terminal_login_Results_Future, c *cli.Context) map[string]core.Any {
-	sessionGlobals := make(map[string]core.Any)
+// NewSessionGlobals returns additional globals for interactive mode (requires terminal connection)
+func NewSessionGlobals(c *cli.Context, sess lang.Session) map[string]core.Any {
+	session := make(map[string]core.Any)
 
 	// Add exec functionality if --with-exec flag is set
 	if c.Bool("with-exec") || c.Bool("with-all") {
-		sessionGlobals["exec"] = lang.NewExecutor(c.Context, f.Exec())
+		session["exec"] = &lang.Exec{IPFS: env.IPFS, Sess: sess}
 	}
 
-	return sessionGlobals
+	return session
 }
