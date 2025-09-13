@@ -41,17 +41,17 @@ func (n Node) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	switch method {
-	case ":type":
+	case "type":
 		return builtin.String(n.Type()), nil
-	case ":size":
+	case "size":
 		size, err := n.Size()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get size: %w", err)
 		}
 		return builtin.Int64(size), nil
-	case ":is-file":
+	case "is-file":
 		return builtin.Bool(n.Type() == "file"), nil
-	case ":is-directory":
+	case "is-directory":
 		return builtin.Bool(n.Type() == "directory"), nil
 	default:
 		return nil, fmt.Errorf("unknown node method: %s", method)
@@ -82,27 +82,27 @@ func (f File) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	switch method {
-	case ":read":
+	case "read":
 		// Read all content
 		content, err := io.ReadAll(f.File)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
 		return content, nil
-	case ":read-string":
+	case "read-string":
 		// Read content as string
 		content, err := io.ReadAll(f.File)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
 		return builtin.String(string(content)), nil
-	case ":size":
+	case "size":
 		size, err := f.Size()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get size: %w", err)
 		}
 		return builtin.Int64(size), nil
-	case ":type":
+	case "type":
 		return builtin.String("file"), nil
 	default:
 		return nil, fmt.Errorf("unknown file method: %s", method)
@@ -144,7 +144,7 @@ func (d Directory) Invoke(args ...core.Any) (core.Any, error) {
 	}
 
 	switch method {
-	case ":list":
+	case "list":
 		// List directory entries
 		entries := make([]core.Any, 0)
 		it := d.Entries()
@@ -152,7 +152,7 @@ func (d Directory) Invoke(args ...core.Any) (core.Any, error) {
 			entries = append(entries, builtin.String(it.Name()))
 		}
 		return builtin.NewList(entries...), nil
-	case ":entries":
+	case "entries":
 		// Return directory entries as a list of strings
 		entries := make([]core.Any, 0)
 		it := d.Entries()
@@ -160,13 +160,13 @@ func (d Directory) Invoke(args ...core.Any) (core.Any, error) {
 			entries = append(entries, builtin.String(it.Name()))
 		}
 		return builtin.NewList(entries...), nil
-	case ":size":
+	case "size":
 		size, err := d.Size()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get size: %w", err)
 		}
 		return builtin.Int64(size), nil
-	case ":type":
+	case "type":
 		return builtin.String("directory"), nil
 	default:
 		return nil, fmt.Errorf("unknown directory method: %s", method)

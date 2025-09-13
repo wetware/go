@@ -30,7 +30,7 @@ type Executor struct {
 	Client system.Executor
 }
 
-//	  (exec buffer
+//	  (exec io.Reader
 //		  :timeout 15s)
 func (e Executor) Invoke(args ...core.Any) (core.Any, error) {
 	if len(args) == 0 {
