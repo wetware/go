@@ -41,7 +41,10 @@ func Command() *cli.Command {
 		Name: "shell",
 		Before: func(c *cli.Context) error {
 			addr := c.String("ipfs")
-			return env.Boot(addr)
+			if err := env.Boot(addr); err != nil {
+				return fmt.Errorf("failed to boot IPFS environment: %w", err)
+			}
+			return nil
 		},
 		After: func(c *cli.Context) error {
 			return env.Close()
@@ -112,6 +115,20 @@ func runHostMode(c *cli.Context) error {
 	}
 	if c.Bool("no-banner") {
 		cmd.Args = append(cmd.Args, "--no-banner")
+	}
+
+	// Pass through capability flags
+	if c.Bool("with-ipfs") {
+		cmd.Args = append(cmd.Args, "--with-ipfs")
+	}
+	if c.Bool("with-exec") {
+		cmd.Args = append(cmd.Args, "--with-exec")
+	}
+	if c.Bool("with-console") {
+		cmd.Args = append(cmd.Args, "--with-console")
+	}
+	if c.Bool("with-all") {
+		cmd.Args = append(cmd.Args, "--with-all")
 	}
 
 	// Set up stdio
@@ -315,21 +332,25 @@ func getCompleter() readline.AutoCompleter {
 
 // getBaseGlobals returns the base globals that are common to both interactive and command modes
 func getBaseGlobals(c *cli.Context) map[string]core.Any {
-	baseGlobals := make(map[string]core.Any)
+	gs := make(map[string]core.Any, len(globals))
 
 	// Copy the base globals from globals.go
 	for k, v := range globals {
-		baseGlobals[k] = v
+		gs[k] = v
 	}
 
 	// Add IPFS support if --with-ipfs flag is set
-	if c.Bool("with-ipfs") || c.Bool("with-all") {
+	withIPFS := c.Bool("with-ipfs")
+	withAll := c.Bool("with-all")
+	if withIPFS || withAll {
 		if env.IPFS != nil {
-			baseGlobals["ipfs"] = lang.NewIPFS(c.Context, env.IPFS)
+			gs["ipfs"] = lang.NewIPFS(c.Context, env.IPFS)
+		} else {
+			panic("uninitialized IPFS environment")
 		}
 	}
 
-	return baseGlobals
+	return gs
 }
 
 // getSessionGlobals returns additional globals for interactive mode (requires terminal connection)

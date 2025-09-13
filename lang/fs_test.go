@@ -47,25 +47,25 @@ func TestFile_Invoke(t *testing.T) {
 		},
 		{
 			name:     "type method",
-			args:     []core.Any{builtin.Keyword(":type")},
+			args:     []core.Any{builtin.Keyword("type")},
 			expected: builtin.String("file"),
 			wantErr:  false,
 		},
 		{
 			name:     "size method",
-			args:     []core.Any{builtin.Keyword(":size")},
+			args:     []core.Any{builtin.Keyword("size")},
 			expected: builtin.Int64(len(content)),
 			wantErr:  false,
 		},
 		{
 			name:     "read-string method",
-			args:     []core.Any{builtin.Keyword(":read-string")},
+			args:     []core.Any{builtin.Keyword("read-string")},
 			expected: builtin.String(content),
 			wantErr:  false,
 		},
 		{
 			name:     "invalid method",
-			args:     []core.Any{builtin.Keyword(":invalid")},
+			args:     []core.Any{builtin.Keyword("invalid")},
 			expected: nil,
 			wantErr:  true,
 		},
@@ -147,25 +147,25 @@ func TestDirectory_Invoke(t *testing.T) {
 		},
 		{
 			name:     "type method",
-			args:     []core.Any{builtin.Keyword(":type")},
+			args:     []core.Any{builtin.Keyword("type")},
 			expected: builtin.String("directory"),
 			wantErr:  false,
 		},
 		{
 			name:     "list method",
-			args:     []core.Any{builtin.Keyword(":list")},
+			args:     []core.Any{builtin.Keyword("list")},
 			expected: nil, // Will be a list, we'll check it's not nil
 			wantErr:  false,
 		},
 		{
 			name:     "entries method",
-			args:     []core.Any{builtin.Keyword(":entries")},
+			args:     []core.Any{builtin.Keyword("entries")},
 			expected: nil, // Will be a list, we'll check it's not nil
 			wantErr:  false,
 		},
 		{
 			name:     "invalid method",
-			args:     []core.Any{builtin.Keyword(":invalid")},
+			args:     []core.Any{builtin.Keyword("invalid")},
 			expected: nil,
 			wantErr:  true,
 		},
@@ -247,31 +247,31 @@ func TestNode_Invoke(t *testing.T) {
 		},
 		{
 			name:     "type method",
-			args:     []core.Any{builtin.Keyword(":type")},
+			args:     []core.Any{builtin.Keyword("type")},
 			expected: builtin.String("file"),
 			wantErr:  false,
 		},
 		{
 			name:     "is-file method",
-			args:     []core.Any{builtin.Keyword(":is-file")},
+			args:     []core.Any{builtin.Keyword("is-file")},
 			expected: builtin.Bool(true),
 			wantErr:  false,
 		},
 		{
 			name:     "is-directory method",
-			args:     []core.Any{builtin.Keyword(":is-directory")},
+			args:     []core.Any{builtin.Keyword("is-directory")},
 			expected: builtin.Bool(false),
 			wantErr:  false,
 		},
 		{
 			name:     "size method",
-			args:     []core.Any{builtin.Keyword(":size")},
+			args:     []core.Any{builtin.Keyword("size")},
 			expected: builtin.Int64(len(content)),
 			wantErr:  false,
 		},
 		{
 			name:     "invalid method",
-			args:     []core.Any{builtin.Keyword(":invalid")},
+			args:     []core.Any{builtin.Keyword("invalid")},
 			expected: nil,
 			wantErr:  true,
 		},
@@ -313,7 +313,7 @@ func TestFile_ReadContent(t *testing.T) {
 		file = files.NewBytesFile([]byte(content))
 		f = File{File: file}
 
-		result, err := f.Invoke(builtin.Keyword(":read-string"))
+		result, err := f.Invoke(builtin.Keyword("read-string"))
 		require.NoError(t, err)
 		assert.Equal(t, builtin.String(content), result)
 	}
@@ -332,7 +332,7 @@ func TestDirectory_Empty(t *testing.T) {
 	assert.Contains(t, result, "empty")
 
 	// Test list method
-	_, err := d.Invoke(builtin.Keyword(":list"))
+	_, err := d.Invoke(builtin.Keyword("list"))
 	require.NoError(t, err)
 	// For empty directory, result might be nil or empty list - both are acceptable
 	// We just verify the method doesn't error
