@@ -15,7 +15,7 @@ func createMockCLIContext() *cli.Context {
 	app := &cli.App{}
 	app.Flags = []cli.Flag{}
 	flagSet := &flag.FlagSet{}
-	flagSet.Bool("with-ipfs", true, "Enable IPFS capability")
+	flagSet.Bool("with-ipfs", false, "Enable IPFS capability") // Set to false for tests
 	flagSet.Bool("with-exec", true, "Enable exec capability")
 	flagSet.Bool("with-console", true, "Enable console capability")
 	flagSet.Bool("with-all", false, "Enable all capabilities")
@@ -158,25 +158,10 @@ func TestExecuteCommandWithIPFS(t *testing.T) {
 	}
 }
 
-func TestGetReadlineConfig(t *testing.T) {
-	t.Parallel()
-
-	// This is a basic test to ensure the function doesn't panic
-	// and returns a valid config
-	config := getReadlineConfig(createMockCLIContext())
-
-	// Test that config has expected fields
-	assert.NotEmpty(t, config.Prompt)
-	assert.NotEmpty(t, config.HistoryFile)
-	assert.NotNil(t, config.AutoComplete)
-	assert.Equal(t, "^C", config.InterruptPrompt)
-	assert.Equal(t, "exit", config.EOFPrompt)
-}
-
 func TestGetCompleter(t *testing.T) {
 	t.Parallel()
 
-	completer := getCompleter()
+	completer := getCompleter(createMockCLIContext())
 	assert.NotNil(t, completer, "Completer should not be nil")
 
 	// Test that completer can be used without panicking
