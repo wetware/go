@@ -249,7 +249,7 @@ func executeCommand(c *cli.Context, command string) error {
 	defer release()
 
 	// Resolve the future to get the actual results
-	results, err := f.Struct()
+	res, err := f.Struct()
 	if err != nil {
 		return fmt.Errorf("failed to resolve terminal login: %w", err)
 	}
@@ -263,7 +263,7 @@ func executeCommand(c *cli.Context, command string) error {
 	}
 
 	// Bind session-specific globals (including executor if --with-exec is set)
-	if err := eval.Bind(NewSessionGlobals(c, results)); err != nil {
+	if err := eval.Bind(NewSessionGlobals(c, &res)); err != nil {
 		return fmt.Errorf("failed to bind session globals: %w", err)
 	}
 
@@ -401,12 +401,12 @@ func getBaseGlobals(c *cli.Context) map[string]core.Any {
 }
 
 // NewSessionGlobals returns additional globals for interactive mode (requires terminal connection)
-func NewSessionGlobals(c *cli.Context, sess lang.Session) map[string]core.Any {
+func NewSessionGlobals(c *cli.Context, f *system.Terminal_login_Results) map[string]core.Any {
 	session := make(map[string]core.Any)
 
 	// Add exec functionality if --with-exec flag is set
 	if c.Bool("with-exec") || c.Bool("with-all") {
-		session["exec"] = &lang.Exec{IPFS: env.IPFS, Sess: sess}
+		session["exec"] = &Exec{Session: f}
 	}
 
 	return session

@@ -15,8 +15,3 @@ interface Terminal {
 interface Executor {
     exec @0 (bytecode :Data) -> (protocol :Text);
 }
-
-struct MethodCall {
-    name @0 :Text;
-    stack  @1 :List(UInt64);
-}
