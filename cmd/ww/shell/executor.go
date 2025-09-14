@@ -1,4 +1,4 @@
-package lang
+package shell
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	iface "github.com/ipfs/kubo/core/coreiface"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
 	"github.com/wetware/go/system"
@@ -17,13 +17,10 @@ import (
 
 var _ core.Invokable = (*Exec)(nil)
 
-type Session interface {
-	Exec() system.Executor
-}
-
 type Exec struct {
-	IPFS iface.CoreAPI
-	Sess Session
+	Session interface {
+		Exec() system.Executor
+	}
 }
 
 //	  (exec <path>
@@ -55,7 +52,7 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 	ctx, cancel := e.NewContext(opts)
 	defer cancel()
 
-	n, err := e.IPFS.Unixfs().Get(ctx, p)
+	n, err := env.IPFS.Unixfs().Get(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve node %v: %w", p, err)
 	}
@@ -67,24 +64,11 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 			return nil, fmt.Errorf("failed to read bytecode: %w", err)
 		}
 
-		f, release := e.SysExec().Exec(ctx, func(p system.Executor_exec_Params) error {
-			return p.SetBytecode(bytecode)
-		})
-		defer release()
-
-		// Wait for the protocol setup to complete
-		result, err := f.Struct()
+		protocol, err := e.ExecBytes(ctx, bytecode)
 		if err != nil {
-			release() // Only release on error
-			return "", err
+			return nil, fmt.Errorf("failed to execute bytecode: %w", err)
 		}
-
-		protocol, err := result.Protocol()
-		if err != nil {
-			release() // Only release on error
-			return "", err
-		}
-		return builtin.String(protocol), nil
+		return protocol, nil
 
 	case files.Directory:
 		return nil, errors.New("TODO:  directory support")
@@ -93,8 +77,20 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 	}
 }
 
-func (e Exec) SysExec() system.Executor {
-	return e.Sess.Exec()
+func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (protocol.ID, error) {
+	f, release := e.Session.Exec().Exec(ctx, func(p system.Executor_exec_Params) error {
+		return p.SetBytecode(bytecode)
+	})
+	defer release()
+
+	// Wait for the protocol setup to complete
+	result, err := f.Struct()
+	if err != nil {
+		return "", err
+	}
+
+	proto, err := result.Protocol()
+	return protocol.ID(proto), err
 }
 
 func (e Exec) NewContext(opts map[builtin.Keyword]core.Any) (context.Context, context.CancelFunc) {
