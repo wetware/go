@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
+	"io"
+	"os"
+	"strings"
 	"testing"
 
+	"github.com/spy16/slurp"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/cli/v2"
 )
@@ -24,6 +29,49 @@ func createMockCLIContext() *cli.Context {
 	ctx := cli.NewContext(app, flagSet, nil)
 	ctx.Context = context.Background()
 	return ctx
+}
+
+// executeCommandForTesting executes a command without RPC setup for testing
+func executeCommandForTesting(c *cli.Context, command string) error {
+	// Create base environment with analyzer and globals
+	eval := slurp.New()
+
+	// Bind base globals (common to both modes)
+	if err := eval.Bind(getBaseGlobals(c)); err != nil {
+		return fmt.Errorf("failed to bind base globals: %w", err)
+	}
+
+	// Create a reader from the command string
+	commandReader := strings.NewReader(command)
+
+	// Create a reader factory for IPFS path support
+	readerFactory := DefaultReaderFactory{IPFS: nil} // No IPFS in tests
+
+	// Read and evaluate the command directly
+	reader := readerFactory.NewReader(commandReader)
+
+	// Read the expression
+	expr, err := reader.One()
+	if err != nil {
+		if err == io.EOF {
+			return nil // Empty command, nothing to do
+		}
+		return fmt.Errorf("failed to read command: %w", err)
+	}
+
+	// Evaluate the expression
+	result, err := eval.Eval(expr)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate command: %w", err)
+	}
+
+	// Print the result if it's not nil
+	if result != nil {
+		printer := printer{out: os.Stdout}
+		return printer.Print(result)
+	}
+
+	return nil
 }
 
 func TestExecuteCommand(t *testing.T) {
@@ -108,7 +156,7 @@ func TestExecuteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := executeCommand(createMockCLIContext(), tt.command)
+			err := executeCommandForTesting(createMockCLIContext(), tt.command)
 
 			if tt.wantError {
 				assert.Error(t, err, "Expected error for command: %s", tt.command)
@@ -147,7 +195,7 @@ func TestExecuteCommandWithIPFS(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := executeCommand(createMockCLIContext(), tt.command)
+			err := executeCommandForTesting(createMockCLIContext(), tt.command)
 
 			if tt.wantError {
 				assert.Error(t, err, "Expected error for command: %s", tt.command)
@@ -262,7 +310,7 @@ func TestArithmeticIntegration(t *testing.T) {
 
 	for _, tt := range arithmeticTests {
 		t.Run(tt.command, func(t *testing.T) {
-			err := executeCommand(createMockCLIContext(), tt.command)
+			err := executeCommandForTesting(createMockCLIContext(), tt.command)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
