@@ -2,7 +2,6 @@ package system
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"log/slog"
@@ -66,27 +65,7 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	c.Host.SetStreamHandler(e.Protocol(), func(s network.Stream) {
 		defer s.Close()
 
-		// Size of the stack (i32)
-		////
-		var size int32
-		if err := binary.Read(s, binary.BigEndian, &size); err != nil {
-			slog.ErrorContext(ctx, "failed to read stack size", "reason", err)
-			return
-		}
-
-		// Stack frames (u64[size])
-		////
-		var word uint64
-		var stack []uint64
-		for i := 0; i < int(size); i++ {
-			if err := binary.Read(s, binary.BigEndian, &word); err != nil {
-				slog.ErrorContext(ctx, "failed to read stack frame", "reason", err)
-				return
-			}
-			stack = append(stack, word)
-		}
-
-		if err := proc.Poll(ctx, s, stack); err != nil {
+		if err := proc.Poll(ctx, s, nil); err != nil {
 			slog.ErrorContext(ctx, "failed to poll process", "reason", err)
 			return
 		}
