@@ -1,4 +1,4 @@
-package lang
+package shell
 
 import (
 	"fmt"
@@ -12,8 +12,19 @@ import (
 	"github.com/spy16/slurp/reader"
 )
 
-// IPFSPathReader is a ReaderMacro that handles IPFS and IPNS paths
-func IPFSPathReader(ipfs iface.CoreAPI) func(*reader.Reader, rune) (core.Any, error) {
+// DefaultReaderFactory creates readers with IPFS path support
+type DefaultReaderFactory struct {
+	IPFS iface.CoreAPI
+}
+
+func (f DefaultReaderFactory) NewReader(r io.Reader) *reader.Reader {
+	rd := reader.New(r)
+	rd.SetMacro('/', false, NewPathReader(f.IPFS))
+	return rd
+}
+
+// NewPathReader is a ReaderMacro that handles IPFS and IPNS paths
+func NewPathReader(ipfs iface.CoreAPI) func(*reader.Reader, rune) (core.Any, error) {
 	return func(rd *reader.Reader, init rune) (core.Any, error) {
 		beginPos := rd.Position()
 
@@ -55,15 +66,4 @@ func IPFSPathReader(ipfs iface.CoreAPI) func(*reader.Reader, rune) (core.Any, er
 
 		return p, nil
 	}
-}
-
-// DefaultReaderFactory creates readers with IPFS path support
-type DefaultReaderFactory struct {
-	IPFS iface.CoreAPI
-}
-
-func (f DefaultReaderFactory) NewReader(r io.Reader) *reader.Reader {
-	rd := reader.New(r)
-	rd.SetMacro('/', false, IPFSPathReader(f.IPFS))
-	return rd
 }

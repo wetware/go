@@ -1,4 +1,4 @@
-package lang
+package shell_test
 
 import (
 	"strings"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/ipfs/boxo/path"
 	"github.com/spy16/slurp/reader"
+	"github.com/wetware/go/cmd/ww/shell"
 )
 
 func TestIPFSPathReader(t *testing.T) {
@@ -54,7 +55,7 @@ func TestIPFSPathReader(t *testing.T) {
 			rd := reader.New(strings.NewReader(tt.input))
 
 			// Call the IPFS path reader
-			result, err := IPFSPathReader(nil)(rd, '/')
+			result, err := shell.NewPathReader(nil)(rd, '/')
 
 			// Check error expectations
 			if tt.wantErr {
@@ -94,7 +95,7 @@ func TestIPFSPathReaderWithValidPaths(t *testing.T) {
 		t.Run("valid_"+pathStr, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(pathStr))
 
-			result, err := IPFSPathReader(nil)(rd, '/')
+			result, err := shell.NewPathReader(nil)(rd, '/')
 			if err != nil {
 				t.Errorf("IPFSPathReader() failed for valid path %s: %v", pathStr, err)
 				return
@@ -128,7 +129,7 @@ func TestIPFSPathReaderWithInvalidPaths(t *testing.T) {
 		t.Run("invalid_"+pathStr, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(pathStr))
 
-			result, err := IPFSPathReader(nil)(rd, '/')
+			result, err := shell.NewPathReader(nil)(rd, '/')
 			if err == nil {
 				t.Errorf("IPFSPathReader() should have failed for invalid path %s, got result: %v", pathStr, result)
 			}
@@ -179,7 +180,7 @@ func TestIPFSPathReaderEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rd := reader.New(strings.NewReader(tt.input))
 
-			result, err := IPFSPathReader(nil)(rd, '/')
+			result, err := shell.NewPathReader(nil)(rd, '/')
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("IPFSPathReader() expected error for %s but got none", tt.input)
