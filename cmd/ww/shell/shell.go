@@ -149,19 +149,19 @@ func runHostMode(c *cli.Context) error {
 
 // runGuestMode runs the shell in guest mode (as a cell process)
 func runGuestMode(c *cli.Context) error {
-	// Check if command flag is provided
-	if command := c.String("command"); command != "" {
-		// Execute single command
-		if err := executeCommand(c, command); err != nil {
-			return fmt.Errorf("repl error: %w", err)
-		}
-		return nil
-	}
-
 	// Check if the bootstrap file descriptor exists
 	host := os.NewFile(system.BOOTSTRAP_FD, "host")
 	if host == nil {
 		return fmt.Errorf("failed to create bootstrap file descriptor")
+	}
+
+	// Check if command flag is provided
+	if command := c.String("command"); command != "" {
+		// Execute single command
+		if err := executeCommand(c, command, host); err != nil {
+			return fmt.Errorf("repl error: %w", err)
+		}
+		return nil
 	}
 
 	conn := rpc.NewConn(rpc.NewStreamTransport(host), &rpc.Options{
@@ -227,14 +227,8 @@ func runGuestMode(c *cli.Context) error {
 	return nil
 }
 
-// executeCommand executes a single command line
-func executeCommand(c *cli.Context, command string) error {
-	// Check if the bootstrap file descriptor exists
-	host := os.NewFile(system.BOOTSTRAP_FD, "host")
-	if host == nil {
-		return fmt.Errorf("failed to create bootstrap file descriptor")
-	}
-
+// executeCommand executes a single command line with a specific host file descriptor
+func executeCommand(c *cli.Context, command string, host *os.File) error {
 	conn := rpc.NewConn(rpc.NewStreamTransport(host), &rpc.Options{
 		BaseContext: func() context.Context { return c.Context },
 		// BootstrapClient: export(),
