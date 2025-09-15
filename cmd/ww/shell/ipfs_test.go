@@ -1,4 +1,4 @@
-package lang
+package shell_test
 
 import (
 	"testing"
@@ -8,6 +8,8 @@ import (
 	"github.com/spy16/slurp/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/wetware/go/cmd/ww/shell"
 )
 
 func TestFile_String(t *testing.T) {
@@ -17,7 +19,7 @@ func TestFile_String(t *testing.T) {
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
 
-	f := File{File: file}
+	f := shell.File{File: file}
 
 	// Test String method
 	result := f.String()
@@ -31,7 +33,7 @@ func TestFile_Invoke(t *testing.T) {
 	// Create a mock file
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
-	f := File{File: file}
+	f := shell.File{File: file}
 
 	tests := []struct {
 		name     string
@@ -113,7 +115,7 @@ func TestDirectory_String(t *testing.T) {
 		"file2.txt": files.NewBytesFile([]byte("content2")),
 	})
 
-	d := Directory{Directory: dir}
+	d := shell.Directory{Directory: dir}
 
 	// Test String method
 	result := d.String()
@@ -131,7 +133,7 @@ func TestDirectory_Invoke(t *testing.T) {
 		"file2.txt": files.NewBytesFile([]byte("content2")),
 	})
 
-	d := Directory{Directory: dir}
+	d := shell.Directory{Directory: dir}
 
 	tests := []struct {
 		name     string
@@ -202,7 +204,7 @@ func TestNode_String(t *testing.T) {
 	// Test with a file node
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
-	n := Node{Node: file}
+	n := shell.Node{Node: file}
 
 	result := n.String()
 	assert.Contains(t, result, "IPFS Node:")
@@ -215,13 +217,13 @@ func TestNode_Type(t *testing.T) {
 	// Test with a file node
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
-	n := Node{Node: file}
+	n := shell.Node{Node: file}
 
 	assert.Equal(t, "file", n.Type())
 
 	// Test with a directory node
 	dir := files.NewMapDirectory(map[string]files.Node{})
-	nDir := Node{Node: dir}
+	nDir := shell.Node{Node: dir}
 	assert.Equal(t, "directory", nDir.Type())
 }
 
@@ -231,7 +233,7 @@ func TestNode_Invoke(t *testing.T) {
 	// Create a mock file node
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
-	n := Node{Node: file}
+	n := shell.Node{Node: file}
 
 	tests := []struct {
 		name     string
@@ -305,7 +307,7 @@ func TestFile_ReadContent(t *testing.T) {
 
 	content := "Hello, World!"
 	file := files.NewBytesFile([]byte(content))
-	f := File{File: file}
+	f := shell.File{File: file}
 
 	result, err := f.Invoke(builtin.Keyword("read-string"))
 	require.NoError(t, err)
@@ -318,7 +320,7 @@ func TestDirectory_Empty(t *testing.T) {
 
 	// Create an empty directory
 	dir := files.NewMapDirectory(map[string]files.Node{})
-	d := Directory{Directory: dir}
+	d := shell.Directory{Directory: dir}
 
 	// Test string representation
 	result := d.String()

@@ -20,7 +20,6 @@ import (
 
 	"github.com/spy16/slurp/repl"
 	"github.com/wetware/go/cmd/internal/flags"
-	"github.com/wetware/go/lang"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/util"
 )
@@ -215,7 +214,7 @@ func runGuestMode(c *cli.Context) error {
 		repl.WithBanner(banner),
 		repl.WithPrompts("ww ", "  | "),
 		repl.WithPrinter(printer{out: os.Stdout}),
-		repl.WithReaderFactory(lang.DefaultReaderFactory{IPFS: env.IPFS}),
+		repl.WithReaderFactory(DefaultReaderFactory{IPFS: env.IPFS}),
 		repl.WithInput(lineReader{Driver: rl}, func(err error) error {
 			if err == nil || err == readline.ErrInterrupt {
 				return nil
@@ -271,7 +270,7 @@ func executeCommand(c *cli.Context, command string) error {
 	commandReader := strings.NewReader(command)
 
 	// Create a reader factory for IPFS path support
-	readerFactory := lang.DefaultReaderFactory{IPFS: env.IPFS}
+	readerFactory := DefaultReaderFactory{IPFS: env.IPFS}
 
 	// Read and evaluate the command directly
 	reader := readerFactory.NewReader(commandReader)
@@ -357,6 +356,7 @@ func getCompleter(c *cli.Context) readline.AutoCompleter {
 		readline.PcItem("version"),
 		readline.PcItem("println"),
 		readline.PcItem("print"),
+		readline.PcItem("send"),
 		readline.PcItem("system"),
 		readline.PcItem("callc"),
 		readline.PcItem("+"),
@@ -391,7 +391,7 @@ func getBaseGlobals(c *cli.Context) map[string]core.Any {
 	// Add IPFS support if --with-ipfs flag is set
 	if c.Bool("with-ipfs") || c.Bool("with-all") {
 		if env.IPFS != nil {
-			gs["ipfs"] = &lang.IPFS{CoreAPI: env.IPFS}
+			gs["ipfs"] = &IPFS{CoreAPI: env.IPFS}
 		} else {
 			panic("uninitialized IPFS environment")
 		}
