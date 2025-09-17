@@ -83,8 +83,9 @@ type Proc struct {
 	Module   api.Module
 }
 
-func (p *Proc) String() string {
-	return p.Endpoint.String()
+// ID returns the process identifier (endpoint name) without the protocol prefix.
+func (p *Proc) ID() string {
+	return p.Endpoint.Name
 }
 
 func (p *Proc) Close(ctx context.Context) error {

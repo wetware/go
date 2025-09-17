@@ -144,7 +144,7 @@ ww shell --with-exec
 
 ```
 ww> (exec /ipfs/QmHash/bytecode.wasm :timeout 30s)
-/protocol/identifier
+abc123def
 ww>
 ```
 
