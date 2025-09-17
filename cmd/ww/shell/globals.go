@@ -1,11 +1,14 @@
 package shell
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/spy16/slurp"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
+	"github.com/urfave/cli/v2"
 )
 
 const helpMessage = `Wetware Shell - Available commands:
@@ -18,12 +21,17 @@ version                 - Show wetware version
 (< a b)                - Less than
 (println expr)         - Print expression with newline
 (print expr)           - Print expression without newline
-(send "peer-addr-or-id" "proc-id" data) - Send data to a peer process (data: string, []byte, or io.Reader)
 (import "module")      - Import a module (stubbed)
 
 IPFS Path Syntax:
 /ipfs/QmHash/...       - Direct IPFS path
-/ipns/domain/...       - IPNS path`
+/ipns/domain/...       - IPNS path
+
+P2P Commands (use --with-p2p):
+(peer :send "peer-addr" "proc-id" data) - Send data to a peer process
+(peer :connect "peer-addr") - Connect to a peer
+(peer :is-self "peer-id") - Check if peer ID is our own
+(peer :id)             - Get our own peer ID`
 
 var globals = map[string]core.Any{
 	// Basic values
@@ -72,7 +80,34 @@ var globals = map[string]core.Any{
 			fmt.Print(arg)
 		}
 	}),
-	"send": slurp.Func("send", func(peerAddr, procId string, data interface{}) error {
-		return SendToPeer(peerAddr, procId, data)
-	}),
+}
+
+func NewGlobals(c *cli.Context) (map[string]core.Any, error) {
+	gs := make(map[string]core.Any, len(globals))
+	for k, v := range globals {
+		gs[k] = v
+	}
+
+	// Add IPFS support if --with-ipfs flag is set
+	if c.Bool("with-ipfs") || c.Bool("with-all") {
+		if env.IPFS == nil {
+			return nil, errors.New("uninitialized IPFS environment")
+		}
+		gs["ipfs"] = &IPFS{CoreAPI: env.IPFS}
+	}
+
+	// Add P2P functionality if --with-p2p flag is set
+	if c.Bool("with-p2p") || c.Bool("with-all") {
+		// Create a new host for P2P functionality
+		host, err := libp2p.New()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p host: %v", err)
+		}
+		gs["peer"] = &Peer{
+			Ctx:  c.Context,
+			Host: host,
+		}
+	}
+
+	return gs, nil
 }
