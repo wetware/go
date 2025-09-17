@@ -12,7 +12,7 @@ func CapabilityFlags() []cli.Flag {
 		&cli.BoolFlag{
 			Name:     "with-all",
 			Category: "CAPABILITIES",
-			Usage:    "grant all capabilities (console, IPFS, exec)",
+			Usage:    "grant all capabilities (console, IPFS, exec, p2p)",
 			EnvVars:  []string{"WW_WITH_ALL"},
 		},
 		&cli.BoolFlag{
@@ -32,6 +32,12 @@ func CapabilityFlags() []cli.Flag {
 			Category: "CAPABILITIES",
 			Usage:    "grant process execution capability",
 			EnvVars:  []string{"WW_WITH_EXEC"},
+		},
+		&cli.BoolFlag{
+			Name:     "with-p2p",
+			Category: "CAPABILITIES",
+			Usage:    "grant P2P networking capability",
+			EnvVars:  []string{"WW_WITH_P2P"},
 		},
 	}
 }
