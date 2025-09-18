@@ -9,7 +9,6 @@ import (
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
 	"github.com/wetware/go/system"
