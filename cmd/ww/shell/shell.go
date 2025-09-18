@@ -103,6 +103,9 @@ func runHostMode(c *cli.Context) error {
 	if c.Bool("with-console") {
 		cmd.Args = append(cmd.Args, "--with-console")
 	}
+	if c.Bool("with-p2p") {
+		cmd.Args = append(cmd.Args, "--with-p2p")
+	}
 	if c.Bool("with-all") {
 		cmd.Args = append(cmd.Args, "--with-all")
 	}
@@ -119,6 +122,9 @@ func runHostMode(c *cli.Context) error {
 	}
 	if c.Bool("with-console") {
 		cmd.Args = append(cmd.Args, "--with-console")
+	}
+	if c.Bool("with-p2p") {
+		cmd.Args = append(cmd.Args, "--with-p2p")
 	}
 	if c.Bool("with-all") {
 		cmd.Args = append(cmd.Args, "--with-all")
@@ -181,10 +187,13 @@ func runGuestMode(c *cli.Context) error {
 		return fmt.Errorf("failed to resolve terminal login: %w", err)
 	}
 
-	// Create base environment with analyzer and globals to it.
+	gs, err := NewGlobals(c)
+	if err != nil {
+		return err
+	}
+
 	eval := slurp.New()
-	// Bind base globals (common to both modes)
-	if err := eval.Bind(getBaseGlobals(c)); err != nil {
+	if err := eval.Bind(gs); err != nil {
 		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
 	// Bind session-specific globals (interactive mode only)
@@ -251,7 +260,11 @@ func executeCommand(c *cli.Context, command string, host *os.File) error {
 	eval := slurp.New()
 
 	// Bind base globals (common to both modes)
-	if err := eval.Bind(getBaseGlobals(c)); err != nil {
+	gs, err := NewGlobals(c)
+	if err != nil {
+		return fmt.Errorf("failed to bind base globals: %w", err)
+	}
+	if err := eval.Bind(gs); err != nil {
 		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
 
@@ -371,27 +384,6 @@ func getCompleter(c *cli.Context) readline.AutoCompleter {
 	}
 
 	return readline.NewPrefixCompleter(completers...)
-}
-
-// getBaseGlobals returns the base globals that are common to both interactive and command modes
-func getBaseGlobals(c *cli.Context) map[string]core.Any {
-	gs := make(map[string]core.Any, len(globals))
-
-	// Copy the base globals from globals.go
-	for k, v := range globals {
-		gs[k] = v
-	}
-
-	// Add IPFS support if --with-ipfs flag is set
-	if c.Bool("with-ipfs") || c.Bool("with-all") {
-		if env.IPFS != nil {
-			gs["ipfs"] = &IPFS{CoreAPI: env.IPFS}
-		} else {
-			panic("uninitialized IPFS environment")
-		}
-	}
-
-	return gs
 }
 
 // NewSessionGlobals returns additional globals for interactive mode (requires terminal connection)

@@ -24,7 +24,8 @@ func TestGetBaseGlobals(t *testing.T) {
 	flagSet.Bool("with-all", false, "Enable all capabilities")
 	c := cli.NewContext(app, flagSet, nil)
 	c.Context = context.Background()
-	baseGlobals := getBaseGlobals(c)
+	baseGlobals, err := NewGlobals(c)
+	require.NoError(t, err)
 
 	// Test that all expected base globals are present
 	expectedGlobals := []string{
@@ -140,8 +141,10 @@ func TestGlobalsConsistency(t *testing.T) {
 	flagSet.Bool("with-all", false, "Enable all capabilities")
 	c := cli.NewContext(app, flagSet, nil)
 	c.Context = context.Background()
-	baseGlobals1 := getBaseGlobals(c)
-	baseGlobals2 := getBaseGlobals(c)
+	baseGlobals1, err := NewGlobals(c)
+	require.NoError(t, err)
+	baseGlobals2, err := NewGlobals(c)
+	require.NoError(t, err)
 
 	// They should have the same content initially
 	assert.Equal(t, baseGlobals1, baseGlobals2)
