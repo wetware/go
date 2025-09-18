@@ -8,11 +8,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/wetware/go/util"
 	"go.uber.org/multierr"
 )
@@ -28,45 +32,69 @@ func ExpandHome(path string) (string, error) {
 	return path, nil
 }
 
-type Env struct {
-	util.IPFSEnv
-	Host host.Host
-	Dir  string // Temporary directory for cell execution
+type EnvConfig struct {
+	IPFS string
+	Port int
+	NS   string
+	MDNS bool
 }
 
-func (env *Env) Boot(addr string, port int) (err error) {
-	// Create temporary directory for cell execution
+func (cfg EnvConfig) New() (env Env, err error) {
 	env.Dir, err = os.MkdirTemp("", "cell-*")
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+		err = fmt.Errorf("failed to create temp directory: %w", err)
+		return
 	}
 
 	// Initialize IPFS client using embedded IPFSEnv
-	if err = env.IPFSEnv.Boot(addr); err != nil {
-		return err
+	////
+	if err = env.IPFSEnv.Boot(cfg.IPFS); err != nil {
+		err = fmt.Errorf("failed to boot IPFS environment: %w", err)
+		return
 	}
 
 	// Initialize libp2p host
-	env.Host, err = HostConfig{IPFS: env.IPFS, Port: port}.New()
-	if err == nil {
-		logBoot(env)
+	////
+	env.Host, err = HostConfig{
+		IPFS: env.IPFS,
+		Port: cfg.Port,
+	}.New()
+	if err != nil {
+		err = fmt.Errorf("failed to create libp2p host: %w", err)
+		return
 	}
-	return err
+
+	// Initialize mDNS discovery service if enabled
+	if cfg.MDNS {
+		env.MDNS = mdns.NewMdnsService(env.Host, env.NS, &MDNSPeerHandler{
+			Peerstore: env.Host.Peerstore(),
+			TTL:       peerstore.AddressTTL,
+		})
+		env.MDNS.Start()
+		slog.Info("mDNS discovery service started")
+	}
+	return
 }
 
-func logBoot(env *Env) {
-	args := make([]any, 0, len(env.Host.Addrs())+1)
-	args = append(args, slog.String("id", env.Host.ID().String()))
-	for _, addr := range env.Host.Addrs() {
-		args = append(args, slog.String("addr", addr.String()))
-	}
-	slog.Info("LibP2P initialized", args...)
+type Env struct {
+	util.IPFSEnv
+	Host host.Host
+	NS   string
+	Dir  string // Temporary directory for cell execution
+	MDNS mdns.Service
 }
 
 func (env *Env) Close() error {
 	var errors []error
 
-	// Close libp2p host independently
+	// Close mDNS service
+	if env.MDNS != nil {
+		if err := env.MDNS.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("failed to close mDNS service: %w", err))
+		}
+	}
+
+	// Close libp2p host
 	if env.Host != nil {
 		if err := env.Host.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("failed to close host: %w", err))
@@ -138,9 +166,30 @@ func (env *Env) Arch() string {
 }
 
 type HostConfig struct {
+	NS      string
 	IPFS    iface.CoreAPI
 	Options []libp2p.Option
 	Port    int
+}
+
+type HostWithDiscovery struct {
+	host.Host
+	MDNS mdns.Service
+}
+
+// Start starts the mDNS discovery service
+func (h *HostWithDiscovery) Start() {
+	if h.MDNS != nil {
+		h.MDNS.Start()
+	}
+}
+
+// Close stops the mDNS discovery service and closes the host
+func (h *HostWithDiscovery) Close() error {
+	if h.MDNS != nil {
+		h.MDNS.Close()
+	}
+	return h.Host.Close()
 }
 
 func (cfg HostConfig) New() (host.Host, error) {
@@ -155,4 +204,21 @@ func (c HostConfig) DefaultOptions() []libp2p.Option {
 	return []libp2p.Option{
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", c.Port)),
 	}
+}
+
+// mdnsNotifee implements the mdns.Notifee interface
+type MDNSPeerHandler struct {
+	peerstore.Peerstore
+	TTL time.Duration
+}
+
+func (m MDNSPeerHandler) HandlePeerFound(pi peer.AddrInfo) {
+	if m.TTL < 0 {
+		m.TTL = peerstore.AddressTTL
+	}
+	slog.Info("mDNS discovered peer",
+		"peer_id", pi.ID,
+		"addrs", pi.Addrs,
+		"ttl", m.TTL)
+	m.Peerstore.AddAddrs(pi.ID, pi.Addrs, peerstore.AddressTTL)
 }
