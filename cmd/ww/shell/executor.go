@@ -1,20 +1,15 @@
 package shell
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/spy16/slurp/builtin"
 	"github.com/spy16/slurp/core"
 	"github.com/wetware/go/system"
@@ -69,11 +64,11 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 			return nil, fmt.Errorf("failed to read bytecode: %w", err)
 		}
 
-		protocol, err := e.ExecBytes(ctx, bytecode)
+		procID, err := e.ExecBytes(ctx, bytecode)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute bytecode: %w", err)
 		}
-		return protocol, nil
+		return builtin.String(procID), nil
 
 	case files.Directory:
 		return nil, errors.New("TODO:  directory support")
@@ -82,7 +77,7 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 	}
 }
 
-func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (protocol.ID, error) {
+func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (string, error) {
 	f, release := e.Session.Exec().Exec(ctx, func(p system.Executor_exec_Params) error {
 		return p.SetBytecode(bytecode)
 	})
@@ -94,8 +89,8 @@ func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (protocol.ID, erro
 		return "", err
 	}
 
-	proto, err := result.Protocol()
-	return protocol.ID(proto), err
+	procID, err := result.Protocol()
+	return procID, err
 }
 
 func (e Exec) NewContext(opts map[builtin.Keyword]core.Any) (context.Context, context.CancelFunc) {
@@ -105,75 +100,4 @@ func (e Exec) NewContext(opts map[builtin.Keyword]core.Any) (context.Context, co
 	// }
 
 	return context.WithTimeout(context.Background(), time.Second*15)
-}
-
-// SendToPeer sends data to a specific peer and process
-func SendToPeer(peerAddr, procIdStr string, data interface{}) error {
-	ctx := context.TODO()
-
-	// Create a new libp2p host for this connection
-	host, err := libp2p.New()
-	if err != nil {
-		return fmt.Errorf("failed to create libp2p host: %w", err)
-	}
-	defer host.Close()
-
-	var peerInfo *peer.AddrInfo
-
-	// Try to parse as peer ID first
-	peerId, err := peer.Decode(peerAddr)
-	if err == nil {
-		// Successfully parsed as peer ID
-		peerInfo = &peer.AddrInfo{
-			ID: peerId,
-			// Note: In a real implementation, you'd need peer discovery
-			// or provide addresses as additional parameters
-		}
-	} else {
-		// Fall back to treating as multiaddr
-		addr, err := ma.NewMultiaddr(peerAddr)
-		if err != nil {
-			return fmt.Errorf("invalid peer address or ID: %w", err)
-		}
-		peerInfo, err = peer.AddrInfoFromP2pAddr(addr)
-		if err != nil {
-			return fmt.Errorf("failed to parse peer info from multiaddr: %w", err)
-		}
-	}
-
-	// Connect to the peer
-	if err := host.Connect(ctx, *peerInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer: %w", err)
-	}
-
-	// Create protocol ID from process ID
-	protocolID := protocol.ID("/ww/0.1.0/" + procIdStr)
-
-	// Open stream to the peer
-	stream, err := host.NewStream(ctx, peerInfo.ID, protocolID)
-	if err != nil {
-		return fmt.Errorf("failed to open stream: %w", err)
-	}
-	defer stream.Close()
-
-	// Convert data to io.Reader based on type
-	var reader io.Reader
-	switch v := data.(type) {
-	case io.Reader:
-		reader = v
-	case []byte:
-		reader = bytes.NewReader(v)
-	case string:
-		reader = strings.NewReader(v)
-	default:
-		return fmt.Errorf("unsupported data type: %T, expected io.Reader, []byte, or string", data)
-	}
-
-	// Send the data atomically
-	_, err = io.Copy(stream, reader)
-	if err != nil {
-		return fmt.Errorf("failed to send data: %w", err)
-	}
-
-	return nil
 }

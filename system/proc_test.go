@@ -75,7 +75,7 @@ func TestProcConfig_New(t *testing.T) {
 
 		// Verify the endpoint has a valid name
 		assert.NotEmpty(t, proc.Endpoint.Name)
-		assert.Contains(t, proc.String(), "/ww/0.1.0/")
+		assert.NotEmpty(t, proc.ID())
 
 		// Clean up
 		proc.Close(ctx)
@@ -126,16 +126,16 @@ func TestProcConfig_New(t *testing.T) {
 	})
 }
 
-func TestProc_String(t *testing.T) {
+func TestProc_ID(t *testing.T) {
 	endpoint := system.NewEndpoint()
 	proc := &system.Proc{
 		Endpoint: endpoint,
 	}
 
-	result := proc.String()
-	expected := endpoint.String()
+	result := proc.ID()
+	expected := endpoint.Name
 	assert.Equal(t, expected, result)
-	assert.Contains(t, result, "/ww/0.1.0/")
+	assert.NotEmpty(t, result)
 }
 
 func TestProc_Close(t *testing.T) {
@@ -429,6 +429,7 @@ func TestEndpoint_String(t *testing.T) {
 
 	assert.Equal(t, expected, result)
 	assert.Contains(t, result, "/ww/0.1.0/")
+	assert.Contains(t, result, endpoint.Name)
 }
 
 func TestEndpoint_Protocol(t *testing.T) {
@@ -521,7 +522,7 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 	assert.NotNil(t, proc.Module, "Module should be initialized")
 	assert.NotNil(t, proc.Endpoint, "Endpoint should be initialized")
 	assert.NotEmpty(t, proc.Endpoint.Name, "Endpoint should have a name")
-	assert.Contains(t, proc.String(), "/ww/0.1.0/", "String should contain protocol prefix")
+	assert.NotEmpty(t, proc.ID(), "String should not be empty")
 
 	// Test that the poll function is exported
 	pollFunc := proc.Module.ExportedFunction("poll")

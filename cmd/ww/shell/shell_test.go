@@ -12,6 +12,7 @@ import (
 
 	"github.com/spy16/slurp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
 
@@ -37,7 +38,11 @@ func executeCommandForTesting(c *cli.Context, command string) error {
 	eval := slurp.New()
 
 	// Bind base globals (common to both modes)
-	if err := eval.Bind(getBaseGlobals(c)); err != nil {
+	gs, err := NewGlobals(c)
+	if err != nil {
+		return fmt.Errorf("failed to bind base globals: %w", err)
+	}
+	if err := eval.Bind(gs); err != nil {
 		return fmt.Errorf("failed to bind base globals: %w", err)
 	}
 
@@ -269,7 +274,8 @@ func TestCommandStructure(t *testing.T) {
 func TestGlobalsIntegration(t *testing.T) {
 	t.Parallel()
 
-	baseGlobals := getBaseGlobals(createMockCLIContext())
+	baseGlobals, err := NewGlobals(createMockCLIContext())
+	require.NoError(t, err)
 
 	// Test that all expected functions are present and callable
 	expectedFunctions := []string{"+", "*", ">", "<", "=", "/", "help", "println", "print"}

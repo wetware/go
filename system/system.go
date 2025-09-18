@@ -87,7 +87,7 @@ func (d DefaultExecutor) Exec(ctx context.Context, call Executor_exec) error {
 	}.New(ctx)
 	if err != nil {
 		return err
-	} else if err = res.SetProtocol(proc.String()); err != nil {
+	} else if err = res.SetProtocol(proc.ID()); err != nil {
 		defer proc.Close(ctx)
 	}
 
@@ -115,11 +115,13 @@ func NewEndpoint() *Endpoint {
 	}
 }
 
+// String returns the full protocol identifier including the /ww/0.1.0/ prefix.
 func (e Endpoint) String() string {
 	proto := e.Protocol()
 	return string(proto)
 }
 
+// Protocol returns the libp2p protocol ID for this endpoint.
 func (e Endpoint) Protocol() protocol.ID {
 	return protocol.ID("/ww/0.1.0/" + e.Name)
 }
