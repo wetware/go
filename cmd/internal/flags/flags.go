@@ -34,6 +34,10 @@ func CapabilityFlags() []cli.Flag {
 			EnvVars:  []string{"WW_WITH_EXEC"},
 		},
 		&cli.BoolFlag{
+			Name:     "with-mdns",
+			Category: "CAPABILITIES",
+			Usage:    "grant mDNS peer discovery capability",
+			EnvVars:  []string{"WW_WITH_MDNS"},
 			Name:     "with-p2p",
 			Category: "CAPABILITIES",
 			Usage:    "grant P2P networking capability",

@@ -56,8 +56,14 @@ func Command() *cli.Command {
 
 		// Environment hooks.
 		////
-		Before: func(c *cli.Context) error {
-			return env.Boot(c.String("ipfs"), c.Int("port"))
+		Before: func(c *cli.Context) (err error) {
+			env, err = EnvConfig{
+				NS:   c.String("ns"),
+				IPFS: c.String("ipfs"),
+				Port: c.Int("port"),
+				MDNS: c.Bool("with-mdns") || c.Bool("with-all"),
+			}.New()
+			return
 		},
 		After: func(c *cli.Context) error {
 			return env.Close()
