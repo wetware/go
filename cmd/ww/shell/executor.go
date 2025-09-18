@@ -64,11 +64,11 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 			return nil, fmt.Errorf("failed to read bytecode: %w", err)
 		}
 
-		protocol, err := e.ExecBytes(ctx, bytecode)
+		procID, err := e.ExecBytes(ctx, bytecode)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute bytecode: %w", err)
 		}
-		return protocol, nil
+		return builtin.String(procID), nil
 
 	case files.Directory:
 		return nil, errors.New("TODO:  directory support")
@@ -77,7 +77,7 @@ func (e Exec) Invoke(args ...core.Any) (core.Any, error) {
 	}
 }
 
-func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (protocol.ID, error) {
+func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (string, error) {
 	f, release := e.Session.Exec().Exec(ctx, func(p system.Executor_exec_Params) error {
 		return p.SetBytecode(bytecode)
 	})
@@ -89,8 +89,8 @@ func (e Exec) ExecBytes(ctx context.Context, bytecode []byte) (protocol.ID, erro
 		return "", err
 	}
 
-	proto, err := result.Protocol()
-	return protocol.ID(proto), err
+	procID, err := result.Protocol()
+	return procID, err
 }
 
 func (e Exec) NewContext(opts map[builtin.Keyword]core.Any) (context.Context, context.CancelFunc) {
