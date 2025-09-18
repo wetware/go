@@ -107,6 +107,11 @@ func runHostMode(c *cli.Context) error {
 		cmd.Args = append(cmd.Args, "--with-all")
 	}
 
+	// Pass through mDNS capability to the run command
+	if c.Bool("with-mdns") {
+		cmd.Args = append(cmd.Args, "--with-mdns")
+	}
+
 	// Add the executable and shell command
 	cmd.Args = append(cmd.Args, execPath, "--", "shell")
 
@@ -119,6 +124,9 @@ func runHostMode(c *cli.Context) error {
 	}
 	if c.Bool("with-console") {
 		cmd.Args = append(cmd.Args, "--with-console")
+	}
+	if c.Bool("with-mdns") {
+		cmd.Args = append(cmd.Args, "--with-mdns")
 	}
 	if c.Bool("with-all") {
 		cmd.Args = append(cmd.Args, "--with-all")
