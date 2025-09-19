@@ -22,8 +22,8 @@ import (
 type ProcConfig struct {
 	Host      host.Host
 	Runtime   wazero.Runtime
-	Bytecode  []byte
-	Env       []string
+	Src       io.ReadCloser
+	Env, Args []string
 	ErrWriter io.Writer
 	Async     bool // If true, use WithStartFunctions() and set up stream handler
 }
@@ -37,7 +37,17 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 		}
 	}()
 
-	cm, err := c.Runtime.CompileModule(ctx, c.Bytecode)
+	if c.Src == nil {
+		return nil, fmt.Errorf("source reader is nil")
+	}
+	
+	bytecode, err := io.ReadAll(c.Src)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Src.Close()
+
+	cm, err := c.Runtime.CompileModule(ctx, bytecode)
 	if err != nil {
 		return nil, err
 	}
@@ -53,16 +63,7 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	cs = append(cs, e)
 
 	// Configure module instantiation based on async mode
-	config := wazero.NewModuleConfig().
-		WithName(e.String()).
-		WithStdin(e).
-		WithStdout(e).
-		WithStderr(c.ErrWriter)
-
-	// In async mode, prevent _start from running automatically
-	if c.Async {
-		config = config.WithStartFunctions()
-	}
+	config := c.NewModuleConfig(e)
 
 	mod, err := c.Runtime.InstantiateModule(ctx, cm, config)
 	if err != nil {
@@ -93,15 +94,24 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	return proc, nil
 }
 
-func (c ProcConfig) NewModuleConfig(endpoint interface {
+type ReadWriteStringer interface {
 	String() string
 	io.ReadWriter
-}) wazero.ModuleConfig {
+}
+
+func (c ProcConfig) NewModuleConfig(sock ReadWriteStringer) wazero.ModuleConfig {
 	config := wazero.NewModuleConfig().
-		WithName(endpoint.String()).
-		WithStdin(endpoint).
-		WithStdout(endpoint).
+		WithName(sock.String()).
+		WithArgs(c.Args...).
+		WithStdin(sock).
+		WithStdout(sock).
 		WithStderr(c.ErrWriter)
+
+	// async mode?
+	if c.Async {
+		// prevent _start from running automatically
+		config = config.WithStartFunctions()
+	}
 
 	// Add environment variables
 	for _, env := range c.Env {
