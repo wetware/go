@@ -6,13 +6,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/mr-tron/base58"
 	"github.com/urfave/cli/v2"
-	"github.com/wetware/go/cmd/internal/flags"
-	"github.com/wetware/go/cmd/ww/run"
 )
 
 func Command() *cli.Command {
@@ -20,34 +20,12 @@ func Command() *cli.Command {
 		Name:      "cat",
 		Usage:     "connect stdin/stdout to a remote peer's stream",
 		ArgsUsage: "<peer-id> <endpoint>",
-		Flags: append([]cli.Flag{
+		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
 				Value:   "/dns4/localhost/tcp/5001/http",
 			},
-			&cli.IntFlag{
-				Name:    "port",
-				Aliases: []string{"p"},
-				EnvVars: []string{"WW_PORT"},
-				Value:   2020,
-			},
-		}, flags.CapabilityFlags()...),
-
-		// Environment hooks.
-		////
-		Before: func(c *cli.Context) (err error) {
-			// Initialize environment similar to run command
-			env, err = run.EnvConfig{
-				NS:   c.String("ns"),
-				IPFS: c.String("ipfs"),
-				Port: c.Int("port"),
-				MDNS: c.Bool("mdns"),
-			}.New()
-			return
-		},
-		After: func(c *cli.Context) error {
-			return env.Close()
 		},
 
 		// Main
@@ -55,8 +33,6 @@ func Command() *cli.Command {
 		Action: Main,
 	}
 }
-
-var env run.Env
 
 func Main(c *cli.Context) error {
 	ctx, cancel := context.WithCancel(c.Context)
@@ -77,28 +53,62 @@ func Main(c *cli.Context) error {
 		return fmt.Errorf("invalid peer ID %s: %w", peerIDStr, err)
 	}
 
-	// Decode base58 endpoint
-	endpointBytes, err := base58.FastBase58Decoding(endpointStr)
+	// Validate base58 endpoint (but use it as-is)
+	_, err = base58.FastBase58Decoding(endpointStr)
 	if err != nil {
 		return fmt.Errorf("invalid endpoint %s: %w", endpointStr, err)
 	}
 
 	// Create the full protocol ID
-	protocolID := protocol.ID("/ww/0.1.0/" + string(endpointBytes))
+	protocolID := protocol.ID("/ww/0.1.0/" + endpointStr)
 
 	slog.InfoContext(ctx, "connecting to peer",
 		"peer", peerID,
 		"endpoint", endpointStr,
 		"protocol", string(protocolID))
 
+	// Create a minimal libp2p host for client-only connection
+	host, err := libp2p.New(
+		libp2p.NoListenAddrs, // Don't listen, just connect
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create libp2p host: %w", err)
+	}
+	defer host.Close()
+
+	slog.InfoContext(ctx, "created client host", "peer-id", host.ID())
+
+	// Connect to the remote peer
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// For now, we'll need the remote peer's addresses
+	// In a real scenario, this would come from peer discovery or manual configuration
+	// For testing, we'll assume the remote peer is listening on localhost:2020
+	remoteAddr := "/ip4/127.0.0.1/tcp/2020"
+
+	slog.InfoContext(ctx, "connecting to remote peer", "address", remoteAddr)
+
+	// Parse the multiaddr and connect
+	addrInfo, err := peer.AddrInfoFromString(remoteAddr + "/p2p/" + peerIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid peer address: %w", err)
+	}
+
+	if err := host.Connect(ctx, *addrInfo); err != nil {
+		return fmt.Errorf("failed to connect to peer: %w", err)
+	}
+
+	slog.InfoContext(ctx, "connected to remote peer")
+
 	// Open a stream to the remote peer
-	stream, err := env.Host.NewStream(ctx, peerID, protocolID)
+	stream, err := host.NewStream(ctx, peerID, protocolID)
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %w", err)
 	}
 	defer stream.Close()
 
-	slog.InfoContext(ctx, "stream opened", "stream", stream.ID())
+	slog.InfoContext(ctx, "stream opened successfully", "stream-id", stream.ID())
 
 	// Set up bidirectional copying
 	done := make(chan error, 2)
