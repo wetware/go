@@ -10,12 +10,10 @@ import (
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v2"
 
-	"github.com/wetware/go/cmd/ww/args"
 	"github.com/wetware/go/cmd/ww/export"
 	"github.com/wetware/go/cmd/ww/idgen"
 	importcmd "github.com/wetware/go/cmd/ww/import"
 	"github.com/wetware/go/cmd/ww/run"
-	"github.com/wetware/go/cmd/ww/shell"
 )
 
 func main() {
@@ -49,16 +47,12 @@ func main() {
 		Commands: []*cli.Command{
 			idgen.Command(),
 			run.Command(),
-			shell.Command(),
 			export.Command(),
 			importcmd.Command(),
 		},
 	}
 
-	hostArgs, guestArgs := args.SplitArgs(os.Args)
-	ctx = context.WithValue(ctx, args.GuestArgs, guestArgs)
-
-	err := app.RunContext(ctx, hostArgs)
+	err := app.RunContext(ctx, os.Args)
 	if err != nil {
 		slog.ErrorContext(ctx, err.Error())
 		os.Exit(1)
