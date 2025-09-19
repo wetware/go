@@ -9,9 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
-	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/tetratelabs/wazero"
@@ -45,6 +43,11 @@ func Command() *cli.Command {
 				Name:    "wasm-debug",
 				Usage:   "enable wasm debug info",
 				EnvVars: []string{"WW_WASM_DEBUG"},
+			},
+			&cli.BoolFlag{
+				Name:    "async",
+				Usage:   "run in async mode for stream processing",
+				EnvVars: []string{"WW_ASYNC"},
 			},
 		}, flags.CapabilityFlags()...),
 
@@ -80,10 +83,11 @@ func Main(c *cli.Context) error {
 	}
 
 	// Resolve the binary path to WASM bytecode
-	bytecode, err := resolveBinary(ctx, binaryPath)
+	f, err := resolveBinary(ctx, binaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve binary %s: %w", binaryPath, err)
 	}
+	defer f.Close()
 
 	// Create wazero runtime
 	runtime := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
@@ -94,9 +98,11 @@ func Main(c *cli.Context) error {
 	p, err := system.ProcConfig{
 		Host:      env.Host,
 		Runtime:   runtime,
-		Bytecode:  bytecode,
+		Src:       f,
 		Env:       c.StringSlice("env"),
+		Args:      c.Args().Slice(),
 		ErrWriter: c.App.ErrWriter,
+		Async:     c.Bool("async"),
 	}.New(ctx)
 	if err != nil && !errors.Is(err, sys.Errno(0)) {
 		return err
@@ -123,76 +129,32 @@ func Main(c *cli.Context) error {
 }
 
 // resolveBinary resolves a binary path to WASM bytecode
-func resolveBinary(ctx context.Context, path string) ([]byte, error) {
-	// Check if it's an IPFS/IPLD/IPNS path
-	if isIPFSPath(path) {
-		return resolveIPFSPath(ctx, path)
+func resolveBinary(ctx context.Context, name string) (io.ReadCloser, error) {
+	// Parse the IPFS path
+	ipfsPath, err := path.NewPath(name)
+	if err == nil {
+		return env.LoadIPFSFile(ctx, ipfsPath)
 	}
 
 	// Check if it's an absolute path
-	if filepath.IsAbs(path) {
-		return os.ReadFile(path)
+	if filepath.IsAbs(name) {
+		return os.Open(name)
 	}
 
 	// Check if it's a relative path (starts with . or /)
-	if len(path) > 0 && (path[0] == '.' || path[0] == '/') {
-		return os.ReadFile(path)
+	if len(name) > 0 && (name[0] == '.' || name[0] == '/') {
+		return os.Open(name)
 	}
 
 	// Check if it's in $PATH
-	if resolvedPath, err := exec.LookPath(path); err == nil {
-		return os.ReadFile(resolvedPath)
+	if resolvedPath, err := exec.LookPath(name); err == nil {
+		return os.Open(resolvedPath)
 	}
 
 	// Try as a relative path in current directory
-	if _, err := os.Stat(path); err == nil {
-		return os.ReadFile(path)
+	if _, err := os.Stat(name); err == nil {
+		return os.Open(name)
 	}
 
-	return nil, fmt.Errorf("binary not found: %s", path)
-}
-
-// isIPFSPath checks if the path is an IPFS/IPLD/IPNS path
-func isIPFSPath(path string) bool {
-	return len(path) > 5 && (path[:5] == "/ipfs" || path[:5] == "/ipld" || path[:5] == "/ipns")
-}
-
-// resolveIPFSPath resolves an IPFS path to WASM bytecode
-func resolveIPFSPath(ctx context.Context, pathStr string) ([]byte, error) {
-	if env.IPFS == nil {
-		return nil, fmt.Errorf("IPFS environment not initialized")
-	}
-
-	// Parse the IPFS path
-	ipfsPath, err := path.NewPath(pathStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid IPFS path: %w", err)
-	}
-
-	// Get the file from IPFS
-	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get from IPFS: %w", err)
-	}
-
-	// Read the file content
-	file, ok := node.(files.File)
-	if !ok {
-		return nil, fmt.Errorf("IPFS path does not point to a file")
-	}
-
-	return io.ReadAll(file)
-}
-
-func withEnv(c *cli.Context, config wazero.ModuleConfig) wazero.ModuleConfig {
-	for _, s := range c.StringSlice("env") {
-		if envvar := strings.SplitN(s, "=", 2); len(envvar[0]) == 0 || len(envvar[1]) == 0 {
-			slog.WarnContext(c.Context, "invalid env string",
-				"env", s)
-			continue
-		} else {
-			config = config.WithEnv(envvar[0], envvar[1])
-		}
-	}
-	return config
+	return nil, fmt.Errorf("binary not found: %s", name)
 }

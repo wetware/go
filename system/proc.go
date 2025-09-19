@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -38,9 +39,9 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	}()
 
 	if c.Src == nil {
-		return nil, fmt.Errorf("source reader is nil")
+		return nil, errors.New("no source provided")
 	}
-	
+
 	bytecode, err := io.ReadAll(c.Src)
 	if err != nil {
 		return nil, err
@@ -62,6 +63,18 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	e := c.NewEndpoint()
 	cs = append(cs, e)
 
+	// In sync mode, set up stdin/stdout for the endpoint
+	if !c.Async {
+		// bidirectional pipe that wraps stdin/stdout.
+		e.ReadWriteCloser = struct {
+			io.Reader
+			io.WriteCloser
+		}{
+			Reader:      os.Stdin,
+			WriteCloser: os.Stdout,
+		}
+	}
+
 	// Configure module instantiation based on async mode
 	config := c.NewModuleConfig(e)
 
@@ -78,7 +91,11 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	}
 
 	// Check if module is closed after instantiation
-	if mod.IsClosed() {
+	// In sync mode, this is expected behavior as main() completes and exits
+	if mod.IsClosed() && !c.Async {
+		// In sync mode, module closure after successful execution is normal
+		// We'll create a minimal proc that can still be used for ID purposes
+	} else if mod.IsClosed() {
 		return nil, fmt.Errorf("module closed immediately after instantiation")
 	}
 	cs = append(cs, mod)
@@ -200,4 +217,22 @@ func (cs CloserSlice) Close(ctx context.Context) error {
 		errs = append(errs, c.Close(ctx))
 	}
 	return multierr.Combine(errs...)
+}
+
+// syncIO implements io.ReadWriteCloser for sync mode
+type syncIO struct {
+	stdin  io.Reader
+	stdout io.Writer
+}
+
+func (s *syncIO) Read(p []byte) (n int, err error) {
+	return s.stdin.Read(p)
+}
+
+func (s *syncIO) Write(p []byte) (n int, err error) {
+	return s.stdout.Write(p)
+}
+
+func (s *syncIO) Close() error {
+	return nil
 }
