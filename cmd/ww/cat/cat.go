@@ -13,12 +13,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/mr-tron/base58"
 	"github.com/urfave/cli/v2"
+	"github.com/wetware/go/util"
 )
+
+var env util.IPFSEnv
 
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
-		Usage:     "connect stdin/stdout to a remote peer's stream",
+		Usage:     "connect stdin/stdout to a remote peer's stream via IPFS",
 		ArgsUsage: "<peer-id> <endpoint>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -26,6 +29,16 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_IPFS"},
 				Value:   "/dns4/localhost/tcp/5001/http",
 			},
+		},
+
+		// Environment hooks
+		Before: func(c *cli.Context) (err error) {
+			err = env.Boot(c.String("ipfs"))
+			return
+		},
+		After: func(c *cli.Context) (err error) {
+			err = env.Close()
+			return
 		},
 
 		// Main
@@ -62,7 +75,7 @@ func Main(c *cli.Context) error {
 	// Create the full protocol ID
 	protocolID := protocol.ID("/ww/0.1.0/" + endpointStr)
 
-	slog.InfoContext(ctx, "connecting to peer",
+	slog.InfoContext(ctx, "connecting to peer via IPFS",
 		"peer", peerID,
 		"endpoint", endpointStr,
 		"protocol", string(protocolID))
@@ -78,13 +91,8 @@ func Main(c *cli.Context) error {
 
 	slog.InfoContext(ctx, "created client host", "peer-id", host.ID())
 
-	// Connect to the remote peer
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// For now, we'll need the remote peer's addresses
-	// In a real scenario, this would come from peer discovery or manual configuration
-	// For testing, we'll assume the remote peer is listening on localhost:2020
+	// For now, we'll assume the remote peer is listening on localhost:2020
+	// In a real scenario, this would come from IPFS peer discovery or manual configuration
 	remoteAddr := "/ip4/127.0.0.1/tcp/2020"
 
 	slog.InfoContext(ctx, "connecting to remote peer", "address", remoteAddr)
@@ -94,6 +102,10 @@ func Main(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid peer address: %w", err)
 	}
+
+	// Connect to the peer
+	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
 	if err := host.Connect(ctx, *addrInfo); err != nil {
 		return fmt.Errorf("failed to connect to peer: %w", err)
