@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/wetware/go/system"
 	"github.com/wetware/go/system/mocks"
 	"go.uber.org/mock/gomock"
@@ -42,6 +44,8 @@ func loadEchoWasm(t *testing.T) []byte {
 }
 
 func TestProcConfig_New(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	mockErrWriter := &bytes.Buffer{}
 
@@ -64,12 +68,13 @@ func TestProcConfig_New(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  validBytecode,
 			ErrWriter: mockErrWriter,
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, proc)
-		assert.NotNil(t, proc.Sys)
+		assert.NotNil(t, proc.Closer)
 		assert.NotNil(t, proc.Module)
 		assert.NotNil(t, proc.Endpoint)
 
@@ -97,6 +102,7 @@ func TestProcConfig_New(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  []byte("invalid wasm bytecode"),
 			ErrWriter: mockErrWriter,
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
@@ -117,6 +123,7 @@ func TestProcConfig_New(t *testing.T) {
 			Runtime:   nil,
 			Bytecode:  []byte{},
 			ErrWriter: mockErrWriter,
+			Async:     true, // Use async mode for these tests
 		}
 
 		// This will panic due to nil runtime, so we expect a panic
@@ -127,7 +134,9 @@ func TestProcConfig_New(t *testing.T) {
 }
 
 func TestProc_ID(t *testing.T) {
-	endpoint := system.NewEndpoint()
+	t.Parallel()
+
+	endpoint := system.ProcConfig{}.NewEndpoint()
 	proc := &system.Proc{
 		Endpoint: endpoint,
 	}
@@ -139,6 +148,8 @@ func TestProc_ID(t *testing.T) {
 }
 
 func TestProc_Close(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	t.Run("successful close", func(t *testing.T) {
@@ -159,6 +170,7 @@ func TestProc_Close(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  validBytecode,
 			ErrWriter: &bytes.Buffer{},
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
@@ -172,6 +184,7 @@ func TestProc_Close(t *testing.T) {
 }
 
 func TestProc_Poll_WithGomock(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("successful poll", func(t *testing.T) {
@@ -188,7 +201,6 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		defer host.Close()
 
 		runtime := wazero.NewRuntime(ctx)
-		defer runtime.Close(ctx)
 
 		validBytecode := loadEchoWasm(t)
 
@@ -197,14 +209,14 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  validBytecode,
 			ErrWriter: &bytes.Buffer{},
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, proc)
 		defer proc.Close(ctx)
-
-		stack := []uint64{1, 2, 3}
+		defer runtime.Close(ctx)
 
 		// Test that poll function exists
 		pollFunc := proc.Module.ExportedFunction("poll")
@@ -215,7 +227,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		mockStream.EXPECT().Read(gomock.Any()).Return(0, io.EOF).AnyTimes()
 
 		// Actually call the Poll method - this should succeed since we have a valid WASM function
-		err = proc.Poll(ctx, mockStream, stack)
+		err = proc.ProcessMessage(ctx, mockStream)
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -239,7 +251,6 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		defer host.Close()
 
 		runtime := wazero.NewRuntime(ctx)
-		defer runtime.Close(ctx)
 
 		validBytecode := loadEchoWasm(t)
 
@@ -248,26 +259,26 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  validBytecode,
 			ErrWriter: &bytes.Buffer{},
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctxWithDeadline)
 		require.NoError(t, err)
 		require.NotNil(t, proc)
 		defer proc.Close(ctxWithDeadline)
-
-		stack := []uint64{1, 2, 3}
+		defer runtime.Close(ctx)
 
 		// Set up mock expectations
 		mockStream.EXPECT().SetReadDeadline(deadline).Return(nil)
 		// The echo WASM module will try to read from stdin
 		mockStream.EXPECT().Read(gomock.Any()).Return(0, io.EOF).AnyTimes()
 
-		// Test that poll function exists
+		// Test that poll function exists (for async mode)
 		pollFunc := proc.Module.ExportedFunction("poll")
 		assert.NotNil(t, pollFunc, "poll function should exist")
 
-		// Actually call the Poll method to trigger the mock expectations
-		err = proc.Poll(ctxWithDeadline, mockStream, stack)
+		// Actually call the ProcessMessage method to trigger the mock expectations
+		err = proc.ProcessMessage(ctxWithDeadline, mockStream)
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -277,7 +288,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockStream := mocks.NewMockStreamInterface(ctrl)
-		endpoint := system.NewEndpoint()
+		endpoint := system.ProcConfig{}.NewEndpoint()
 
 		// Create context with deadline
 		deadline := time.Now().Add(time.Hour)
@@ -288,13 +299,11 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 			Endpoint: endpoint,
 		}
 
-		stack := []uint64{1, 2, 3}
-
 		// Set up mock expectations
 		deadlineErr := errors.New("deadline error")
 		mockStream.EXPECT().SetReadDeadline(deadline).Return(deadlineErr)
 
-		err := proc.Poll(ctxWithDeadline, mockStream, stack)
+		err := proc.ProcessMessage(ctxWithDeadline, mockStream)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "set read deadline")
 		assert.Contains(t, err.Error(), "deadline error")
@@ -320,6 +329,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  noPollBytecode,
 			ErrWriter: &bytes.Buffer{},
+			Async:     true, // Use async mode for these tests
 		}
 
 		// This should fail to create the module due to invalid bytecode
@@ -330,6 +340,8 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 }
 
 func TestProc_StreamHandler_WithGomock(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	mockErrWriter := &bytes.Buffer{}
 
@@ -358,6 +370,7 @@ func TestProc_StreamHandler_WithGomock(t *testing.T) {
 		Runtime:   runtime,
 		Bytecode:  validBytecode,
 		ErrWriter: mockErrWriter,
+		Async:     true, // Use async mode for these tests
 	}
 
 	proc, err := config.New(ctx)
@@ -407,7 +420,9 @@ func TestProc_StreamHandler_WithGomock(t *testing.T) {
 }
 
 func TestNewEndpoint(t *testing.T) {
-	endpoint := system.NewEndpoint()
+	t.Parallel()
+
+	endpoint := system.ProcConfig{}.NewEndpoint()
 
 	assert.NotNil(t, endpoint)
 	assert.NotEmpty(t, endpoint.Name)
@@ -422,7 +437,9 @@ func TestNewEndpoint(t *testing.T) {
 }
 
 func TestEndpoint_String(t *testing.T) {
-	endpoint := system.NewEndpoint()
+	t.Parallel()
+
+	endpoint := system.ProcConfig{}.NewEndpoint()
 
 	result := endpoint.String()
 	expected := string(endpoint.Protocol())
@@ -433,7 +450,9 @@ func TestEndpoint_String(t *testing.T) {
 }
 
 func TestEndpoint_Protocol(t *testing.T) {
-	endpoint := system.NewEndpoint()
+	t.Parallel()
+
+	endpoint := system.ProcConfig{}.NewEndpoint()
 
 	protocol := endpoint.Protocol()
 
@@ -442,6 +461,8 @@ func TestEndpoint_Protocol(t *testing.T) {
 }
 
 func TestProcConfig_New_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	mockErrWriter := &bytes.Buffer{}
 
@@ -454,6 +475,7 @@ func TestProcConfig_New_ErrorHandling(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  []byte{},
 			ErrWriter: mockErrWriter,
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
@@ -470,6 +492,7 @@ func TestProcConfig_New_ErrorHandling(t *testing.T) {
 			Runtime:   runtime,
 			Bytecode:  nil,
 			ErrWriter: mockErrWriter,
+			Async:     true, // Use async mode for these tests
 		}
 
 		proc, err := config.New(ctx)
@@ -480,8 +503,8 @@ func TestProcConfig_New_ErrorHandling(t *testing.T) {
 
 func TestEndpoint_Concurrency(t *testing.T) {
 	// Test that multiple endpoints have different names
-	endpoint1 := system.NewEndpoint()
-	endpoint2 := system.NewEndpoint()
+	endpoint1 := system.ProcConfig{}.NewEndpoint()
+	endpoint2 := system.ProcConfig{}.NewEndpoint()
 
 	assert.NotEqual(t, endpoint1.Name, endpoint2.Name, "Endpoints should have unique names")
 	assert.NotEqual(t, endpoint1.String(), endpoint2.String(), "Endpoint strings should be different")
@@ -510,6 +533,7 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 		Runtime:   runtime,
 		Bytecode:  completeBytecode,
 		ErrWriter: &bytes.Buffer{},
+		Async:     true, // Use async mode for integration test
 	}
 
 	proc, err := config.New(ctx)
@@ -518,7 +542,7 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 	defer proc.Close(ctx)
 
 	// Test that all components are properly initialized
-	assert.NotNil(t, proc.Sys, "Sys should be initialized")
+	assert.NotNil(t, proc.Closer, "Closer should be initialized")
 	assert.NotNil(t, proc.Module, "Module should be initialized")
 	assert.NotNil(t, proc.Endpoint, "Endpoint should be initialized")
 	assert.NotEmpty(t, proc.Endpoint.Name, "Endpoint should have a name")
@@ -527,4 +551,269 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 	// Test that the poll function is exported
 	pollFunc := proc.Module.ExportedFunction("poll")
 	assert.NotNil(t, pollFunc, "poll function should be exported")
+}
+
+// TestEcho_Synchronous tests the echo example in synchronous mode
+// where main() is called directly and processes stdin to stdout
+func TestEcho_Synchronous(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// Create a libp2p host with in-process transport
+	host, err := libp2p.New(
+		libp2p.Transport(inproc.New()),
+	)
+	require.NoError(t, err)
+	defer host.Close()
+
+	// Create runtime and load echo WASM
+	runtime := wazero.NewRuntime(ctx)
+	defer runtime.Close(ctx)
+
+	bytecode := loadEchoWasm(t)
+
+	// Test input data
+	testInput := "Hello, World!\nThis is a test message.\n"
+	expectedOutput := testInput
+
+	// Create a pipe to simulate stdin/stdout
+	reader, writer := io.Pipe()
+
+	// Write test data to the writer end
+	go func() {
+		defer writer.Close()
+		writer.Write([]byte(testInput))
+	}()
+
+	// Create a buffer to capture output
+	var outputBuffer bytes.Buffer
+
+	// Compile the module first
+	cm, err := runtime.CompileModule(ctx, bytecode)
+	require.NoError(t, err)
+	defer cm.Close(ctx)
+
+	// Instantiate WASI
+	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, runtime)
+	require.NoError(t, err)
+	defer wasi.Close(ctx)
+
+	// Create a new module instance with the pipe as stdin/stdout
+	// In sync mode, _start runs automatically and processes stdin/stdout
+	mod, err := runtime.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
+		WithName("echo-sync-test").
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime().
+		WithStdin(reader).         // Use pipe reader as stdin
+		WithStdout(&outputBuffer). // Capture output
+		WithStderr(&bytes.Buffer{}))
+	require.NoError(t, err)
+	defer mod.Close(ctx)
+
+	// Wait for the pipe to be closed (indicating EOF)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify the output matches the input
+	output := outputBuffer.String()
+	assert.Equal(t, expectedOutput, output, "Echo should output exactly what was input")
+}
+
+// TestEcho_Asynchronous tests the echo example in asynchronous mode
+// where poll() is called with a stream and processes one complete message
+func TestEcho_Asynchronous(t *testing.T) {
+	// t.Parallel() // Temporarily disabled to debug runtime close issue
+	ctx := context.Background()
+
+	// Create a libp2p host with in-process transport
+	host, err := libp2p.New(
+		libp2p.Transport(inproc.New()),
+	)
+	require.NoError(t, err)
+	defer host.Close()
+
+	// Create runtime and load echo WASM
+	runtime := wazero.NewRuntime(ctx)
+	defer runtime.Close(ctx)
+
+	bytecode := loadEchoWasm(t)
+	config := system.ProcConfig{
+		Host:      host,
+		Runtime:   runtime,
+		Bytecode:  bytecode,
+		ErrWriter: &bytes.Buffer{},
+		Async:     true, // Async mode
+	}
+
+	proc, err := config.New(ctx)
+	require.NoError(t, err)
+	defer proc.Close(ctx)
+
+	// In async mode, _start is prevented from running automatically
+	// We'll call poll() for each message
+
+	// Test input data
+	testInput := "Hello, Async World!\nThis is an async test message.\n"
+	expectedOutput := testInput
+
+	// Create a mock stream using gomock
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockStream := mocks.NewMockStreamInterface(ctrl)
+	writeBuffer := &bytes.Buffer{}
+
+	// Set up expectations for the mock stream
+	// The echo module will read from stdin until EOF, then write to stdout
+	mockStream.EXPECT().
+		Read(gomock.Any()).
+		DoAndReturn(func(p []byte) (int, error) {
+			if len(testInput) == 0 {
+				return 0, io.EOF
+			}
+			n := copy(p, testInput)
+			testInput = testInput[n:]
+			return n, nil
+		}).
+		AnyTimes()
+
+	mockStream.EXPECT().
+		Write(gomock.Any()).
+		DoAndReturn(func(p []byte) (int, error) {
+			return writeBuffer.Write(p)
+		}).
+		AnyTimes()
+
+	mockStream.EXPECT().
+		Close().
+		Return(nil).
+		AnyTimes()
+
+	// Process message with the mock stream
+	// This should process one complete message (until EOF)
+	err = proc.ProcessMessage(ctx, mockStream)
+	require.NoError(t, err, "ProcessMessage should succeed")
+
+	// Verify the output matches the input
+	output := writeBuffer.String()
+	assert.Equal(t, expectedOutput, output, "Async echo should output exactly what was input")
+}
+
+// TestEcho_RepeatedAsync tests multiple asynchronous calls to verify
+// the pattern works consistently across multiple messages
+func TestEcho_RepeatedAsync(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// Create a libp2p host with in-process transport
+	host, err := libp2p.New(
+		libp2p.Transport(inproc.New()),
+	)
+	require.NoError(t, err)
+	defer host.Close()
+
+	bytecode := loadEchoWasm(t)
+
+	// Test multiple messages
+	testMessages := []string{
+		"Message 1: Hello World!\n",
+		"Message 2: This is a test.\n",
+		"Message 3: Multiple async calls.\n",
+		"Message 4: Each should be processed independently.\n",
+		"Message 5: One stream = one message.\n",
+	}
+
+	// Process each message with a separate poll call
+	for i, testInput := range testMessages {
+		t.Run(fmt.Sprintf("message_%d", i+1), func(t *testing.T) {
+			t.Parallel()
+
+			// Create a fresh runtime and proc for each sub-test
+			runtime := wazero.NewRuntime(ctx)
+			defer runtime.Close(ctx)
+
+			config := system.ProcConfig{
+				Host:      host,
+				Runtime:   runtime,
+				Bytecode:  bytecode,
+				ErrWriter: &bytes.Buffer{},
+				Async:     true, // Async mode
+			}
+
+			proc, err := config.New(ctx)
+			require.NoError(t, err)
+			defer proc.Close(ctx)
+
+			// Create a fresh mock stream for each message
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStream := mocks.NewMockStreamInterface(ctrl)
+			writeBuffer := &bytes.Buffer{}
+
+			// Create a local copy of testInput to avoid closure issues
+			localTestInput := testInput
+
+			// Set up expectations for the mock stream
+			mockStream.EXPECT().
+				Read(gomock.Any()).
+				DoAndReturn(func(p []byte) (int, error) {
+					if len(localTestInput) == 0 {
+						return 0, io.EOF
+					}
+					n := copy(p, localTestInput)
+					localTestInput = localTestInput[n:]
+					return n, nil
+				}).
+				AnyTimes()
+
+			mockStream.EXPECT().
+				Write(gomock.Any()).
+				DoAndReturn(func(p []byte) (int, error) {
+					return writeBuffer.Write(p)
+				}).
+				AnyTimes()
+
+			mockStream.EXPECT().
+				Close().
+				Return(nil).
+				AnyTimes()
+
+			// Process message with the mock stream
+			err = proc.ProcessMessage(ctx, mockStream)
+			require.NoError(t, err, "ProcessMessage should succeed for message %d", i+1)
+
+			// Verify the output matches the input
+			output := writeBuffer.String()
+			assert.Equal(t, testInput, output, "Message %d should be echoed correctly", i+1)
+		})
+	}
+}
+
+// TestEndpoint_NilReadWriteCloser tests that Endpoint handles nil ReadWriteCloser correctly
+func TestEndpoint_NilReadWriteCloser(t *testing.T) {
+	t.Parallel()
+
+	// Create an endpoint with nil ReadWriteCloser
+	endpoint := &system.Endpoint{
+		Name: "test-endpoint",
+		// ReadWriteCloser is nil
+	}
+
+	// Test Read returns EOF immediately
+	buf := make([]byte, 10)
+	n, err := endpoint.Read(buf)
+	assert.Equal(t, 0, n, "Read should return 0 bytes")
+	assert.Equal(t, io.EOF, err, "Read should return EOF")
+
+	// Test Write discards data
+	n, err = endpoint.Write([]byte("test data"))
+	assert.Equal(t, 9, n, "Write should return length of data")
+	assert.NoError(t, err, "Write should not return error")
+
+	// Test Close doesn't panic
+	err = endpoint.Close(context.Background())
+	assert.NoError(t, err, "Close should not return error")
 }
