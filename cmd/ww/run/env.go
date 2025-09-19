@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/path"
 	iface "github.com/ipfs/kubo/core/coreiface"
 	"github.com/libp2p/go-libp2p"
@@ -164,6 +165,27 @@ func (env *Env) Arch() string {
 		return arch
 	}
 	return runtime.GOARCH
+}
+
+// LoadIPFSFile resolves an IPFS path to WASM bytecode
+func (env *Env) LoadIPFSFile(ctx context.Context, p path.Path) (files.File, error) {
+	if env.IPFS == nil {
+		return nil, fmt.Errorf("IPFS environment not initialized")
+	}
+
+	// Get the file from IPFS
+	node, err := env.IPFS.Unixfs().Get(ctx, p)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get from IPFS: %w", err)
+	}
+
+	// Read the file content
+	file, ok := node.(files.File)
+	if !ok {
+		return nil, fmt.Errorf("IPFS path does not point to a file")
+	}
+
+	return file, nil
 }
 
 type HostConfig struct {
