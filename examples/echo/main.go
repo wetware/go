@@ -4,18 +4,31 @@ package main
 
 import (
 	"io"
-	"log/slog"
 	"os"
 )
 
-func main() {}
+// main is the entry point for synchronous mode.
+// It processes one complete message from stdin and exits.
+func main() {
+	// Echo: copy stdin to stdout using io.Copy
+	// io.Copy uses an internal 32KB buffer by default
+	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+		os.Stderr.WriteString("Error copying stdin to stdout: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	// Return 0 to indicate successful completion
+}
 
-// Echo function that can be called from the WASM module
+// poll is the async entry point for stream-based processing.
+// This function is called by the wetware runtime when a new stream
+// is established for this process.
 //
 //export poll
 func poll() {
-	var buf [512]byte
-	if n, err := io.CopyBuffer(os.Stdout, os.Stdin, buf[:]); err != nil {
-		slog.Error("failed to copy", "reason", err, "written", n)
+	// In async mode, we process each incoming stream
+	// This is the same logic as main() but for individual streams
+	if _, err := io.Copy(os.Stdout, os.Stdin); err != nil {
+		os.Stderr.WriteString("Error in poll: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 }
