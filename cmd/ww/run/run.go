@@ -95,6 +95,7 @@ func Main(c *cli.Context) error {
 		Host:      env.Host,
 		Runtime:   runtime,
 		Bytecode:  bytecode,
+		Env:       c.StringSlice("env"),
 		ErrWriter: c.App.ErrWriter,
 	}.New(ctx)
 	if err != nil && !errors.Is(err, sys.Errno(0)) {

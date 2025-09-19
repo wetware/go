@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -22,6 +23,7 @@ type ProcConfig struct {
 	Host      host.Host
 	Runtime   wazero.Runtime
 	Bytecode  []byte
+	Env       []string
 	ErrWriter io.Writer
 	Async     bool // If true, use WithStartFunctions() and set up stream handler
 }
@@ -53,9 +55,6 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	// Configure module instantiation based on async mode
 	config := wazero.NewModuleConfig().
 		WithName(e.String()).
-		WithSysNanosleep().
-		WithSysNanotime().
-		WithSysWalltime().
 		WithStdin(e).
 		WithStdout(e).
 		WithStderr(c.ErrWriter)
@@ -92,6 +91,26 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 		Endpoint: e,
 		Closer:   cs}
 	return proc, nil
+}
+
+func (c ProcConfig) NewModuleConfig(endpoint interface {
+	String() string
+	io.ReadWriter
+}) wazero.ModuleConfig {
+	config := wazero.NewModuleConfig().
+		WithName(endpoint.String()).
+		WithStdin(endpoint).
+		WithStdout(endpoint).
+		WithStderr(c.ErrWriter)
+
+	// Add environment variables
+	for _, env := range c.Env {
+		if k, v, ok := strings.Cut(env, "="); ok {
+			config = config.WithEnv(k, v)
+		}
+	}
+
+	return config
 }
 
 func (p ProcConfig) NewEndpoint() *Endpoint {
