@@ -218,21 +218,3 @@ func (cs CloserSlice) Close(ctx context.Context) error {
 	}
 	return multierr.Combine(errs...)
 }
-
-// syncIO implements io.ReadWriteCloser for sync mode
-type syncIO struct {
-	stdin  io.Reader
-	stdout io.Writer
-}
-
-func (s *syncIO) Read(p []byte) (n int, err error) {
-	return s.stdin.Read(p)
-}
-
-func (s *syncIO) Write(p []byte) (n int, err error) {
-	return s.stdout.Write(p)
-}
-
-func (s *syncIO) Close() error {
-	return nil
-}
