@@ -3,8 +3,6 @@ module github.com/wetware/go
 go 1.24
 
 require (
-	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
-	github.com/chzyer/readline v1.5.1
 	github.com/ipfs/boxo v0.28.0
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.43.0
@@ -12,7 +10,6 @@ require (
 	github.com/lthibault/go-libp2p-inproc-transport v0.4.1
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.16.0
-	github.com/spy16/slurp v0.3.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.9.0
 	github.com/urfave/cli/v2 v2.27.5
@@ -27,7 +24,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20241020182519-7843d2ba8fdf // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
