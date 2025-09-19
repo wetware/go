@@ -2,23 +2,26 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
-	os_exec "os/exec"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
-	"capnproto.org/go/capnp/v3/rpc"
+	"github.com/ipfs/boxo/files"
+	"github.com/ipfs/boxo/path"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
-	"github.com/wetware/go/cmd/ww/args"
 	"github.com/wetware/go/system"
 )
 
 var env Env
-
-const protocol = "/ww/0.1.0"
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -32,20 +35,11 @@ func Command() *cli.Command {
 				EnvVars: []string{"WW_IPFS"},
 				Value:   "/dns4/localhost/tcp/5001/http",
 			},
-			&cli.StringSliceFlag{
-				Name:    "env",
-				EnvVars: []string{"WW_ENV"},
-			},
 			&cli.IntFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
 				EnvVars: []string{"WW_PORT"},
 				Value:   2020,
-			},
-			&cli.StringSliceFlag{
-				Name:     "with-fd",
-				Category: "FILE DESCRIPTORS",
-				Usage:    "map existing parent fd to name (e.g., db=3). Use --with-fd multiple times for multiple fds.",
 			},
 			&cli.BoolFlag{
 				Name:    "wasm-debug",
@@ -61,7 +55,7 @@ func Command() *cli.Command {
 				NS:   c.String("ns"),
 				IPFS: c.String("ipfs"),
 				Port: c.Int("port"),
-				MDNS: c.Bool("with-mdns") || c.Bool("with-all"),
+				MDNS: c.Bool("mdns"),
 			}.New()
 			return
 		},
@@ -79,100 +73,125 @@ func Main(c *cli.Context) error {
 	ctx, cancel := context.WithCancel(c.Context)
 	defer cancel()
 
-	// Set up the RPC socket for the cell
-	////
-	host, guest, err := system.SocketConfig[system.Terminal]{
-		BootstrapClient: system.TerminalConfig{
-			Exec: exec(c),
-		}.New(),
+	// Get the binary path from arguments
+	binaryPath := c.Args().First()
+	if binaryPath == "" {
+		return fmt.Errorf("no binary specified")
+	}
+
+	// Resolve the binary path to WASM bytecode
+	bytecode, err := resolveBinary(ctx, binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve binary %s: %w", binaryPath, err)
+	}
+
+	// Create wazero runtime
+	runtime := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().
+		WithDebugInfoEnabled(c.Bool("wasm-debug")).
+		WithCloseOnContextDone(true))
+	defer runtime.Close(ctx)
+
+	p, err := system.ProcConfig{
+		Host:      env.Host,
+		Runtime:   runtime,
+		Bytecode:  bytecode,
+		ErrWriter: c.App.ErrWriter,
 	}.New(ctx)
-	if err != nil {
+	if err != nil && !errors.Is(err, sys.Errno(0)) {
 		return err
 	}
-	defer host.Close()
-	defer guest.Close()
+	defer p.Close(ctx)
 
-	// Check if first arg is an IPFS path and prepare name for CommandContext
-	name, err := env.ResolveExecPath(ctx, c.Args().First())
-	if err != nil {
-		return err
+	if !p.Config.Async {
+		return nil
 	}
 
-	// Fetch or create the arguments for the guest process.
-	guestArgs, ok := c.Context.Value(args.GuestArgs).([]string)
-	if !ok {
-		guestArgs = []string{}
-	}
-
-	// Set up file descriptor management
-	////
-	fdManager, err := NewFDManager(c.StringSlice("with-fd"))
-	if err != nil {
-		return fmt.Errorf("file descriptor setup failed: %w", err)
-	}
-	defer fdManager.Close()
-
-	// Run target in jailed subprocess
-	////
-	cmd := os_exec.CommandContext(ctx, name, guestArgs...)
-	cmd.Dir = env.Dir
-
-	// Combine environment variables: base env + --env flags + FD mappings
-	baseEnv := c.StringSlice("env")
-	fdEnvVars := fdManager.GenerateEnvVars()
-	cmd.Env = append(baseEnv, fdEnvVars...)
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = sysProcAttr(env.Dir)
-
-	// Set up ExtraFiles: RPC socket first, then user FDs
-	extraFiles := []*os.File{guest}
-	userFiles, err := fdManager.PrepareFDs()
-	if err != nil {
-		return err
-	}
-	cmd.ExtraFiles = append(extraFiles, userFiles...)
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	defer cmd.Cancel()
-
-	// Set up libp2p protocol handler
-	////
-	env.Host.SetStreamHandler(protocol, func(s network.Stream) {
+	env.Host.SetStreamHandler(p.Endpoint.Protocol(), func(s network.Stream) {
 		defer s.Close()
-
-		conn := rpc.NewConn(rpc.NewPackedStreamTransport(s), &rpc.Options{
-			BaseContext:     func() context.Context { return ctx },
-			BootstrapClient: host.Bootstrap(ctx), // cell-provided capability
-		})
-		defer conn.Close()
-
-		select {
-		case <-ctx.Done():
-		case <-conn.Done():
+		if err := p.Poll(ctx, s, nil); err != nil {
+			slog.ErrorContext(ctx, "failed to poll process",
+				"id", p.ID(),
+				"stream", s.ID(),
+				"reason", err)
 		}
 	})
-	defer env.Host.RemoveStreamHandler(protocol)
+	defer env.Host.RemoveStreamHandler(p.Endpoint.Protocol())
 
-	return cmd.Wait()
+	<-ctx.Done()
+	return ctx.Err()
 }
 
-func exec(c *cli.Context) system.Executor {
-	if !c.Bool("with-exec") && !c.Bool("with-all") {
-		slog.DebugContext(c.Context, "returning null executor client",
-			"--with-exec", c.Bool("with-exec"),
-			"--with-all", c.Bool("with-all"))
-		return system.Executor{} // null client
+// resolveBinary resolves a binary path to WASM bytecode
+func resolveBinary(ctx context.Context, path string) ([]byte, error) {
+	// Check if it's an IPFS/IPLD/IPNS path
+	if isIPFSPath(path) {
+		return resolveIPFSPath(ctx, path)
 	}
 
-	return system.ExecutorConfig{
-		Host: env.Host,
-		Runtime: wazero.NewRuntimeConfig().
-			WithDebugInfoEnabled(c.Bool("wasm-debug")).
-			WithCloseOnContextDone(true),
-	}.New(c.Context)
+	// Check if it's an absolute path
+	if filepath.IsAbs(path) {
+		return os.ReadFile(path)
+	}
+
+	// Check if it's a relative path (starts with . or /)
+	if len(path) > 0 && (path[0] == '.' || path[0] == '/') {
+		return os.ReadFile(path)
+	}
+
+	// Check if it's in $PATH
+	if resolvedPath, err := exec.LookPath(path); err == nil {
+		return os.ReadFile(resolvedPath)
+	}
+
+	// Try as a relative path in current directory
+	if _, err := os.Stat(path); err == nil {
+		return os.ReadFile(path)
+	}
+
+	return nil, fmt.Errorf("binary not found: %s", path)
+}
+
+// isIPFSPath checks if the path is an IPFS/IPLD/IPNS path
+func isIPFSPath(path string) bool {
+	return len(path) > 5 && (path[:5] == "/ipfs" || path[:5] == "/ipld" || path[:5] == "/ipns")
+}
+
+// resolveIPFSPath resolves an IPFS path to WASM bytecode
+func resolveIPFSPath(ctx context.Context, pathStr string) ([]byte, error) {
+	if env.IPFS == nil {
+		return nil, fmt.Errorf("IPFS environment not initialized")
+	}
+
+	// Parse the IPFS path
+	ipfsPath, err := path.NewPath(pathStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid IPFS path: %w", err)
+	}
+
+	// Get the file from IPFS
+	node, err := env.IPFS.Unixfs().Get(ctx, ipfsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get from IPFS: %w", err)
+	}
+
+	// Read the file content
+	file, ok := node.(files.File)
+	if !ok {
+		return nil, fmt.Errorf("IPFS path does not point to a file")
+	}
+
+	return io.ReadAll(file)
+}
+
+func withEnv(c *cli.Context, config wazero.ModuleConfig) wazero.ModuleConfig {
+	for _, s := range c.StringSlice("env") {
+		if envvar := strings.SplitN(s, "=", 2); len(envvar[0]) == 0 || len(envvar[1]) == 0 {
+			slog.WarnContext(c.Context, "invalid env string",
+				"env", s)
+			continue
+		} else {
+			config = config.WithEnv(envvar[0], envvar[1])
+		}
+	}
+	return config
 }

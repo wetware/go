@@ -56,6 +56,7 @@ func (cfg EnvConfig) New() (env Env, err error) {
 	// Initialize libp2p host
 	////
 	env.Host, err = HostConfig{
+		NS:   cfg.NS,
 		IPFS: env.IPFS,
 		Port: cfg.Port,
 	}.New()
