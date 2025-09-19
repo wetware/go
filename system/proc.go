@@ -2,17 +2,20 @@ package system
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
-	"log/slog"
-	"runtime"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/mr-tron/base58"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/sys"
 	"go.uber.org/multierr"
+	"golang.org/x/sync/semaphore"
 )
 
 type ProcConfig struct {
@@ -20,96 +23,152 @@ type ProcConfig struct {
 	Runtime   wazero.Runtime
 	Bytecode  []byte
 	ErrWriter io.Writer
+	Async     bool // If true, use WithStartFunctions() and set up stream handler
 }
 
 func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	var ok = false
+	var cs CloserSlice
+	defer func() {
+		if !ok {
+			cs.Close(ctx)
+		}
+	}()
+
 	cm, err := c.Runtime.CompileModule(ctx, c.Bytecode)
 	if err != nil {
 		return nil, err
 	}
+	cs = append(cs, cm)
 
-	sys, err := wasi_snapshot_preview1.Instantiate(ctx, c.Runtime)
+	wasi, err := wasi_snapshot_preview1.Instantiate(ctx, c.Runtime)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if !ok {
-			sys.Close(ctx)
-		}
-	}()
+	cs = append(cs, wasi)
 
-	e := NewEndpoint()
-	mod, err := c.Runtime.InstantiateModule(ctx, cm, wazero.NewModuleConfig().
+	e := c.NewEndpoint()
+	cs = append(cs, e)
+
+	// Configure module instantiation based on async mode
+	config := wazero.NewModuleConfig().
 		WithName(e.String()).
 		WithSysNanosleep().
 		WithSysNanotime().
 		WithSysWalltime().
 		WithStdin(e).
 		WithStdout(e).
-		WithStderr(c.ErrWriter).
-		WithStartFunctions())
-	if err != nil {
-		return nil, err
+		WithStderr(c.ErrWriter)
+
+	// In async mode, prevent _start from running automatically
+	if c.Async {
+		config = config.WithStartFunctions()
 	}
-	defer func() {
-		if !ok {
-			e.Close()
-		}
-	}()
 
-	proc := &Proc{
-		Sys:      sys,
-		Module:   mod,
-		Endpoint: e}
-	c.Host.SetStreamHandler(e.Protocol(), func(s network.Stream) {
-		defer s.Close()
-
-		if err := proc.Poll(ctx, s, nil); err != nil {
-			slog.ErrorContext(ctx, "failed to poll process", "reason", err)
-			return
+	mod, err := c.Runtime.InstantiateModule(ctx, cm, config)
+	if err != nil {
+		// Check if the error is sys.ExitError with exit code 0 which indicates success
+		var exitErr *sys.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 0 {
+			// Exit code 0 means success, so we can continue
+			err = nil
+		} else {
+			return nil, err
 		}
-	})
-	runtime.SetFinalizer(proc, func(p *Proc) {
-		c.Host.RemoveStreamHandler(e.Protocol())
-	})
+	}
+
+	// Check if module is closed after instantiation
+	if mod.IsClosed() {
+		return nil, fmt.Errorf("module closed immediately after instantiation")
+	}
+	cs = append(cs, mod)
+
+	// Mark proc as initialized and optionally bind stream handler.
+	////
 	ok = true
+	proc := &Proc{
+		Config:   c,
+		Module:   mod,
+		Endpoint: e,
+		Closer:   cs}
 	return proc, nil
 }
 
+func (p ProcConfig) NewEndpoint() *Endpoint {
+	var buf [8]byte
+	if _, err := io.ReadFull(rand.Reader, buf[:]); err != nil {
+		panic(err)
+	}
+
+	return &Endpoint{
+		Name: base58.FastBase58Encoding(buf[:]),
+		sem:  semaphore.NewWeighted(1),
+	}
+}
+
 type Proc struct {
-	Sys      api.Closer
+	Config   ProcConfig
 	Endpoint *Endpoint
 	Module   api.Module
+	api.Closer
 }
 
 // ID returns the process identifier (endpoint name) without the protocol prefix.
-func (p *Proc) ID() string {
+func (p Proc) ID() string {
 	return p.Endpoint.Name
 }
 
-func (p *Proc) Close(ctx context.Context) error {
-	return multierr.Combine(
-		p.Endpoint.Close(),
-		p.Module.Close(ctx),
-		p.Sys.Close(ctx))
-}
-
-func (p Proc) Poll(ctx context.Context, s network.Stream, stack []uint64) error {
+// ProcessMessage processes one complete message synchronously.
+// In sync mode: lets _start run automatically and process one message
+// In async mode: calls the poll export function
+func (p Proc) ProcessMessage(ctx context.Context, s network.Stream) error {
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := s.SetReadDeadline(deadline); err != nil {
 			return fmt.Errorf("set read deadline: %w", err)
 		}
 	}
 
+	// Check if module is closed before we start
+	if p.Module.IsClosed() {
+		return fmt.Errorf("%s::ProcessMessage: module closed", p.ID())
+	}
+
+	// Set the stream as the endpoint's ReadWriteCloser for this message
+	// The Endpoint's Read/Write methods will delegate to the stream
 	p.Endpoint.ReadWriteCloser = s
 	defer func() {
+		// Reset to nil after processing this message
 		p.Endpoint.ReadWriteCloser = nil
 	}()
 
-	if poll := p.Module.ExportedFunction("poll"); poll == nil {
-		return fmt.Errorf("%s::poll: not found", p)
-	} else {
-		return poll.CallWithStack(ctx, stack)
+	// In async mode, call the poll export function
+	if p.Config.Async {
+		if poll := p.Module.ExportedFunction("poll"); poll == nil {
+			return fmt.Errorf("%s::poll: not found", p.ID())
+		} else if err := poll.CallWithStack(ctx, nil); err != nil {
+			var exitErr *sys.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() != 0 {
+				return fmt.Errorf("%s::poll: %w", p.ID(), err)
+			}
+			// If it's ExitError with code 0, treat as success
+		}
 	}
+	// In sync mode, _start already ran during module instantiation
+
+	return nil
+}
+
+// Poll is an alias for ProcessMessage for backward compatibility
+func (p Proc) Poll(ctx context.Context, s network.Stream, stack []uint64) error {
+	return p.ProcessMessage(ctx, s)
+}
+
+type CloserSlice []api.Closer
+
+func (cs CloserSlice) Close(ctx context.Context) error {
+	var errs []error
+	for _, c := range cs {
+		errs = append(errs, c.Close(ctx))
+	}
+	return multierr.Combine(errs...)
 }
