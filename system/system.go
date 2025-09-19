@@ -33,10 +33,9 @@ func (e *Endpoint) Write(p []byte) (n int, err error) {
 	return e.ReadWriteCloser.Write(p)
 }
 
-// String returns the full protocol identifier including the /ww/0.1.0/ prefix.
+// String returns the endpoint name without the protocol prefix.
 func (e Endpoint) String() string {
-	proto := e.Protocol()
-	return string(proto)
+	return e.Name
 }
 
 // Protocol returns the libp2p protocol ID for this endpoint.
