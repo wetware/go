@@ -442,11 +442,10 @@ func TestEndpoint_String(t *testing.T) {
 	endpoint := system.ProcConfig{}.NewEndpoint()
 
 	result := endpoint.String()
-	expected := string(endpoint.Protocol())
+	expected := endpoint.Name
 
 	assert.Equal(t, expected, result)
-	assert.Contains(t, result, "/ww/0.1.0/")
-	assert.Contains(t, result, endpoint.Name)
+	assert.Equal(t, endpoint.Name, result)
 }
 
 func TestEndpoint_Protocol(t *testing.T) {
