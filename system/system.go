@@ -11,9 +11,6 @@ import (
 type Endpoint struct {
 	Name string
 	io.ReadWriteCloser
-	Host interface {
-		RemoveStreamHandler(protocol.ID)
-	}
 	sem *semaphore.Weighted
 }
 
@@ -48,9 +45,6 @@ func (e Endpoint) Protocol() protocol.ID {
 }
 
 func (e *Endpoint) Close(context.Context) (err error) {
-	if e.Host != nil {
-		e.Host.RemoveStreamHandler(e.Protocol())
-	}
 	if e.ReadWriteCloser != nil {
 		err = e.ReadWriteCloser.Close()
 	}
