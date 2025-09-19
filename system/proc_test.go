@@ -66,7 +66,7 @@ func TestProcConfig_New(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  validBytecode,
+			Src:       io.NopCloser(bytes.NewReader(validBytecode)),
 			ErrWriter: mockErrWriter,
 			Async:     true, // Use async mode for these tests
 		}
@@ -100,7 +100,7 @@ func TestProcConfig_New(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  []byte("invalid wasm bytecode"),
+			Src:       io.NopCloser(bytes.NewReader([]byte("invalid wasm bytecode"))),
 			ErrWriter: mockErrWriter,
 			Async:     true, // Use async mode for these tests
 		}
@@ -121,7 +121,7 @@ func TestProcConfig_New(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   nil,
-			Bytecode:  []byte{},
+			Src:       io.NopCloser(bytes.NewReader([]byte{})),
 			ErrWriter: mockErrWriter,
 			Async:     true, // Use async mode for these tests
 		}
@@ -168,7 +168,7 @@ func TestProc_Close(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  validBytecode,
+			Src:       io.NopCloser(bytes.NewReader(validBytecode)),
 			ErrWriter: &bytes.Buffer{},
 			Async:     true, // Use async mode for these tests
 		}
@@ -207,7 +207,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  validBytecode,
+			Src:       io.NopCloser(bytes.NewReader(validBytecode)),
 			ErrWriter: &bytes.Buffer{},
 			Async:     true, // Use async mode for these tests
 		}
@@ -257,7 +257,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  validBytecode,
+			Src:       io.NopCloser(bytes.NewReader(validBytecode)),
 			ErrWriter: &bytes.Buffer{},
 			Async:     true, // Use async mode for these tests
 		}
@@ -327,7 +327,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		configNoPoll := system.ProcConfig{
 			Host:      host,
 			Runtime:   runtime,
-			Bytecode:  noPollBytecode,
+			Src:       io.NopCloser(bytes.NewReader(noPollBytecode)),
 			ErrWriter: &bytes.Buffer{},
 			Async:     true, // Use async mode for these tests
 		}
@@ -368,7 +368,7 @@ func TestProc_StreamHandler_WithGomock(t *testing.T) {
 	config := system.ProcConfig{
 		Host:      host,
 		Runtime:   runtime,
-		Bytecode:  validBytecode,
+		Src:       io.NopCloser(bytes.NewReader(validBytecode)),
 		ErrWriter: mockErrWriter,
 		Async:     true, // Use async mode for these tests
 	}
@@ -472,7 +472,7 @@ func TestProcConfig_New_ErrorHandling(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      nil,
 			Runtime:   runtime,
-			Bytecode:  []byte{},
+			Src:       io.NopCloser(bytes.NewReader([]byte{})),
 			ErrWriter: mockErrWriter,
 			Async:     true, // Use async mode for these tests
 		}
@@ -489,7 +489,7 @@ func TestProcConfig_New_ErrorHandling(t *testing.T) {
 		config := system.ProcConfig{
 			Host:      nil,
 			Runtime:   runtime,
-			Bytecode:  nil,
+			Src:       nil,
 			ErrWriter: mockErrWriter,
 			Async:     true, // Use async mode for these tests
 		}
@@ -530,7 +530,7 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 	config := system.ProcConfig{
 		Host:      host,
 		Runtime:   runtime,
-		Bytecode:  completeBytecode,
+		Src:       io.NopCloser(bytes.NewReader(completeBytecode)),
 		ErrWriter: &bytes.Buffer{},
 		Async:     true, // Use async mode for integration test
 	}
@@ -640,7 +640,7 @@ func TestEcho_Asynchronous(t *testing.T) {
 	config := system.ProcConfig{
 		Host:      host,
 		Runtime:   runtime,
-		Bytecode:  bytecode,
+		Src:       io.NopCloser(bytes.NewReader(bytecode)),
 		ErrWriter: &bytes.Buffer{},
 		Async:     true, // Async mode
 	}
@@ -736,7 +736,7 @@ func TestEcho_RepeatedAsync(t *testing.T) {
 			config := system.ProcConfig{
 				Host:      host,
 				Runtime:   runtime,
-				Bytecode:  bytecode,
+				Src:       io.NopCloser(bytes.NewReader(bytecode)),
 				ErrWriter: &bytes.Buffer{},
 				Async:     true, // Async mode
 			}
