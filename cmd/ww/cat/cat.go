@@ -2,63 +2,68 @@ package cat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/mr-tron/base58"
 	"github.com/urfave/cli/v2"
-	"github.com/wetware/go/util"
+	"github.com/wetware/go/cmd/internal/flags"
 )
-
-var env util.IPFSEnv
 
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
-		Usage:     "connect stdin/stdout to a remote peer's stream via IPFS",
-		ArgsUsage: "<peer-id> <endpoint>",
-		Flags: []cli.Flag{
+		ArgsUsage: "<peer> <proc>",
+		Usage:     "Connect to a peer and execute a procedure over a stream",
+		Description: `Connect to a specified peer and execute a procedure over a custom protocol stream.
+The command will:
+1. Initialize IPFS environment for stream forwarding
+2. Use IPFS to establish connection to the specified peer
+3. Forward the stream using the /ww/0.1.0/<proc> protocol
+4. Bind the stream to stdin/stdout for communication
+
+Examples:
+  ww cat QmPeer123 /echo
+  ww cat 12D3KooW... /myproc`,
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
 				Value:   "/dns4/localhost/tcp/5001/http",
+				Usage:   "IPFS API endpoint",
 			},
-		},
+			&cli.DurationFlag{
+				Name:    "timeout",
+				EnvVars: []string{"WW_TIMEOUT"},
+				Value:   30 * time.Second,
+				Usage:   "Connection timeout",
+			},
+		}, flags.CapabilityFlags()...),
 
-		// Environment hooks
-		Before: func(c *cli.Context) (err error) {
-			err = env.Boot(c.String("ipfs"))
-			return
-		},
-		After: func(c *cli.Context) (err error) {
-			err = env.Close()
-			return
-		},
-
-		// Main
-		////
 		Action: Main,
 	}
 }
 
 func Main(c *cli.Context) error {
-	ctx, cancel := context.WithCancel(c.Context)
+	ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
 	defer cancel()
 
-	// Get arguments
-	args := c.Args().Slice()
-	if len(args) != 2 {
-		return fmt.Errorf("usage: ww cat <peer-id> <endpoint>")
+	if c.NArg() != 2 {
+		return cli.Exit("cat requires exactly two arguments: <peer> <proc>", 1)
 	}
 
-	peerIDStr := args[0]
-	endpointStr := args[1]
+	peerIDStr := c.Args().Get(0)
+	procName := c.Args().Get(1)
 
 	// Parse peer ID
 	peerID, err := peer.Decode(peerIDStr)
@@ -66,89 +71,104 @@ func Main(c *cli.Context) error {
 		return fmt.Errorf("invalid peer ID %s: %w", peerIDStr, err)
 	}
 
-	// Validate base58 endpoint (but use it as-is)
-	_, err = base58.FastBase58Decoding(endpointStr)
+	// Construct protocol ID
+	protocolID := protocol.ID("/ww/0.1.0/" + procName)
+
+	// Create libp2p host in client mode
+	h, err := libp2p.New(libp2p.NoListenAddrs)
 	if err != nil {
-		return fmt.Errorf("invalid endpoint %s: %w", endpointStr, err)
+		return fmt.Errorf("failed to create host: %w", err)
 	}
+	defer h.Close()
 
-	// Create the full protocol ID
-	protocolID := protocol.ID("/ww/0.1.0/" + endpointStr)
-
-	slog.InfoContext(ctx, "connecting to peer via IPFS",
-		"peer", peerID,
-		"endpoint", endpointStr,
-		"protocol", string(protocolID))
-
-	// Create a minimal libp2p host for client-only connection
-	host, err := libp2p.New(
-		libp2p.NoListenAddrs, // Don't listen, just connect
+	// Set up DHT in client mode
+	dht, err := dual.New(
+		ctx,
+		h,
+		dual.DHTOption(
+			dht.Mode(dht.ModeClient), // Client mode
+		),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create libp2p host: %w", err)
+		return fmt.Errorf("failed to create DHT: %w", err)
 	}
-	defer host.Close()
+	defer dht.Close()
 
-	slog.InfoContext(ctx, "created client host", "peer-id", host.ID())
+	// Bootstrap DHT
+	if err := dht.Bootstrap(ctx); err != nil {
+		slog.WarnContext(ctx, "failed to bootstrap DHT", "error", err)
+	}
 
-	// For now, we'll assume the remote peer is listening on localhost:2020
-	// In a real scenario, this would come from IPFS peer discovery or manual configuration
-	remoteAddr := "/ip4/127.0.0.1/tcp/2020"
-
-	slog.InfoContext(ctx, "connecting to remote peer", "address", remoteAddr)
-
-	// Parse the multiaddr and connect
-	addrInfo, err := peer.AddrInfoFromString(remoteAddr + "/p2p/" + peerIDStr)
+	// Find peer addresses using DHT
+	peerInfo, err := dht.FindPeer(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("invalid peer address: %w", err)
+		return fmt.Errorf("failed to find peer %s: %w", peerID, err)
 	}
 
-	// Connect to the peer
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	if err := host.Connect(ctx, *addrInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer: %w", err)
+	// Connect to peer
+	if err := h.Connect(ctx, peerInfo); err != nil {
+		return fmt.Errorf("failed to connect to peer %s: %w", peerID, err)
 	}
 
-	slog.InfoContext(ctx, "connected to remote peer")
-
-	// Open a stream to the remote peer
-	stream, err := host.NewStream(ctx, peerID, protocolID)
+	// Open stream to peer
+	stream, err := h.NewStream(ctx, peerID, protocolID)
 	if err != nil {
-		return fmt.Errorf("failed to open stream: %w", err)
+		return fmt.Errorf("failed to open stream to peer %s: %w", peerID, err)
 	}
 	defer stream.Close()
 
-	slog.InfoContext(ctx, "stream opened successfully", "stream-id", stream.ID())
+	// Display connection banner
+	fmt.Printf("⚗️  Wetware Stream Connected\n")
+	fmt.Printf("   Peer: %s...\n", peerID.String()[:12])
+	fmt.Printf("   Endpoint: %s\n", protocolID)
+	fmt.Printf("   Ctrl+C to exit\n\n")
 
-	// Set up bidirectional copying
-	done := make(chan error, 2)
+	// Bind stream to stdin/stdout
+	return bindStreamToStdio(ctx, stream)
+}
 
-	// Copy from local stdin to remote stream
+func bindStreamToStdio(ctx context.Context, stream network.Stream) error {
+	// Copy data between stream and stdin/stdout
+	readDone := make(chan error, 1)
+	writeDone := make(chan error, 1)
+
+	// Copy from stream to stdout
 	go func() {
-		defer stream.CloseWrite()
-		_, err := io.Copy(stream, os.Stdin)
-		done <- err
-	}()
-
-	// Copy from remote stream to local stdout
-	go func() {
-		defer stream.CloseRead()
 		_, err := io.Copy(os.Stdout, stream)
-		done <- err
+		readDone <- err
 	}()
 
-	// Wait for either direction to complete
-	select {
-	case err := <-done:
-		if err != nil {
-			slog.ErrorContext(ctx, "stream error", "error", err)
+	// Copy from stdin to stream
+	go func() {
+		_, err := io.Copy(stream, os.Stdin)
+		writeDone <- err
+	}()
+
+	// Wait for stdin to close (Ctrl+D)
+	err := <-writeDone
+	if err != nil && err != io.EOF {
+		// Check if it's a broken pipe error (expected when stdin closes)
+		if !errors.Is(err, syscall.EPIPE) {
 			return err
 		}
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 
-	return nil
+	// Close the write end to signal EOF to remote peer
+	// This will trigger the echo server to respond and then close
+	stream.CloseWrite()
+
+	// Wait for BOTH streams to finish (linger behavior)
+	// Don't exit until both the write and read directions are complete
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-readDone:
+		// Check if this is a graceful closure (EOF) or an error
+		if err == nil || errors.Is(err, io.EOF) {
+			// Graceful closure - this is expected
+			return nil
+		}
+		// Any other error should be reported
+		return err
+	}
 }

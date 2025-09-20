@@ -6,6 +6,7 @@ require (
 	github.com/ipfs/boxo v0.28.0
 	github.com/ipfs/kubo v0.31.0
 	github.com/libp2p/go-libp2p v0.43.0
+	github.com/libp2p/go-libp2p-kad-dht v0.29.0
 	github.com/lmittmann/tint v1.0.4
 	github.com/lthibault/go-libp2p-inproc-transport v0.4.1
 	github.com/mr-tron/base58 v1.2.0
@@ -19,6 +20,7 @@ require (
 )
 
 require (
+	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -73,7 +75,6 @@ require (
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
-	github.com/libp2p/go-libp2p-kad-dht v0.29.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.6.4 // indirect
 	github.com/libp2p/go-libp2p-record v0.3.1 // indirect
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4 // indirect
