@@ -115,15 +115,15 @@ func Main(c *cli.Context) error {
 
 	// Log connection information for async mode
 	slog.InfoContext(ctx, "process started in async mode",
-		"peer-id", env.Host.ID(),
+		"peer", env.Host.ID(),
 		"endpoint", p.Endpoint.Name,
 		"protocol", string(p.Endpoint.Protocol()),
 		"addresses", env.Host.Addrs())
 
 	env.Host.SetStreamHandler(p.Endpoint.Protocol(), func(s network.Stream) {
-		defer s.Close()
+		defer s.CloseRead()
 		slog.InfoContext(ctx, "stream connected",
-			"peer-id", s.Conn().RemotePeer(),
+			"peer", s.Conn().RemotePeer(),
 			"stream-id", s.ID(),
 			"endpoint", p.Endpoint.Name)
 		if err := p.Poll(ctx, s, nil); err != nil {
