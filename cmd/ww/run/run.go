@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 
 	"github.com/ipfs/boxo/path"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/urfave/cli/v2"
@@ -31,7 +33,7 @@ func Command() *cli.Command {
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
-				Value:   "/dns4/localhost/tcp/5001/http",
+				Value:   "/ip4/127.0.0.1/tcp/5001/http",
 			},
 			&cli.IntFlag{
 				Name:    "port",
@@ -55,11 +57,9 @@ func Command() *cli.Command {
 		////
 		Before: func(c *cli.Context) (err error) {
 			env, err = EnvConfig{
-				NS:   c.String("ns"),
 				IPFS: c.String("ipfs"),
 				Port: c.Int("port"),
-				MDNS: c.Bool("mdns"),
-			}.New()
+			}.New(c.Context)
 			return
 		},
 		After: func(c *cli.Context) error {
@@ -113,12 +113,26 @@ func Main(c *cli.Context) error {
 		return nil
 	}
 
+	sub, err := env.Host.EventBus().Subscribe([]any{
+		new(event.EvtPeerIdentificationCompleted),
+		new(event.EvtPeerIdentificationFailed),
+		new(event.EvtAutoRelayAddrsUpdated),
+		new(event.EvtHostReachableAddrsChanged),
+		new(event.EvtLocalReachabilityChanged),
+		new(event.EvtPeerProtocolsUpdated),
+		new(event.EvtLocalProtocolsUpdated),
+		new(event.EvtPeerConnectednessChanged),
+		new(event.EvtNATDeviceTypeChanged),
+		new(event.EvtLocalAddressesUpdated)})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to event loop: %w", err)
+	}
+	defer sub.Close()
+
 	// Log connection information for async mode
 	slog.InfoContext(ctx, "process started in async mode",
 		"peer", env.Host.ID(),
-		"endpoint", p.Endpoint.Name,
-		"protocol", string(p.Endpoint.Protocol()),
-		"addresses", env.Host.Addrs())
+		"endpoint", p.Endpoint.Name)
 
 	env.Host.SetStreamHandler(p.Endpoint.Protocol(), func(s network.Stream) {
 		defer s.CloseRead()
@@ -135,8 +149,71 @@ func Main(c *cli.Context) error {
 	})
 	defer env.Host.RemoveStreamHandler(p.Endpoint.Protocol())
 
-	<-ctx.Done()
-	return ctx.Err()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case v := <-sub.Out():
+			switch ev := v.(type) {
+			case event.EvtNATDeviceTypeChanged:
+				slog.InfoContext(ctx, "NAT device type changed",
+					"device type", ev.NatDeviceType)
+			case event.EvtLocalReachabilityChanged:
+				slog.InfoContext(ctx, "local reachability changed",
+					"reachability", ev.Reachability)
+			case event.EvtHostReachableAddrsChanged:
+				slog.DebugContext(ctx, "host reachable addresses changed",
+					"reachable", ev.Reachable,
+					"unreachable", ev.Unreachable,
+					"unknown", ev.Unknown)
+			case event.EvtLocalAddressesUpdated:
+				r, err := ev.SignedPeerRecord.Record()
+				if err != nil {
+					return err
+				}
+				signer, err := peer.IDFromPublicKey(ev.SignedPeerRecord.PublicKey)
+				if err != nil {
+					return err
+				}
+				slog.DebugContext(ctx, "local addresses updated",
+					"current", ev.Current,
+					"diffs", ev.Diffs,
+					"peer", r.(*peer.PeerRecord).PeerID,
+					"addrs", r.(*peer.PeerRecord).Addrs,
+					"seq", r.(*peer.PeerRecord).Seq,
+					"signer", signer)
+			case event.EvtPeerIdentificationCompleted:
+				slog.DebugContext(ctx, "peer identification completed",
+					"peer", ev.Peer,
+					"agent-version", ev.AgentVersion,
+					"protocol-version", ev.ProtocolVersion,
+					"protocols", ev.Protocols)
+			case event.EvtPeerIdentificationFailed:
+				slog.WarnContext(ctx, "peer identification failed",
+					"peer", ev.Peer,
+					"reason", ev.Reason)
+			case event.EvtAutoRelayAddrsUpdated:
+				slog.DebugContext(ctx, "auto relay addresses updated",
+					"addresses", ev.RelayAddrs)
+			case event.EvtPeerProtocolsUpdated:
+				slog.DebugContext(ctx, "peer protocols updated",
+					"peer", ev.Peer,
+					"added", ev.Added,
+					"removed", ev.Removed)
+			case event.EvtLocalProtocolsUpdated:
+				slog.DebugContext(ctx, "local protocols updated",
+					"added", ev.Added,
+					"removed", ev.Removed)
+			case event.EvtPeerConnectednessChanged:
+				slog.DebugContext(ctx, "peer connectedness changed",
+					"peer", ev.Peer,
+					"connectedness", ev.Connectedness)
+
+			default:
+				panic(v) // unhandled event
+			}
+		}
+	}
 }
 
 // resolveBinary resolves a binary path to WASM bytecode
