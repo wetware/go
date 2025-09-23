@@ -8,17 +8,16 @@ import (
 	"log/slog"
 	"os"
 	"syscall"
-	"time"
 
-	"github.com/libp2p/go-libp2p"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/urfave/cli/v2"
 	"github.com/wetware/go/cmd/internal/flags"
+	"github.com/wetware/go/util"
 )
+
+var env util.IPFSEnv
 
 func Command() *cli.Command {
 	return &cli.Command{
@@ -39,16 +38,17 @@ Examples:
 			&cli.StringFlag{
 				Name:    "ipfs",
 				EnvVars: []string{"WW_IPFS"},
-				Value:   "/dns4/localhost/tcp/5001/http",
+				Value:   "/ip4/127.0.0.1/tcp/5001/http",
 				Usage:   "IPFS API endpoint",
 			},
-			&cli.DurationFlag{
-				Name:    "timeout",
-				EnvVars: []string{"WW_TIMEOUT"},
-				Value:   30 * time.Second,
-				Usage:   "Connection timeout",
-			},
-		}, flags.CapabilityFlags()...),
+		}, append(flags.CapabilityFlags(), flags.P2PFlags()...)...),
+
+		Before: func(c *cli.Context) error {
+			return env.Boot(c.String("ipfs"))
+		},
+		After: func(c *cli.Context) error {
+			return env.Close()
+		},
 
 		Action: Main,
 	}
@@ -75,39 +75,49 @@ func Main(c *cli.Context) error {
 	protocolID := protocol.ID("/ww/0.1.0/" + procName)
 
 	// Create libp2p host in client mode
-	h, err := libp2p.New(libp2p.NoListenAddrs)
+	h, err := util.NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create host: %w", err)
 	}
 	defer h.Close()
 
-	// Set up DHT in client mode
-	dht, err := dual.New(
-		ctx,
-		h,
-		dual.DHTOption(
-			dht.Mode(dht.ModeClient), // Client mode
-		),
-	)
+	dht, err := env.NewDHT(ctx, h)
 	if err != nil {
-		return fmt.Errorf("failed to create DHT: %w", err)
+		return fmt.Errorf("failed to create DHT client: %w", err)
 	}
 	defer dht.Close()
 
-	// Bootstrap DHT
+	// Set up DHT readiness monitoring BEFORE bootstrapping
+	slog.DebugContext(ctx, "setting up DHT readiness monitoring")
+	readyChan := make(chan error, 1)
+	go func() {
+		readyChan <- util.WaitForDHTReady(ctx, dht)
+	}()
+
+	// Bootstrap the DHT to populate routing table with IPFS peers
+	slog.DebugContext(ctx, "bootstrapping DHT")
 	if err := dht.Bootstrap(ctx); err != nil {
-		slog.WarnContext(ctx, "failed to bootstrap DHT", "error", err)
+		return fmt.Errorf("failed to bootstrap DHT: %w", err)
 	}
 
-	// Find peer addresses using DHT
+	// Wait for DHT to be ready
+	slog.DebugContext(ctx, "waiting for DHT routing table to populate")
+	if err := <-readyChan; err != nil {
+		slog.WarnContext(ctx, "DHT may not be fully ready", "error", err)
+	}
+
+	// Use DHT for peer discovery
+	slog.DebugContext(ctx, "searching for peer via DHT", "peer", peerID.String()[:12])
+
+	// Try to find the peer using DHT
 	peerInfo, err := dht.FindPeer(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to find peer %s: %w", peerID, err)
+		return fmt.Errorf("failed to find peer %s via DHT: %w", peerID, err)
 	}
 
-	// Connect to peer
+	slog.DebugContext(ctx, "target peer found via DHT", "peer", peerInfo.ID.String()[:12])
 	if err := h.Connect(ctx, peerInfo); err != nil {
-		return fmt.Errorf("failed to connect to peer %s: %w", peerID, err)
+		return fmt.Errorf("failed to connect to peer %s: %w", peerInfo.ID, err)
 	}
 
 	// Open stream to peer
@@ -157,8 +167,8 @@ func bindStreamToStdio(ctx context.Context, stream network.Stream) error {
 	// This will trigger the echo server to respond and then close
 	stream.CloseWrite()
 
-	// Wait for BOTH streams to finish (linger behavior)
-	// Don't exit until both the write and read directions are complete
+	// Wait for the remote peer to finish processing and send response
+	// The echo server should now process the input and send back the echoed text
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
