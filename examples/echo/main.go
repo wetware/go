@@ -16,7 +16,8 @@ func main() {
 		os.Stderr.WriteString("Error copying stdin to stdout: " + err.Error() + "\n")
 		os.Exit(1)
 	}
-	// Return 0 to indicate successful completion
+	defer os.Stdout.Sync()
+	// implicitly returns 0 to indicate successful completion
 }
 
 // poll is the async entry point for stream-based processing.
@@ -31,4 +32,5 @@ func poll() {
 		os.Stderr.WriteString("Error in poll: " + err.Error() + "\n")
 		os.Exit(1)
 	}
+	defer os.Stdout.Sync()
 }
