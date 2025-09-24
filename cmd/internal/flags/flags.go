@@ -34,12 +34,6 @@ func CapabilityFlags() []cli.Flag {
 			EnvVars:  []string{"WW_WITH_EXEC"},
 		},
 		&cli.BoolFlag{
-			Name:     "with-mdns",
-			Category: "CAPABILITIES",
-			Usage:    "grant mDNS peer discovery capability",
-			EnvVars:  []string{"WW_WITH_MDNS"},
-		},
-		&cli.BoolFlag{
 			Name:     "with-p2p",
 			Category: "CAPABILITIES",
 			Usage:    "grant P2P networking capability",
@@ -57,22 +51,6 @@ func P2PFlags() []cli.Flag {
 			Aliases:  []string{"j"},
 			Usage:    "connect to cluster through specified peers",
 			EnvVars:  []string{"WW_JOIN"},
-		},
-		&cli.StringFlag{
-			Name:     "discover",
-			Category: "P2P",
-			Aliases:  []string{"d"},
-			Usage:    "automatic peer discovery settings",
-			Value:    "/mdns",
-			EnvVars:  []string{"WW_DISCOVER"},
-		},
-		&cli.StringFlag{
-			Name:     "namespace",
-			Category: "P2P",
-			Aliases:  []string{"ns"},
-			Usage:    "cluster namespace (must match dial host)",
-			Value:    "ww",
-			EnvVars:  []string{"WW_NAMESPACE"},
 		},
 		&cli.BoolFlag{
 			Name:     "dial",
