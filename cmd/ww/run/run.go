@@ -9,11 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/ipfs/boxo/path"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/urfave/cli/v2"
@@ -134,20 +136,39 @@ func Main(c *cli.Context) error {
 		"peer", env.Host.ID(),
 		"endpoint", p.Endpoint.Name)
 
-	env.Host.SetStreamHandler(p.Endpoint.Protocol(), func(s network.Stream) {
+	// Set up stream handler that matches both exact protocol and with method suffix
+	baseProto := p.Endpoint.Protocol()
+	env.Host.SetStreamHandlerMatch(baseProto, func(protocol protocol.ID) bool {
+		// Match exact base protocol (/ww/0.1.0/<proc-id>) or with method suffix (/ww/0.1.0/<proc-id>/<method>)
+		return protocol == baseProto || strings.HasPrefix(string(protocol), string(baseProto)+"/")
+	}, func(s network.Stream) {
 		defer s.CloseRead()
+
+		// Extract method from protocol string
+		method := "poll" // default
+		protocolStr := string(s.Protocol())
+		if strings.HasPrefix(protocolStr, string(baseProto)+"/") {
+			// Extract method from /ww/0.1.0/<proc-id>/<method>
+			parts := strings.Split(protocolStr, "/")
+			if len(parts) > 0 {
+				method = parts[len(parts)-1]
+			}
+		}
+
 		slog.InfoContext(ctx, "stream connected",
 			"peer", s.Conn().RemotePeer(),
 			"stream-id", s.ID(),
-			"endpoint", p.Endpoint.Name)
-		if err := p.Poll(ctx, s, nil); err != nil {
+			"endpoint", p.Endpoint.Name,
+			"method", method)
+		if err := p.ProcessMessage(ctx, s, method); err != nil {
 			slog.ErrorContext(ctx, "failed to poll process",
 				"id", p.ID(),
 				"stream", s.ID(),
+				"method", method,
 				"reason", err)
 		}
 	})
-	defer env.Host.RemoveStreamHandler(p.Endpoint.Protocol())
+	defer env.Host.RemoveStreamHandler(baseProto)
 
 	for {
 		select {
