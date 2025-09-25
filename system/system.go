@@ -5,13 +5,11 @@ import (
 	"io"
 
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"golang.org/x/sync/semaphore"
 )
 
 type Endpoint struct {
 	Name string
 	io.ReadWriteCloser
-	sem *semaphore.Weighted
 }
 
 // Read implements io.Reader for Endpoint
