@@ -227,7 +227,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		mockStream.EXPECT().Read(gomock.Any()).Return(0, io.EOF).AnyTimes()
 
 		// Actually call the Poll method - this should succeed since we have a valid WASM function
-		err = proc.ProcessMessage(ctx, mockStream)
+		err = proc.ProcessMessage(ctx, mockStream, "poll")
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -278,7 +278,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		assert.NotNil(t, pollFunc, "poll function should exist")
 
 		// Actually call the ProcessMessage method to trigger the mock expectations
-		err = proc.ProcessMessage(ctxWithDeadline, mockStream)
+		err = proc.ProcessMessage(ctxWithDeadline, mockStream, "poll")
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -303,7 +303,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		deadlineErr := errors.New("deadline error")
 		mockStream.EXPECT().SetReadDeadline(deadline).Return(deadlineErr)
 
-		err := proc.ProcessMessage(ctxWithDeadline, mockStream)
+		err := proc.ProcessMessage(ctxWithDeadline, mockStream, "poll")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "set read deadline")
 		assert.Contains(t, err.Error(), "deadline error")
@@ -691,7 +691,7 @@ func TestEcho_Asynchronous(t *testing.T) {
 
 	// Process message with the mock stream
 	// This should process one complete message (until EOF)
-	err = proc.ProcessMessage(ctx, mockStream)
+	err = proc.ProcessMessage(ctx, mockStream, "poll")
 	require.NoError(t, err, "ProcessMessage should succeed")
 
 	// Verify the output matches the input
@@ -781,7 +781,7 @@ func TestEcho_RepeatedAsync(t *testing.T) {
 				AnyTimes()
 
 			// Process message with the mock stream
-			err = proc.ProcessMessage(ctx, mockStream)
+			err = proc.ProcessMessage(ctx, mockStream, "poll")
 			require.NoError(t, err, "ProcessMessage should succeed for message %d", i+1)
 
 			// Verify the output matches the input
