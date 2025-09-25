@@ -218,16 +218,17 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		defer proc.Close(ctx)
 		defer runtime.Close(ctx)
 
-		// Test that poll function exists
-		pollFunc := proc.Module.ExportedFunction("poll")
-		assert.NotNil(t, pollFunc, "poll function should exist")
+		// Test that echo function exists
+		echoFunc := proc.Module.ExportedFunction("echo")
+		assert.NotNil(t, echoFunc, "echo function should exist")
 
 		// The echo WASM module will try to read from stdin, so we need to expect Read calls
-		// The poll function reads up to 512 bytes from stdin
+		// The echo function reads up to 512 bytes from stdin
 		mockStream.EXPECT().Read(gomock.Any()).Return(0, io.EOF).AnyTimes()
+		mockStream.EXPECT().Reset().Return(nil).AnyTimes()
 
-		// Actually call the Poll method - this should succeed since we have a valid WASM function
-		err = proc.ProcessMessage(ctx, mockStream, "poll")
+		// Actually call the ProcessMessage method - this should succeed since we have a valid WASM function
+		err = proc.ProcessMessage(ctx, mockStream, "echo")
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -272,13 +273,14 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		mockStream.EXPECT().SetReadDeadline(deadline).Return(nil)
 		// The echo WASM module will try to read from stdin
 		mockStream.EXPECT().Read(gomock.Any()).Return(0, io.EOF).AnyTimes()
+		mockStream.EXPECT().Reset().Return(nil).AnyTimes()
 
-		// Test that poll function exists (for async mode)
-		pollFunc := proc.Module.ExportedFunction("poll")
-		assert.NotNil(t, pollFunc, "poll function should exist")
+		// Test that echo function exists (for async mode)
+		echoFunc := proc.Module.ExportedFunction("echo")
+		assert.NotNil(t, echoFunc, "echo function should exist")
 
 		// Actually call the ProcessMessage method to trigger the mock expectations
-		err = proc.ProcessMessage(ctxWithDeadline, mockStream, "poll")
+		err = proc.ProcessMessage(ctxWithDeadline, mockStream, "echo")
 		// The WASM function should execute successfully
 		assert.NoError(t, err)
 	})
@@ -303,7 +305,7 @@ func TestProc_Poll_WithGomock(t *testing.T) {
 		deadlineErr := errors.New("deadline error")
 		mockStream.EXPECT().SetReadDeadline(deadline).Return(deadlineErr)
 
-		err := proc.ProcessMessage(ctxWithDeadline, mockStream, "poll")
+		err := proc.ProcessMessage(ctxWithDeadline, mockStream, "echo")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "set read deadline")
 		assert.Contains(t, err.Error(), "deadline error")
@@ -547,9 +549,9 @@ func TestProc_Integration_WithRealWasm(t *testing.T) {
 	assert.NotEmpty(t, proc.Endpoint.Name, "Endpoint should have a name")
 	assert.NotEmpty(t, proc.ID(), "String should not be empty")
 
-	// Test that the poll function is exported
-	pollFunc := proc.Module.ExportedFunction("poll")
-	assert.NotNil(t, pollFunc, "poll function should be exported")
+	// Test that the echo function is exported
+	echoFunc := proc.Module.ExportedFunction("echo")
+	assert.NotNil(t, echoFunc, "echo function should be exported")
 }
 
 // TestEcho_Synchronous tests the echo example in synchronous mode
@@ -689,9 +691,14 @@ func TestEcho_Asynchronous(t *testing.T) {
 		Return(nil).
 		AnyTimes()
 
+	mockStream.EXPECT().
+		Reset().
+		Return(nil).
+		AnyTimes()
+
 	// Process message with the mock stream
 	// This should process one complete message (until EOF)
-	err = proc.ProcessMessage(ctx, mockStream, "poll")
+	err = proc.ProcessMessage(ctx, mockStream, "echo")
 	require.NoError(t, err, "ProcessMessage should succeed")
 
 	// Verify the output matches the input
@@ -780,8 +787,13 @@ func TestEcho_RepeatedAsync(t *testing.T) {
 				Return(nil).
 				AnyTimes()
 
+			mockStream.EXPECT().
+				Reset().
+				Return(nil).
+				AnyTimes()
+
 			// Process message with the mock stream
-			err = proc.ProcessMessage(ctx, mockStream, "poll")
+			err = proc.ProcessMessage(ctx, mockStream, "echo")
 			require.NoError(t, err, "ProcessMessage should succeed for message %d", i+1)
 
 			// Verify the output matches the input
