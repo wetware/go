@@ -26,7 +26,9 @@ func TestIPFS_Env(t *testing.T) {
 	require.NoError(t, err)
 
 	ipfs, err := rpc.NewLocalApi()
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("IPFS not available: %v", err)
+	}
 
 	dir, err := ipfs.Unixfs().Ls(context.Background(), root)
 	require.NoError(t, err)
@@ -48,7 +50,9 @@ func TestIPFS_FS(t *testing.T) {
 	require.NoError(t, err)
 
 	ipfs, err := rpc.NewLocalApi()
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("IPFS not available: %v", err)
+	}
 
 	fs := system.IPFS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}
 	err = fstest.TestFS(fs,
@@ -68,7 +72,9 @@ func TestIPFS_SubFS(t *testing.T) {
 	require.NoError(t, err)
 
 	ipfs, err := rpc.NewLocalApi()
-	require.NoError(t, err)
+	if err != nil {
+		t.Skipf("IPFS not available: %v", err)
+	}
 
 	fs, err := fs.Sub(system.IPFS{Ctx: context.Background(), Unix: ipfs.Unixfs(), Root: root}, "fs")
 	require.NoError(t, err)
