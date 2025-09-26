@@ -21,6 +21,7 @@ import (
 )
 
 type ProcConfig struct {
+	IPFS      IPFS
 	Host      host.Host
 	Runtime   wazero.Runtime
 	Src       io.ReadCloser
@@ -76,7 +77,7 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 	}
 
 	// Configure module instantiation based on async mode
-	config := c.NewModuleConfig(e)
+	config := c.NewModuleConfig(ctx, e)
 
 	mod, err := c.Runtime.InstantiateModule(ctx, cm, config)
 	if err != nil {
@@ -107,7 +108,8 @@ func (c ProcConfig) New(ctx context.Context) (*Proc, error) {
 		Config:   c,
 		Module:   mod,
 		Endpoint: e,
-		Closer:   cs}
+		Closer:   cs,
+		sem:      semaphore.NewWeighted(1)}
 	return proc, nil
 }
 
@@ -116,13 +118,14 @@ type ReadWriteStringer interface {
 	io.ReadWriter
 }
 
-func (c ProcConfig) NewModuleConfig(sock ReadWriteStringer) wazero.ModuleConfig {
+func (c ProcConfig) NewModuleConfig(ctx context.Context, sock ReadWriteStringer) wazero.ModuleConfig {
 	config := wazero.NewModuleConfig().
 		WithName(sock.String()).
 		WithArgs(c.Args...).
 		WithStdin(sock).
 		WithStdout(sock).
-		WithStderr(c.ErrWriter)
+		WithStderr(c.ErrWriter).
+		WithFSConfig(c.NewFSConfig(ctx))
 
 	// async mode?
 	if c.Async {
@@ -140,16 +143,25 @@ func (c ProcConfig) NewModuleConfig(sock ReadWriteStringer) wazero.ModuleConfig 
 	return config
 }
 
+func (c ProcConfig) NewFSConfig(ctx context.Context) wazero.FSConfig {
+	ipfs := IPFS{
+		Ctx:  ctx,
+		Unix: c.IPFS.Unix,
+		Root: c.IPFS.Root}
+
+	return wazero.NewFSConfig().
+		WithFSMount(ipfs, "/ipfs").
+		WithFSMount(ipfs, "/ipns").
+		WithFSMount(ipfs, "/ipld")
+}
+
 func (p ProcConfig) NewEndpoint() *Endpoint {
 	var buf [8]byte
 	if _, err := io.ReadFull(rand.Reader, buf[:]); err != nil {
 		panic(err)
 	}
 
-	return &Endpoint{
-		Name: base58.FastBase58Encoding(buf[:]),
-		sem:  semaphore.NewWeighted(1),
-	}
+	return &Endpoint{Name: base58.FastBase58Encoding(buf[:])}
 }
 
 type Proc struct {
@@ -157,6 +169,8 @@ type Proc struct {
 	Endpoint *Endpoint
 	Module   api.Module
 	api.Closer
+
+	sem *semaphore.Weighted
 }
 
 // ID returns the process identifier (endpoint name) without the protocol prefix.
@@ -199,6 +213,11 @@ func (p Proc) ProcessMessage(ctx context.Context, s network.Stream, method strin
 			_ = s.Reset()
 			return fmt.Errorf("unknown method: %s", method)
 		}
+
+		if err := p.sem.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("acquire semaphore: %w", err)
+		}
+		defer p.sem.Release(1)
 
 		if err := exp.CallWithStack(ctx, nil); err != nil {
 			var exitErr *sys.ExitError
