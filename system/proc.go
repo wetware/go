@@ -166,8 +166,8 @@ func (p Proc) ID() string {
 
 // ProcessMessage processes one complete message synchronously.
 // In sync mode: lets _start run automatically and process one message
-// In async mode: calls the poll export function
-func (p Proc) ProcessMessage(ctx context.Context, s network.Stream) error {
+// In async mode: calls the specified export function
+func (p Proc) ProcessMessage(ctx context.Context, s network.Stream, method string) error {
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := s.SetReadDeadline(deadline); err != nil {
 			return fmt.Errorf("set read deadline: %w", err)
@@ -187,14 +187,23 @@ func (p Proc) ProcessMessage(ctx context.Context, s network.Stream) error {
 		p.Endpoint.ReadWriteCloser = nil
 	}()
 
-	// In async mode, call the poll export function
+	// In async mode, call the specified export function
 	if p.Config.Async {
-		if poll := p.Module.ExportedFunction("poll"); poll == nil {
-			return fmt.Errorf("%s::poll: not found", p.ID())
-		} else if err := poll.CallWithStack(ctx, nil); err != nil {
+		// Normalize method: if empty string, use "poll"
+		if method == "" {
+			method = "poll"
+		}
+
+		exp := p.Module.ExportedFunction(method)
+		if exp == nil {
+			_ = s.Reset()
+			return fmt.Errorf("unknown method: %s", method)
+		}
+
+		if err := exp.CallWithStack(ctx, nil); err != nil {
 			var exitErr *sys.ExitError
 			if errors.As(err, &exitErr) && exitErr.ExitCode() != 0 {
-				return fmt.Errorf("%s::poll: %w", p.ID(), err)
+				return fmt.Errorf("%s::%s: %w", p.ID(), method, err)
 			}
 			// If it's ExitError with code 0, treat as success
 		}
@@ -202,11 +211,6 @@ func (p Proc) ProcessMessage(ctx context.Context, s network.Stream) error {
 	// In sync mode, _start already ran during module instantiation
 
 	return nil
-}
-
-// Poll is an alias for ProcessMessage for backward compatibility
-func (p Proc) Poll(ctx context.Context, s network.Stream, stack []uint64) error {
-	return p.ProcessMessage(ctx, s)
 }
 
 type CloserSlice []api.Closer

@@ -22,7 +22,7 @@ var env util.IPFSEnv
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "cat",
-		ArgsUsage: "<peer> <proc>",
+		ArgsUsage: "<peer> <proc> [method]",
 		Usage:     "Connect to a peer and execute a procedure over a stream",
 		Description: `Connect to a specified peer and execute a procedure over a custom protocol stream.
 The command will:
@@ -33,7 +33,8 @@ The command will:
 
 Examples:
   ww cat QmPeer123 /echo
-  ww cat 12D3KooW... /myproc`,
+  ww cat 12D3KooW... /myproc echo
+  ww cat 12D3KooW... /myproc poll`,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:    "ipfs",
@@ -58,12 +59,13 @@ func Main(c *cli.Context) error {
 	ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
 	defer cancel()
 
-	if c.NArg() != 2 {
-		return cli.Exit("cat requires exactly two arguments: <peer> <proc>", 1)
+	if c.NArg() < 3 {
+		return cli.Exit("cat requires 2-3 arguments: <peer> <proc> [method]", 1)
 	}
 
 	peerIDStr := c.Args().Get(0)
 	procName := c.Args().Get(1)
+	method := c.Args().Get(2)
 
 	// Parse peer ID
 	peerID, err := peer.Decode(peerIDStr)
@@ -73,6 +75,9 @@ func Main(c *cli.Context) error {
 
 	// Construct protocol ID
 	protocolID := protocol.ID("/ww/0.1.0/" + procName)
+	if method != "" && method != "poll" {
+		protocolID = protocol.ID("/ww/0.1.0/" + procName + "/" + method)
+	}
 
 	// Create libp2p host in client mode
 	h, err := util.NewClient()
